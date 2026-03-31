@@ -9,6 +9,8 @@ class Asignatura extends Model
 {
     protected $table = 'asignaturas';
     protected $primaryKey = 'ID_Asignatura';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'Codigo_Asignatura',

@@ -10,6 +10,8 @@ class Facultad extends Model
 {
     protected $table = 'facultades';
     protected $primaryKey = 'ID_Facultad';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Sede',

@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -30,8 +30,11 @@ interface Props {
 }
 
 export default function Normativas({ normativas, programas }: Props) {
-  const [data, setData] = useState<Normativa[]>(normativas.data);
-  const [meta, setMeta] = useState(normativas.meta);
+  const initialData = normativas?.data || [];
+  const initialMeta = normativas?.meta || { current_page: 1, total: 0, per_page: 20, last_page: 1 };
+  
+  const [data, setData] = useState<Normativa[]>(initialData);
+  const [meta, setMeta] = useState(initialMeta);
   const [loading, setLoading] = useState(false);
 
   const columns = [
@@ -51,51 +54,42 @@ export default function Normativas({ normativas, programas }: Props) {
     },
   ];
 
+  // Los datos se cargan desde el servidor via Inertia props
   const handleSearch = async (search: string, page: number = 1) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/normativas?search=${search}&page=${page}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const result = await response.json();
-      setData(result.data);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error('Error fetching normativas:', error);
+      if (!search) {
+        setData(initialData);
+        setMeta(initialMeta);
+      } else {
+        const filtered = initialData.filter(n => 
+          n.Tipo_Normativa?.toLowerCase().includes(search.toLowerCase()) ||
+          n.Numero_Normativa?.toLowerCase().includes(search.toLowerCase())
+        );
+        setData(filtered);
+        setMeta({ ...meta, total: filtered.length });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleRefresh = async () => {
-    await handleSearch('', 1);
+    setData(initialData);
+    setMeta(initialMeta);
   };
 
   const handleToggle = async (id: number) => {
-    try {
-      const response = await fetch(`/api/v1/normativas/${id}/toggle`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        handleRefresh();
-      }
-    } catch (error) {
-      console.error('Error toggling normativa:', error);
-    }
+    router.patch(`/normativas/${id}/toggle`, {}, {
+      onSuccess: () => handleRefresh(),
+    });
   };
 
   const actions = (row: Normativa) => (
     <div className="action-buttons">
-      <button 
-        className="btn-edit" 
-        onClick={() => window.location.href = `/normativas/${row.ID_Normativa}/edit`}
+      <button
+        className="btn-edit"
+        onClick={() => router.visit(`/normativas/${row.ID_Normativa}/edit`)}
         title="Editar"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -133,7 +127,7 @@ export default function Normativas({ normativas, programas }: Props) {
           <p className="page-subtitle">Administra las normativas de los programas</p>
         </div>
         <div className="page-actions">
-          <button className="btn-primary" onClick={() => window.location.href = '/normativas/create'}>
+          <button className="btn-primary" onClick={() => router.visit('/normativas/create')}>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>

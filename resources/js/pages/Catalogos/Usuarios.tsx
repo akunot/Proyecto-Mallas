@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -24,8 +24,11 @@ interface Props {
 }
 
 export default function Usuarios({ usuarios }: Props) {
-  const [data, setData] = useState<Usuario[]>(usuarios.data);
-  const [meta, setMeta] = useState(usuarios.meta);
+  const initialData = usuarios?.data || [];
+  const initialMeta = usuarios?.meta || { current_page: 1, total: 0, per_page: 20, last_page: 1 };
+  
+  const [data, setData] = useState<Usuario[]>(initialData);
+  const [meta, setMeta] = useState(initialMeta);
   const [loading, setLoading] = useState(false);
 
   const columns = [
@@ -48,51 +51,42 @@ export default function Usuarios({ usuarios }: Props) {
     },
   ];
 
+  // Los datos se cargan desde el servidor via Inertia props
   const handleSearch = async (search: string, page: number = 1) => {
     setLoading(true);
     try {
-      const response = await fetch(`/api/v1/usuarios?search=${search}&page=${page}`, {
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      const result = await response.json();
-      setData(result.data);
-      setMeta(result.meta);
-    } catch (error) {
-      console.error('Error fetching usuarios:', error);
+      if (!search) {
+        setData(initialData);
+        setMeta(initialMeta);
+      } else {
+        const filtered = initialData.filter(u => 
+          u.Nombre_Usuario.toLowerCase().includes(search.toLowerCase()) ||
+          u.Email_Usuario?.toLowerCase().includes(search.toLowerCase())
+        );
+        setData(filtered);
+        setMeta({ ...meta, total: filtered.length });
+      }
     } finally {
       setLoading(false);
     }
   };
 
   const handleRefresh = async () => {
-    await handleSearch('', 1);
+    setData(initialData);
+    setMeta(initialMeta);
   };
 
   const handleToggle = async (id: number) => {
-    try {
-      const response = await fetch(`/api/v1/usuarios/${id}/toggle`, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${localStorage.getItem('token')}`,
-          'Content-Type': 'application/json',
-        },
-      });
-      if (response.ok) {
-        handleRefresh();
-      }
-    } catch (error) {
-      console.error('Error toggling usuario:', error);
-    }
+    router.patch(`/usuarios/${id}/toggle`, {}, {
+      onSuccess: () => handleRefresh(),
+    });
   };
 
   const actions = (row: Usuario) => (
     <div className="action-buttons">
-      <button 
-        className="btn-edit" 
-        onClick={() => window.location.href = `/usuarios/${row.ID_Usuario}/edit`}
+      <button
+        className="btn-edit"
+        onClick={() => router.visit(`/usuarios/${row.ID_Usuario}/edit`)}
         title="Editar"
       >
         <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -132,7 +126,7 @@ export default function Usuarios({ usuarios }: Props) {
           <p className="page-subtitle">Administra los usuarios del sistema</p>
         </div>
         <div className="page-actions">
-          <button className="btn-primary" onClick={() => window.location.href = '/usuarios/create'}>
+          <button className="btn-primary" onClick={() => router.visit('/usuarios/create')}>
             <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
               <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
             </svg>

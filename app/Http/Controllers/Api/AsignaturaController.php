@@ -13,7 +13,6 @@ class AsignaturaController extends CatalogoController
     {
         $this->model = new Asignatura();
         $this->fillable = [
-            'ID_Asignatura',
             'Codigo_Asignatura',
             'Nombre_Asignatura',
             'Creditos_Asignatura',
@@ -23,9 +22,9 @@ class AsignaturaController extends CatalogoController
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         // Las asignaturas no tienen campo activo
-        return 'id';
+        return null;
     }
 }

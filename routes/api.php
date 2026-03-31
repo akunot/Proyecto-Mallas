@@ -10,6 +10,9 @@ use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\UsuarioController;
 use Illuminate\Support\Facades\Route;
 
+// Al inicio de routes/api.php, después de los use statements
+\Log::info('=== API REQUEST: ' . request()->method() . ' ' . request()->path());
+
 /*
 |--------------------------------------------------------------------------
 | API Routes
@@ -70,7 +73,7 @@ Route::prefix('v1/public')->group(function () {
 | RUTAS PROTEGIDAS (requieren autenticación)
 |--------------------------------------------------------------------------
 */
-Route::middleware('auth:sanctum')->prefix('v1')->group(function () {
+Route::middleware('auth.token')->prefix('v1')->group(function () {
     // Cierre de sesión
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     

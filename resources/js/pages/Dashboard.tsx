@@ -1,4 +1,4 @@
-import { Head } from '@inertiajs/react';
+import { Head, Link } from '@inertiajs/react';
 import MainLayout from '../Layout/MainLayout';
 
 export default function Dashboard() {
@@ -57,27 +57,13 @@ export default function Dashboard() {
                             </div>
                         </div>
                     </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-orange-100 rounded-full">
-                                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Mallas Activas</p>
-                                <p className="text-2xl font-semibold text-gray-900">0</p>
-                            </div>
-                        </div>
-                    </div>
                 </div>
 
                 {/* Acciones rápidas */}
                 <div className="bg-white rounded-lg shadow p-6">
                     <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                        <a
+                    <div className="grid grid-cols-1 md:grid-cols-1 gap-4">
+                        <Link
                             href="/sedes"
                             className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
                         >
@@ -90,38 +76,7 @@ export default function Dashboard() {
                                 <p className="font-medium text-gray-900">Gestionar Sedes</p>
                                 <p className="text-sm text-gray-500">Administrar sedes y facultades</p>
                             </div>
-                        </a>
-
-                        <a
-                            href="/cargas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Cargar Malla</p>
-                                <p className="text-sm text-gray-500">Subir archivo Excel de malla</p>
-                            </div>
-                        </a>
-
-                        <a
-                            href="/mallas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M2.458 12C3.732 7.943 7.523 5 12 5c4.478 0 8.268 2.943 9.542 7-1.274 4.057-5.064 7-9.542 7-4.477 0-8.268-2.943-9.542-7z" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Ver Mallas</p>
-                                <p className="text-sm text-gray-500">Consultar mallas curriculares</p>
-                            </div>
-                        </a>
+                        </Link>
                     </div>
                 </div>
             </div>

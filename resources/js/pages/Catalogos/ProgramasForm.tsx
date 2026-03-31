@@ -72,7 +72,6 @@ export default function ProgramasForm({ programa, facultades, errors: initialErr
     setErrors({});
 
     try {
-      const token = localStorage.getItem('token');
       const method = isEditing ? 'PUT' : 'POST';
       const url = isEditing 
         ? `/api/v1/programas/${programa.ID_Programa}` 
@@ -88,10 +87,10 @@ export default function ProgramasForm({ programa, facultades, errors: initialErr
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        credentials: 'same-origin', // Incluir cookies de sesión
         body: JSON.stringify(payload),
       });
 

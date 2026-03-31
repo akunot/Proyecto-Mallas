@@ -9,6 +9,8 @@ class ErrorCarga extends Model
 {
     protected $table = 'errores_carga';
     protected $primaryKey = 'ID_Error';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Carga',

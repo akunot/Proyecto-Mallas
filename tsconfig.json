@@ -117,5 +117,14 @@
         "resources/js/**/*.ts",
         "resources/js/**/*.d.ts",
         "resources/js/**/*.tsx"
-    ]
+    ],
+    "exclude": [
+        "node_modules",
+        "dist",
+        "build",
+        ".next",
+        "out",
+        "coverage",
+        "**/*.spec.ts"
+  ]
 }

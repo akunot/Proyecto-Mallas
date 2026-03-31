@@ -9,6 +9,8 @@ class Requisito extends Model
 {
     protected $table = 'requisitos';
     protected $primaryKey = 'ID_Requisito';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Agrup_Asig',

@@ -10,6 +10,8 @@ class Normativa extends Model
 {
     protected $table = 'normativas';
     protected $primaryKey = 'ID_Normativa';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Programa',

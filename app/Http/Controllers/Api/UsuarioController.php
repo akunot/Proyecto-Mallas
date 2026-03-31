@@ -13,14 +13,13 @@ class UsuarioController extends CatalogoController
     {
         $this->model = new Usuario();
         $this->fillable = [
-            'ID_Usuario',
             'Nombre_Usuario',
             'Email_Usuario',
             'Activo_Usuario',
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         return 'Activo_Usuario';
     }

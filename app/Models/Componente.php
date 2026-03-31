@@ -9,6 +9,8 @@ class Componente extends Model
 {
     protected $table = 'componentes';
     protected $primaryKey = 'ID_Componente';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'Nombre_Componente',

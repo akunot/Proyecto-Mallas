@@ -110,7 +110,17 @@ class CatalogoController extends Controller
         $record = $this->model->findOrFail($id);
 
         // Determinar el campo de activo
-        $activeField = $this->getActiveField();
+        $modelName = class_basename($this->model);
+        $activeField = $this->getActiveField($modelName);
+
+        // Si no hay campo activo, retornar error
+        if (!$activeField) {
+            return response()->json([
+                'data' => null,
+                'message' => 'Este catálogo no soporta activación/desactivación.',
+            ], 422);
+        }
+
         $newStatus = !$record->{$activeField};
 
         $record->update([$activeField => $newStatus]);
@@ -194,15 +204,17 @@ class CatalogoController extends Controller
     /**
      * Obtener el campo de activo del modelo
      */
-    protected function getActiveField(): string
+    private function getActiveField(string $model): ?string
     {
-        // Por defecto buscar campos activo
-        if (isset($this->model->{'Activo_' . ucfirst($this->routeName)})) {
-            return 'Activo_' . ucfirst($this->routeName);
-        }
-        if (isset($this->model->Esta_Activo)) {
-            return 'Esta_Activo';
-        }
-        return 'Activo_Usuario';
+        $map = [
+            'Sede'       => 'Activo_Sede',
+            'Facultad'   => 'Activo_Facultad',
+            'Programa'   => 'Activo_Programa',
+            'Normativa'  => 'Activo_Normativa',
+            'Componente' => 'Activo_Componente',
+            'Asignatura' => 'Activo_Asignatura',
+            'Usuario'    => 'Esta_Activo',
+        ];
+        return $map[$model] ?? null;
     }
 }

@@ -10,6 +10,8 @@ class MallaCurricular extends Model
 {
     protected $table = 'mallas_curriculares';
     protected $primaryKey = 'ID_Malla';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Normativa',

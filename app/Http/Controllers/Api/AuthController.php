@@ -130,17 +130,14 @@ class AuthController extends Controller
             ], 422);
         }
 
-        // Código válido: invalidar y generar token
+        // Código válido: invalidar código OTP
         $usuario->update([
             'Otp_Code' => null,
             'Otp_Expires_At' => null,
         ]);
 
-        // Crear token de Sanctum
-        $token = $usuario->createToken('auth-token')->plainTextToken;
-
-        // Nota: No usamos auth()->login() porque usaremos autenticación por tokens (Sanctum)
-        // Las rutas web protegidas usarán middleware auth:sanctum
+        // Hacer login para establecer sesión de cookie (para auth middleware)
+        auth()->login($usuario);
 
         // Crear respuesta JSON
         $response = response()->json([
@@ -150,8 +147,7 @@ class AuthController extends Controller
                     'id' => $usuario->ID_Usuario,
                     'nombre' => $usuario->Nombre_Usuario,
                     'email' => $usuario->Email_Usuario,
-                ],
-                'token' => $token,
+                ]
             ]
         ]);
 
@@ -160,11 +156,14 @@ class AuthController extends Controller
 
     /**
      * Cerrar sesión
-     * Invalida el token actual del usuario.
+     * Invalida la sesión del usuario.
      */
     public function logout(Request $request): JsonResponse
     {
-        $request->user()->currentAccessToken()->delete();
+        // Cerrar sesión y invalidar tokens de sesión
+        auth()->logout();
+        $request->session()->invalidate();
+        $request->session()->regenerateToken();
 
         return response()->json([
             'message' => 'Sesión cerrada exitosamente.',

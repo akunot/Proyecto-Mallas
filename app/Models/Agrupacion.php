@@ -10,6 +10,8 @@ class Agrupacion extends Model
 {
     protected $table = 'agrupaciones';
     protected $primaryKey = 'ID_Agrupacion';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Malla',

@@ -14,15 +14,14 @@ class ComponenteController extends CatalogoController
     {
         $this->model = new Componente();
         $this->fillable = [
-            'ID_Componente',
             'Nombre_Componente',
             'Descripcion_Componente',
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         // Los componentes no tienen campo activo
-        return 'id';
+        return null;
     }
 }

@@ -55,7 +55,6 @@ export default function FacultadesForm({ facultad, sedes, errors: initialErrors 
     setErrors({});
 
     try {
-      const token = localStorage.getItem('token');
       const method = isEditing ? 'PUT' : 'POST';
       const url = isEditing 
         ? `/api/v1/facultades/${facultad.ID_Facultad}` 
@@ -64,10 +63,10 @@ export default function FacultadesForm({ facultad, sedes, errors: initialErrors 
       const response = await fetch(url, {
         method,
         headers: {
-          'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
           'Accept': 'application/json',
         },
+        credentials: 'same-origin', // Incluir cookies de sesión
         body: JSON.stringify({
           ...formData,
           ID_Sede: parseInt(formData.ID_Sede),

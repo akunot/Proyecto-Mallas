@@ -1,10 +1,8 @@
-import { getAuthToken } from '../hooks/useAuthToken';
-
 const API_BASE_URL = '/api/v1';
 
 /**
- * Cliente API que obtiene el token de window.authToken (memoria)
- * en lugar de localStorage para mayor seguridad
+ * Cliente API que usa autenticación de sesión (cookies)
+ * en lugar de tokens Bearer para compatibilidad con auth de sesión
  */
 class ApiClient {
     private baseUrl: string;
@@ -14,17 +12,26 @@ class ApiClient {
     }
 
     private getHeaders(): HeadersInit {
-        const token = getAuthToken();
         const headers: HeadersInit = {
             'Content-Type': 'application/json',
             'Accept': 'application/json',
         };
 
-        if (token) {
-            headers['Authorization'] = `Bearer ${token}`;
+        return headers;
+    }
+
+    private getFetchOptions(method: string, data?: any): RequestInit {
+        const options: RequestInit = {
+            method,
+            headers: this.getHeaders(),
+            credentials: 'same-origin', // Incluir cookies de sesión
+        };
+
+        if (data !== undefined) {
+            options.body = JSON.stringify(data);
         }
 
-        return headers;
+        return options;
     }
 
     async get<T>(endpoint: string, params?: Record<string, any>): Promise<T> {
@@ -42,7 +49,7 @@ class ApiClient {
 
         const response = await fetch(url.toString(), {
             method: 'GET',
-            headers: this.getHeaders(),
+            ...this.getFetchOptions('GET'),
         });
 
         if (!response.ok) {
@@ -58,8 +65,7 @@ class ApiClient {
         const url = new URL(fullUrl, window.location.origin);
         const response = await fetch(url.toString(), {
             method: 'POST',
-            headers: this.getHeaders(),
-            body: data ? JSON.stringify(data) : undefined,
+            ...this.getFetchOptions('POST', data),
         });
 
         if (!response.ok) {
@@ -70,10 +76,12 @@ class ApiClient {
     }
 
     async put<T>(endpoint: string, data: any): Promise<T> {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+        const fullUrl = this.baseUrl + '/' + cleanEndpoint;
+        const url = new URL(fullUrl, window.location.origin);
+        const response = await fetch(url.toString(), {
             method: 'PUT',
-            headers: this.getHeaders(),
-            body: JSON.stringify(data),
+            ...this.getFetchOptions('PUT', data),
         });
 
         if (!response.ok) {
@@ -84,10 +92,12 @@ class ApiClient {
     }
 
     async patch<T>(endpoint: string, data?: any): Promise<T> {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+        const fullUrl = this.baseUrl + '/' + cleanEndpoint;
+        const url = new URL(fullUrl, window.location.origin);
+        const response = await fetch(url.toString(), {
             method: 'PATCH',
-            headers: this.getHeaders(),
-            body: data ? JSON.stringify(data) : undefined,
+            ...this.getFetchOptions('PATCH', data),
         });
 
         if (!response.ok) {
@@ -98,9 +108,12 @@ class ApiClient {
     }
 
     async delete<T>(endpoint: string): Promise<T> {
-        const response = await fetch(`${this.baseUrl}${endpoint}`, {
+        const cleanEndpoint = endpoint.startsWith('/') ? endpoint.slice(1) : endpoint;
+        const fullUrl = this.baseUrl + '/' + cleanEndpoint;
+        const url = new URL(fullUrl, window.location.origin);
+        const response = await fetch(url.toString(), {
             method: 'DELETE',
-            headers: this.getHeaders(),
+            ...this.getFetchOptions('DELETE'),
         });
 
         if (!response.ok) {

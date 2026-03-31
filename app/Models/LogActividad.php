@@ -9,6 +9,8 @@ class LogActividad extends Model
 {
     protected $table = 'logs_actividad';
     protected $primaryKey = 'ID_Log';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Usuario',

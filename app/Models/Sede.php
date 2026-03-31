@@ -10,6 +10,8 @@ class Sede extends Model
 {
     protected $table = 'sedes';
     protected $primaryKey = 'ID_Sede';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'Nombre_Sede',

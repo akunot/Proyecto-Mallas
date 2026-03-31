@@ -15,7 +15,6 @@ class FacultadController extends CatalogoController
     {
         $this->model = new Facultad();
         $this->fillable = [
-            'ID_Facultad',
             'ID_Sede',
             'Nombre_Facultad',
             'Conmutador_Facultad',
@@ -25,10 +24,10 @@ class FacultadController extends CatalogoController
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         // Las facultades no tienen campo activo, siempre están activas
-        return 'id';
+        return null;
     }
 
     protected function getRelatedData(): array

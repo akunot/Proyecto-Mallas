@@ -10,6 +10,8 @@ class CargaMalla extends Model
 {
     protected $table = 'cargas_mallas';
     protected $primaryKey = 'ID_Carga';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Archivo',

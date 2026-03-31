@@ -15,7 +15,6 @@ class ProgramaController extends CatalogoController
     {
         $this->model = new Programa();
         $this->fillable = [
-            'ID_Programa',
             'ID_Facultad',
             'Codigo_Programa',
             'Nombre_Programa',
@@ -34,7 +33,7 @@ class ProgramaController extends CatalogoController
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         return 'Activo_Programa';
     }

@@ -1,4 +1,5 @@
 import { useState, FormEvent } from 'react';
+import { router } from '@inertiajs/react';
 import { useAuth } from '../../context/AuthContext';
 import { authApi } from '../../api/auth';
 
@@ -34,10 +35,14 @@ export default function Login() {
         setIsLoading(true);
 
         try {
+            console.log('[LOGIN] Verificando OTP...');
             await login(email, otp);
-            // Navegar al dashboard - Sanctum cookie se encarga de la autenticación
-            window.location.href = '/dashboard';
+            console.log('[LOGIN] Login exitoso!');
+            
+            // La sesión ya está establecida via cookie, navegar directamente
+            router.visit('/dashboard');
         } catch (err: any) {
+            console.error('[LOGIN] Error:', err);
             setError(err.response?.data?.message || 'Código inválido');
         } finally {
             setIsLoading(false);

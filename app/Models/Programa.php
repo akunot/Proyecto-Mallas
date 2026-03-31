@@ -10,6 +10,8 @@ class Programa extends Model
 {
     protected $table = 'programas';
     protected $primaryKey = 'ID_Programa';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Facultad',

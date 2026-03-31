@@ -3,7 +3,6 @@ import { authApi, AuthUser } from '../api/auth';
 
 interface AuthContextType {
     user: AuthUser | null;
-    token: string | null;
     isLoading: boolean;
     isAuthenticated: boolean;
     login: (email: string, code: string) => Promise<void>;
@@ -13,42 +12,26 @@ interface AuthContextType {
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
-// Variable global para almacenar el token (en memoria, no localStorage)
-declare global {
-    interface Window {
-        authToken: string | null;
-    }
-}
-
-window.authToken = null;
-
 export function AuthProvider({ children }: { children: ReactNode }) {
     const [user, setUser] = useState<AuthUser | null>(null);
-    const [token, setToken] = useState<string | null>(window.authToken);
     const [isLoading, setIsLoading] = useState(true);
 
-    // Verificar autenticación al cargar
+    // Verificar autenticación al cargar (sesión via cookie)
     useEffect(() => {
         const checkAuth = async () => {
-            if (!token) {
-                setIsLoading(false);
-                return;
-            }
-
             try {
                 const userData = await authApi.me();
                 setUser(userData.data);
             } catch (error) {
-                // Token inválido
-                window.authToken = null;
-                setToken(null);
+                // No autenticado o sesión expirada
+                setUser(null);
             } finally {
                 setIsLoading(false);
             }
         };
 
         checkAuth();
-    }, [token]);
+    }, []);
 
     const requestOtp = async (email: string) => {
         await authApi.requestOtp(email);
@@ -56,10 +39,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const login = async (email: string, code: string) => {
         const response = await authApi.verifyOtp(email, code);
-        const newToken = response.data.token;
-        
-        window.authToken = newToken;
-        setToken(newToken);
+        // La sesión se establece automáticamente via cookie por auth()->login()
         setUser(response.data.user);
     };
 
@@ -67,19 +47,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         try {
             await authApi.logout();
         } finally {
-            window.authToken = null;
-            setToken(null);
             setUser(null);
         }
     };
 
-    const isAuthenticated = !!user && !!token;
+    const isAuthenticated = !!user;
 
     return (
         <AuthContext.Provider
             value={{
                 user,
-                token,
                 isLoading,
                 isAuthenticated,
                 login,

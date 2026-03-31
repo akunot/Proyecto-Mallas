@@ -15,7 +15,6 @@ class NormativaController extends CatalogoController
     {
         $this->model = new Normativa();
         $this->fillable = [
-            'ID_Normativa',
             'ID_Programa',
             'Tipo_Normativa',
             'Numero_Normativa',
@@ -27,7 +26,7 @@ class NormativaController extends CatalogoController
         ];
     }
 
-    protected function getActiveField(): string
+    protected function getActiveField(string $model): ?string
     {
         return 'Esta_Activo';
     }

@@ -9,6 +9,8 @@ class DiffMalla extends Model
 {
     protected $table = 'diffs_mallas';
     protected $primaryKey = 'ID_Diff';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Carga',

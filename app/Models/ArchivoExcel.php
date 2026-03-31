@@ -10,6 +10,8 @@ class ArchivoExcel extends Model
 {
     protected $table = 'archivos_excel';
     protected $primaryKey = 'ID_Archivo';
+    public $incrementing = true;
+    protected $keyType = 'int';
 
     protected $fillable = [
         'ID_Usuario',
