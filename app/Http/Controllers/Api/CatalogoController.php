@@ -134,6 +134,20 @@ class CatalogoController extends Controller
     }
 
     /**
+     * Eliminar un registro
+     */
+    public function destroy(int $id)
+    {
+        $record = $this->model->findOrFail($id);
+        $record->delete();
+
+        return response()->json([
+            'data' => null,
+            'message' => ucfirst($this->routeName) . ' eliminado exitosamente.',
+        ]);
+    }
+
+    /**
      * Editar un registro - devuelve página de Inertia
      */
     public function edit(int $id)

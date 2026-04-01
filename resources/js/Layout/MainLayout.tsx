@@ -15,8 +15,7 @@ export default function Layout({ children }: LayoutProps) {
         { name: 'Sedes', href: '/sedes' },
         { name: 'Facultades', href: '/facultades' },
         { name: 'Programas', href: '/programas' },
-        { name: 'Mallas', href: '/mallas' },
-        { name: 'Cargas', href: '/cargas' },
+        { name: 'Usuarios', href: '/usuarios' },
     ];
 
     const isActive = (href: string) => url.startsWith(href);

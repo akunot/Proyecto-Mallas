@@ -1,7 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
 import MainLayout from '../Layout/MainLayout';
 
-export default function Dashboard() {
+interface Props {
+  sedesCount: number;
+  facultadesCount: number;
+  programasCount: number;
+}
+
+export default function Dashboard({ sedesCount, facultadesCount, programasCount }: Props) {
     return (
         <MainLayout>
             <Head title="Dashboard" />
@@ -25,7 +31,7 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Sedes</p>
-                                <p className="text-2xl font-semibold text-gray-900">1</p>
+                                <p className="text-2xl font-semibold text-gray-900">{sedesCount}</p>
                             </div>
                         </div>
                     </div>
@@ -39,7 +45,7 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Facultades</p>
-                                <p className="text-2xl font-semibold text-gray-900">4</p>
+                                <p className="text-2xl font-semibold text-gray-900">{facultadesCount}</p>
                             </div>
                         </div>
                     </div>
@@ -53,7 +59,7 @@ export default function Dashboard() {
                             </div>
                             <div className="ml-4">
                                 <p className="text-sm font-medium text-gray-500">Programas</p>
-                                <p className="text-2xl font-semibold text-gray-900">0</p>
+                                <p className="text-2xl font-semibold text-gray-900">{programasCount}</p>
                             </div>
                         </div>
                     </div>

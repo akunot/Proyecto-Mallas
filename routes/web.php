@@ -42,7 +42,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/auth/logout', [AuthController::class, 'logout']);
     
     // Dashboard
-    Route::inertia('/dashboard', 'Dashboard')->name('dashboard');
+    Route::get('/dashboard', function () {
+        $sedesCount = Sede::count();
+        $facultadesCount = Facultad::count();
+        $programasCount = Programa::count();
+        
+        return Inertia::render('Dashboard', [
+            'sedesCount' => $sedesCount,
+            'facultadesCount' => $facultadesCount,
+            'programasCount' => $programasCount,
+        ]);
+    })->name('dashboard');
     
     // Catálogos - Sedes
     Route::get('/sedes', function () {
@@ -62,13 +72,26 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/sedes/create', 'Catalogos/SedesForm', ['sedes' => []])->name('sedes.create');
     Route::get('/sedes/{id}/edit', [SedeController::class, 'edit']);
     Route::patch('/sedes/{id}/toggle', [SedeController::class, 'toggle']);
+    Route::delete('/sedes/{id}', [SedeController::class, 'destroy']);
     
     // Catálogos - Facultades
     Route::get('/facultades', function () {
         $facultades = Facultad::with('sede')->paginate(20);
+        $facultadesData = collect($facultades->items())->map(function ($facultad) {
+            return [
+                'ID_Facultad' => $facultad->ID_Facultad,
+                'ID_Sede' => $facultad->ID_Sede,
+                'Nombre_Facultad' => $facultad->Nombre_Facultad,
+                'Conmutador_Facultad' => $facultad->Conmutador_Facultad,
+                'Extension_Facultad' => $facultad->Extension_Facultad,
+                'Campus_Facultad' => $facultad->Campus_Facultad,
+                'Url_Facultad' => $facultad->Url_Facultad,
+                'Nombre_Sede' => $facultad->sede ? $facultad->sede->Nombre_Sede : null,
+            ];
+        });
         return Inertia::render('Catalogos/Facultades', [
             'facultades' => [
-                'data' => $facultades->items(),
+                'data' => $facultadesData,
                 'meta' => [
                     'current_page' => $facultades->currentPage(),
                     'total' => $facultades->total(),
@@ -78,9 +101,15 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('facultades');
-    Route::inertia('/facultades/create', 'Catalogos/FacultadesForm', ['sedes' => []])->name('facultades.create');
+    Route::get('/facultades/create', function () {
+        $sedes = Sede::select('ID_Sede', 'Nombre_Sede')->get();
+        return Inertia::render('Catalogos/FacultadesForm', [
+            'sedes' => $sedes,
+        ]);
+    })->name('facultades.create');
     Route::get('/facultades/{id}/edit', [FacultadController::class, 'edit']);
     Route::patch('/facultades/{id}/toggle', [FacultadController::class, 'toggle']);
+    Route::delete('/facultades/{id}', [FacultadController::class, 'destroy']);
     
     // Catálogos - Programas
     Route::get('/programas', function () {
