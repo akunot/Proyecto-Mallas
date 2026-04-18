@@ -45,8 +45,10 @@ class CatalogoController extends Controller
         $perPage = $request->per_page ?? 20;
         $results = $query->paginate($perPage);
 
+        $sanitizedItems = $this->sanitizeForJson($results->items());
+
         return response()->json([
-            'data' => $results->items(),
+            'data' => $sanitizedItems,
             'meta' => [
                 'current_page' => $results->currentPage(),
                 'total' => $results->total(),
@@ -63,9 +65,10 @@ class CatalogoController extends Controller
     public function show(int $id)
     {
         $record = $this->model->findOrFail($id);
+        $sanitizedRecord = $this->sanitizeForJson($record);
 
         return response()->json([
-            'data' => $record,
+            'data' => $sanitizedRecord,
             'message' => '',
         ]);
     }
@@ -78,9 +81,10 @@ class CatalogoController extends Controller
         $validated = $request->validate($this->getValidationRules('create'));
 
         $record = $this->model->create($validated);
+        $sanitizedRecord = $this->sanitizeForJson($record);
 
         return response()->json([
-            'data' => $record,
+            'data' => $sanitizedRecord,
             'message' => ucfirst($this->routeName) . ' creado exitosamente.',
         ], 201);
     }
@@ -95,9 +99,10 @@ class CatalogoController extends Controller
         $validated = $request->validate($this->getValidationRules('update'));
 
         $record->update($validated);
+        $sanitizedRecord = $this->sanitizeForJson($record);
 
         return response()->json([
-            'data' => $record,
+            'data' => $sanitizedRecord,
             'message' => ucfirst($this->routeName) . ' actualizado exitosamente.',
         ]);
     }
@@ -126,9 +131,10 @@ class CatalogoController extends Controller
         $record->update([$activeField => $newStatus]);
 
         $statusText = $newStatus ? 'activado' : 'desactivado';
+        $sanitizedRecord = $this->sanitizeForJson($record);
 
         return response()->json([
-            'data' => $record,
+            'data' => $sanitizedRecord,
             'message' => ucfirst($this->routeName) . ' ' . $statusText . ' exitosamente.',
         ]);
     }
@@ -145,6 +151,39 @@ class CatalogoController extends Controller
             'data' => null,
             'message' => ucfirst($this->routeName) . ' eliminado exitosamente.',
         ]);
+    }
+
+    /**
+     * Sanitiza datos para JSON asegurando codificación UTF-8 válida
+     */
+    protected function sanitizeForJson($data)
+    {
+        if (is_array($data)) {
+            return array_map([$this, 'sanitizeForJson'], $data);
+        }
+
+        if (is_object($data)) {
+            if ($data instanceof \Illuminate\Database\Eloquent\Collection) {
+                return $this->sanitizeForJson($data->toArray());
+            }
+            
+            if (method_exists($data, 'toArray')) {
+                return $this->sanitizeForJson($data->toArray());
+            }
+
+            $result = [];
+            foreach ($data as $key => $value) {
+                $result[$key] = $this->sanitizeForJson($value);
+            }
+            return $result;
+        }
+
+        if (is_string($data)) {
+            // Force valid UTF-8 encoding
+            return mb_convert_encoding($data, 'UTF-8', 'UTF-8');
+        }
+
+        return $data;
     }
 
     /**

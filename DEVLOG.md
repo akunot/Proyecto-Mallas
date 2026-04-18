@@ -181,6 +181,9 @@
 ### Fase 3: Carga de Excel y Flujo de Aprobación (Pendiente)
 
 #### 3.1 Carga de Excel
+- [x] Implementar creación de carga sin archivo en estado `esperando_archivos`
+- [x] Añadir endpoint `POST /api/cargas/{id}/archivo` para subir archivos tipados
+- [x] Añadir endpoint `POST /api/cargas/{id}/procesar` para lanzar el job
 - [ ] Servicio de parseo de Excel (Laravel Excel)
 - [ ] Validación de estructura del archivo
 - [ ] Detección de duplicados por hash SHA-256

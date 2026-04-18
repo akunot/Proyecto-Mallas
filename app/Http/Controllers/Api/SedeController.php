@@ -14,6 +14,7 @@ class SedeController extends CatalogoController
     {
         $this->model = new Sede();
         $this->fillable = [
+            'Codigo_Sede',
             'Nombre_Sede',
             'Ciudad_Sede',
             'Direccion_Sede',

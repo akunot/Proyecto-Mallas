@@ -15,8 +15,9 @@ return new class extends Migration
         Schema::create('archivos_excel', function (Blueprint $table) {
             $table->id('ID_Archivo');
             $table->unsignedBigInteger('ID_Usuario');
+            $table->string('Tipo_Archivo', 20);
             $table->string('Nombre_Archivo', 300);
-            $table->longText('Contenido_Archivo');
+            $table->binary('Contenido_Archivo');
             $table->bigInteger('Tamanio_Bytes')->unsigned();
             $table->string('Hash_Sha256', 64);
             $table->string('Estado_Procesamiento', 30)->default('pendiente');

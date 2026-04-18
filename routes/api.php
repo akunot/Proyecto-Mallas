@@ -8,12 +8,11 @@ use App\Http\Controllers\Api\NormativaController;
 use App\Http\Controllers\Api\ComponenteController;
 use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\Api\CargaController;
 use Illuminate\Support\Facades\Route;
 
-// Al inicio de routes/api.php, después de los use statements
-\Log::info('=== API REQUEST: ' . request()->method() . ' ' . request()->path());
-
 /*
+
 |--------------------------------------------------------------------------
 | API Routes
 |--------------------------------------------------------------------------
@@ -57,6 +56,11 @@ Route::prefix('v1/public')->group(function () {
     
     // Ver programas por facultad (público)
     Route::get('/facultades/{id}/programas', [ProgramaController::class, 'index']);
+    
+    // Test endpoint - probar si la API responde
+    Route::get('/test', function() {
+        return response()->json(['message' => 'API funcionando', 'status' => 'ok']);
+    });
     
     // Ver mallas vigentes de todos los programas (público)
     // Route::get('/mallas', [MallaController::class, 'publicIndex']);
@@ -129,5 +133,23 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::patch('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle']);
         
         // Mallas y cargas (Fase 3+)
-        // Estas rutas se implementarán en fases posteriores
+        Route::get('/cargas', [CargaController::class, 'index']);
+        Route::post('/cargas', [CargaController::class, 'store']);
+        Route::get('/cargas/{id}', [CargaController::class, 'show']);
+        Route::post('/cargas/{id}/archivo', [CargaController::class, 'uploadArchivo']);
+        Route::post('/cargas/{id}/procesar', [CargaController::class, 'procesar']);
+        Route::get('/cargas/{id}/estado', [CargaController::class, 'estado']);
+        Route::get('/cargas/{id}/errores', [CargaController::class, 'errores']);
+        Route::get('/cargas/{id}/diff', [CargaController::class, 'diff']);
+        Route::patch('/cargas/{id}/enviar-revision', [CargaController::class, 'enviarRevision']);
+        Route::patch('/cargas/{id}/revisar', [CargaController::class, 'revisar']);
+        
+        // Test endpoint autenticado
+        Route::get('/test-auth', function() {
+            return response()->json([
+                'message' => 'Autenticado correctamente',
+                'user_id' => auth('web')->user()?->ID_Usuario,
+                'user_name' => auth('web')->user()?->Nombre_Usuario,
+            ]);
+        });
 });

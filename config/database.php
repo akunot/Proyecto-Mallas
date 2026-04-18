@@ -60,8 +60,12 @@ return [
             'strict' => true,
             'engine' => null,
             'options' => extension_loaded('pdo_mysql') ? array_filter([
+                defined('PDO::MYSQL_ATTR_CONNECT_TIMEOUT') ? PDO::MYSQL_ATTR_CONNECT_TIMEOUT : 0 => 60,
+                defined('PDO::MYSQL_ATTR_READ_TIMEOUT') ? PDO::MYSQL_ATTR_READ_TIMEOUT : 0 => 120,
+                defined('PDO::MYSQL_ATTR_WRITE_TIMEOUT') ? PDO::MYSQL_ATTR_WRITE_TIMEOUT : 0 => 120,
                 (PHP_VERSION_ID >= 80500 ? Mysql::ATTR_SSL_CA : PDO::MYSQL_ATTR_SSL_CA) => env('MYSQL_ATTR_SSL_CA'),
             ]) : [],
+            'sticky' => false,
         ],
 
         'mariadb' => [

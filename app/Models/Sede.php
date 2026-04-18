@@ -14,6 +14,7 @@ class Sede extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
+        'Codigo_Sede',
         'Nombre_Sede',
         'Ciudad_Sede',
         'Direccion_Sede',

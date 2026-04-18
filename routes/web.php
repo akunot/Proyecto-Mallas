@@ -69,7 +69,9 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('sedes');
-    Route::inertia('/sedes/create', 'Catalogos/SedesForm', ['sedes' => []])->name('sedes.create');
+    Route::get('/sedes/create', function () {
+        return Inertia::render('Catalogos/SedesForm');
+    })->name('sedes.create');
     Route::get('/sedes/{id}/edit', [SedeController::class, 'edit']);
     Route::patch('/sedes/{id}/toggle', [SedeController::class, 'toggle']);
     Route::delete('/sedes/{id}', [SedeController::class, 'destroy']);
@@ -81,6 +83,7 @@ Route::middleware(['auth'])->group(function () {
             return [
                 'ID_Facultad' => $facultad->ID_Facultad,
                 'ID_Sede' => $facultad->ID_Sede,
+                'Codigo_Facultad' => $facultad->Codigo_Facultad,
                 'Nombre_Facultad' => $facultad->Nombre_Facultad,
                 'Conmutador_Facultad' => $facultad->Conmutador_Facultad,
                 'Extension_Facultad' => $facultad->Extension_Facultad,
@@ -126,7 +129,12 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('programas');
-    Route::inertia('/programas/create', 'Catalogos/ProgramasForm', ['facultades' => []])->name('programas.create');
+    Route::get('/programas/create', function () {
+        $facultades = \App\Models\Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get();
+        return Inertia::render('Catalogos/ProgramasForm', [
+            'facultades' => $facultades,
+        ]);
+    })->name('programas.create');
     Route::get('/programas/{id}/edit', [ProgramaController::class, 'edit']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
     
@@ -145,7 +153,12 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('normativas');
-    Route::inertia('/normativas/create', 'Catalogos/NormativasForm', ['programas' => []])->name('normativas.create');
+    Route::get('/normativas/create', function () {
+        $programas = Programa::select('ID_Programa', 'Nombre_Programa')->where('Activo_Programa', 1)->get();
+        return Inertia::render('Catalogos/NormativasForm', [
+            'programas' => $programas,
+        ]);
+    })->name('normativas.create');
     Route::get('/normativas/{id}/edit', [NormativaController::class, 'edit']);
     Route::patch('/normativas/{id}/toggle', [NormativaController::class, 'toggle']);
     
@@ -206,7 +219,6 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/usuarios/{id}/edit', [UsuarioController::class, 'edit']);
     Route::patch('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle']);
     
-    // Mallas y cargas (Fase 3+) - Comentado: rutas huérfanas sin páginas implementadas
-    // Route::inertia('/mallas', 'Mallas/Index')->name('mallas');
-    // Route::inertia('/cargas', 'Cargas/Index')->name('cargas');
+    // Mallas y cargas (Fase 3+)
+    Route::inertia('/cargas', 'Cargas/Cargas')->name('cargas');
 });

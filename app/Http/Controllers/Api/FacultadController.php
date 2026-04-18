@@ -16,11 +16,13 @@ class FacultadController extends CatalogoController
         $this->model = new Facultad();
         $this->fillable = [
             'ID_Sede',
+            'Codigo_Facultad',
             'Nombre_Facultad',
             'Conmutador_Facultad',
             'Extension_Facultad',
             'Campus_Facultad',
             'Url_Facultad',
+            'Esta_Activo',
         ];
     }
 

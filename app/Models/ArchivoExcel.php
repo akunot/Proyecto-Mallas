@@ -13,17 +13,22 @@ class ArchivoExcel extends Model
     public $incrementing = true;
     protected $keyType = 'int';
 
+    // ✅ AÑADIR ESTO: nunca exponer el binario en JSON/arrays
+    protected $hidden = ['Contenido_Archivo'];
+
     protected $fillable = [
         'ID_Usuario',
+        'Tipo_Archivo',
         'Nombre_Archivo',
-        'Contenido_Archivo',
+        'Contenido_Archivo',   // fillable para escritura, pero hidden para lectura JSON
         'Tamanio_Bytes',
         'Hash_Sha256',
         'Estado_Procesamiento',
+        'Fecha_Subido',
     ];
 
     protected $casts = [
-        'Contenido_Archivo' => 'encrypted:256',
+        // El contenido se almacena como dato binario y no se expone en JSON
     ];
 
     public function usuario(): BelongsTo
@@ -31,8 +36,18 @@ class ArchivoExcel extends Model
         return $this->belongsTo(Usuario::class, 'ID_Usuario', 'ID_Usuario');
     }
 
-    public function cargas(): HasMany
+    public function cargasAsignaturas(): HasMany
     {
-        return $this->hasMany(CargaMalla::class, 'ID_Archivo', 'ID_Archivo');
+        return $this->hasMany(CargaMalla::class, 'ID_Archivo_Asignaturas', 'ID_Archivo');
+    }
+
+    public function cargasElectivas(): HasMany
+    {
+        return $this->hasMany(CargaMalla::class, 'ID_Archivo_Electivas', 'ID_Archivo');
+    }
+
+    public function cargasMalla(): HasMany
+    {
+        return $this->hasMany(CargaMalla::class, 'ID_Archivo_Malla', 'ID_Archivo');
     }
 }

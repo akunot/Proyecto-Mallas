@@ -14,10 +14,14 @@ class CargaMalla extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'ID_Archivo',
+        'ID_Archivo_Asignaturas',
+        'ID_Archivo_Electivas',
+        'ID_Archivo_Malla',
         'ID_Malla',
         'ID_Malla_Base',
         'ID_Usuario',
+        'ID_Programa',
+        'ID_Normativa',
         'Estado_Carga',
         'Comentario_Carga',
         'Comentario_Revisor',
@@ -31,12 +35,37 @@ class CargaMalla extends Model
 
     public function archivo(): BelongsTo
     {
-        return $this->belongsTo(ArchivoExcel::class, 'ID_Archivo', 'ID_Archivo');
+        return $this->belongsTo(ArchivoExcel::class, 'ID_Archivo_Malla', 'ID_Archivo');
+    }
+
+    public function archivoAsignaturas(): BelongsTo
+    {
+        return $this->belongsTo(ArchivoExcel::class, 'ID_Archivo_Asignaturas', 'ID_Archivo');
+    }
+
+    public function archivoElectivas(): BelongsTo
+    {
+        return $this->belongsTo(ArchivoExcel::class, 'ID_Archivo_Electivas', 'ID_Archivo');
+    }
+
+    public function archivoMalla(): BelongsTo
+    {
+        return $this->belongsTo(ArchivoExcel::class, 'ID_Archivo_Malla', 'ID_Archivo');
     }
 
     public function malla(): BelongsTo
     {
         return $this->belongsTo(MallaCurricular::class, 'ID_Malla', 'ID_Malla');
+    }
+
+    public function normativa(): BelongsTo
+    {
+        return $this->belongsTo(Normativa::class, 'ID_Normativa', 'ID_Normativa');
+    }
+
+    public function programa(): BelongsTo
+    {
+        return $this->belongsTo(Programa::class, 'ID_Programa', 'ID_Programa');
     }
 
     public function mallaBase(): BelongsTo

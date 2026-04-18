@@ -13,6 +13,7 @@ class SedeSeeder extends Seeder
     public function run(): void
     {
         Sede::create([
+            'Codigo_Sede' => 1,
             'Nombre_Sede' => 'Universidad Nacional de Colombia - Sede Manizales',
             'Ciudad_Sede' => 'Manizales',
             'Direccion_Sede' => 'Carrera 27 # 64-60',
