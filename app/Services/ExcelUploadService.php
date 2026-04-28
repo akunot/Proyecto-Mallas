@@ -13,17 +13,20 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ExcelUploadService
 {
-    public function createCarga(int $normativaId, ?int $mallaBaseId, int $userId): array
+    public function createCarga(?int $normativaId, ?int $mallaBaseId, int $userId, string $tipoCarga): array
     {
-        $normativa = Normativa::findOrFail($normativaId);
-        $programaId = $normativa->ID_Programa;
+        $programaId = null;
+        if ($normativaId) {
+            $normativa = Normativa::findOrFail($normativaId);
+            $programaId = $normativa->ID_Programa;
 
-        if ($mallaBaseId && !MallaCurricular::where('ID_Malla', $mallaBaseId)->where('ID_Programa', $programaId)->exists()) {
-            return [
-                'success' => false,
-                'message' => 'La malla base seleccionada no pertenece al programa de la normativa.',
-                'status' => 400,
-            ];
+            if ($mallaBaseId && !MallaCurricular::where('ID_Malla', $mallaBaseId)->where('ID_Programa', $programaId)->exists()) {
+                return [
+                    'success' => false,
+                    'message' => 'La malla base seleccionada no pertenece al programa de la normativa.',
+                    'status' => 400,
+                ];
+            }
         }
 
         $carga = CargaMalla::create([
@@ -35,6 +38,7 @@ class ExcelUploadService
             'ID_Usuario' => $userId,
             'ID_Programa' => $programaId,
             'ID_Normativa' => $normativaId,
+            'tipo_carga' => $tipoCarga,
             'Estado_Carga' => 'esperando_archivos',
         ]);
 
@@ -74,7 +78,7 @@ class ExcelUploadService
         $archivo = ArchivoExcel::create([
             'ID_Usuario' => $userId,
             'Tipo_Archivo' => $tipoArchivo,
-            'Nombre_Archivo' => $file->getClientOriginalName(),
+            'Nombre_Archivo' => $this->sanitizeUtf8($file->getClientOriginalName()),
             'Contenido_Archivo' => $file->getContent(),
             'Tamanio_Bytes' => $file->getSize(),
             'Hash_Sha256' => $hash,
@@ -88,7 +92,16 @@ class ExcelUploadService
             $this->deleteArchivoIfOrphaned($previousArchivoId);
         }
 
-        if ($carga->ID_Archivo_Asignaturas && $carga->ID_Archivo_Electivas && $carga->ID_Archivo_Malla) {
+        $isReadyToProcess = false;
+        if ($carga->tipo_carga === 'malla') {
+            $isReadyToProcess = $carga->ID_Archivo_Asignaturas && $carga->ID_Archivo_Electivas && $carga->ID_Archivo_Malla;
+        } elseif ($carga->tipo_carga === 'asignaturas') {
+            $isReadyToProcess = $field === 'ID_Archivo_Asignaturas';
+        } elseif ($carga->tipo_carga === 'electivas') {
+            $isReadyToProcess = $field === 'ID_Archivo_Electivas';
+        }
+
+        if ($isReadyToProcess) {
             $carga->update(['Estado_Carga' => 'listo_para_procesar']);
         }
 
@@ -125,8 +138,13 @@ class ExcelUploadService
         }
     }
 
-    private function isDuplicateArchivo(int $programaId, string $hash, string $tipoArchivo, int $excludeCargaId): bool
+    private function isDuplicateArchivo(?int $programaId, string $hash, string $tipoArchivo, int $excludeCargaId): bool
     {
+        // Si no hay programaId (para cargas de asignaturas/electivas sin normativa), no validar duplicados
+        if (!$programaId) {
+            return false;
+        }
+
         return CargaMalla::where('ID_Programa', $programaId)
             ->where('ID_Carga', '<>', $excludeCargaId)
             ->where(function ($query) use ($hash, $tipoArchivo) {
@@ -144,345 +162,16 @@ class ExcelUploadService
             ->exists();
     }
 
-    private function parseProgramaFromExcel($spreadsheet): array
-    {
-        try {
-            // Try different sheet names
-            $sheetName = null;
-            foreach (['Programas', 'programas', 'PROGRAMA', 'PROGRAMA'] as $name) {
-                if ($spreadsheet->getSheetByName($name)) {
-                    $sheetName = $name;
-                    break;
-                }
-            }
-            
-            if (!$sheetName) {
-                // Try to find any sheet with "programa" in the name
-                foreach ($spreadsheet->getSheetNames() as $name) {
-                    if (stripos($name, 'programa') !== false) {
-                        $sheetName = $name;
-                        break;
-                    }
-                }
-            }
-            
-            if (!$sheetName) {
-                return [];
-            }
-            
-            $sheet = $spreadsheet->getSheetByName($sheetName);
-            $rows = $sheet->toArray();
-            if (count($rows) < 2) {
-                return [];
-            }
-            
-            $data = $rows[1];
-            
-            // Column mapping: 
-            // 0 = ID, 1 = PROGRAMA (name), 2 = SNIES, etc.
-            $programaNombre = $this->sanitizeUtf8($this->cleanCell($data[1] ?? ''));
-            $snies = $this->sanitizeUtf8($this->cleanCell($data[2] ?? ''));
-            
-            return [
-                'codigo' => $snies,
-                'nombre' => $programaNombre,
-                'snies' => $snies,
-            ];
-        } catch (\Exception $e) {
-            return [];
-        }
-    }
-
-    private function parseSedeFromExcel($spreadsheet): ?int
-    {
-        try {
-            // Try to find from "Sede" sheet
-            $sheet = $spreadsheet->getSheetByName('Sede');
-            if ($sheet) {
-                $rows = $sheet->toArray();
-                if (count($rows) >= 2) {
-                    $data = $rows[1];
-                    // Column 0 is ID, column 1 is SEDE name
-                    $sedeCodigo = !empty($data[0]) ? (int)$data[0] : null;
-                    $sedeNombre = $this->cleanCell($data[1] ?? '');
-                    
-                    if ($sedeCodigo) {
-                        $sede = \App\Models\Sede::where('Codigo_Sede', $sedeCodigo)->first();
-                        if ($sede) {
-                            return $sede->ID_Sede;
-                        }
-                        
-                        // Try by ID
-                        $sede = \App\Models\Sede::find($sedeCodigo);
-                        if ($sede) {
-                            $sede->update(['Codigo_Sede' => $sedeCodigo]);
-                            return $sede->ID_Sede;
-                        }
-                        
-                        // Create new
-                        $sede = \App\Models\Sede::create([
-                            'Codigo_Sede' => $sedeCodigo,
-                            'Nombre_Sede' => $sedeNombre ?: 'Universidad Nacional de Colombia - Sede Manizales',
-                            'Ciudad_Sede' => 'Manizales',
-                        ]);
-                        return $sede->ID_Sede;
-                    }
-                }
-            }
-            
-            // Try to find from "Facultades" sheet
-            foreach (['Facultades', 'facultades'] as $name) {
-                $sheet = $spreadsheet->getSheetByName($name);
-                if ($sheet) {
-                    $rows = $sheet->toArray();
-                    if (count($rows) >= 2) {
-                        $data = $rows[1];
-                        $sedeIdFromExcel = !empty($data[1]) ? (int)$data[1] : null; // Column 1 seems to be SEDE (ID)
-                        
-                        if ($sedeIdFromExcel) {
-                            $sede = \App\Models\Sede::where('Codigo_Sede', $sedeIdFromExcel)->first();
-                            if ($sede) {
-                                return $sede->ID_Sede;
-                            }
-                            
-                            $sede = \App\Models\Sede::find($sedeIdFromExcel);
-                            if ($sede) {
-                                $sede->update(['Codigo_Sede' => $sedeIdFromExcel]);
-                                return $sede->ID_Sede;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // If still nothing, get the first existing sede
-            $sede = \App\Models\Sede::first();
-            if ($sede) {
-                return $sede->ID_Sede;
-            }
-            
-            // Create default sede
-            $sede = \App\Models\Sede::create([
-                'Codigo_Sede' => 1,
-                'Nombre_Sede' => 'Universidad Nacional de Colombia - Sede Manizales',
-                'Ciudad_Sede' => 'Manizales',
-            ]);
-            return $sede->ID_Sede;
-            
-        } catch (\Exception $e) {
-            \Log::error('Error parsing sede from Excel:', ['error' => $e->getMessage()]);
-            return null;
-        }
-    }
-
-    private function parseFacultadFromExcel($spreadsheet, ?int $sedeId = null): ?int
-    {
-        try {
-            // First, look for the relationship in the "Programas" sheet - column for FACULTAD (ID)
-            $sheetName = null;
-            foreach (['Programas', 'programas', 'PROGRAMA'] as $name) {
-                if ($spreadsheet->getSheetByName($name)) {
-                    $sheetName = $name;
-                    break;
-                }
-            }
-            
-            if ($sheetName) {
-                $sheet = $spreadsheet->getSheetByName($sheetName);
-                $rows = $sheet->toArray();
-                if (count($rows) >= 2) {
-                    $data = $rows[1];
-                    
-                    // Column 4 is "FACULTAD (ID)" - use this as Codigo_Facultad
-                    $facultadCodigo = !empty($data[4]) ? (int)$data[4] : null;
-                    
-                    if ($facultadCodigo) {
-                        // First try to find by Codigo_Facultad
-                        $facultad = \App\Models\Facultad::where('Codigo_Facultad', $facultadCodigo)->first();
-                        if ($facultad) {
-                            return $facultad->ID_Facultad;
-                        }
-                        
-                        // If not found, try by ID directly
-                        $facultad = \App\Models\Facultad::find($facultadCodigo);
-                        if ($facultad) {
-                            // Update its Codigo_Facultad to match Excel
-                            $facultad->update(['Codigo_Facultad' => $facultadCodigo]);
-                            return $facultad->ID_Facultad;
-                        }
-                        
-                        // Create new faculty with the code from Excel
-                        $facultadNombre = $this->cleanCell($data[0] ?? '') ?: 'Facultad de Ingeniería';
-                        
-                        // Use provided sedeId or fall back to first
-                        $sedeIdToUse = $sedeId ?: (\App\Models\Sede::first()?->ID_Sede);
-                        
-                        if ($sedeIdToUse) {
-                            $newFacultad = \App\Models\Facultad::create([
-                                'ID_Sede' => $sedeIdToUse,
-                                'Codigo_Facultad' => $facultadCodigo,
-                                'Nombre_Facultad' => $facultadNombre,
-                                'Esta_Activo' => 1,
-                            ]);
-                            return $newFacultad->ID_Facultad;
-                        }
-                    }
-                }
-            }
-            
-            // If no faculty found from Programas sheet, try to find from "Facultades" sheet
-            foreach (['Facultades', 'facultades', 'FACULTAD', 'FACULTADES'] as $name) {
-                $sheet = $spreadsheet->getSheetByName($name);
-                if ($sheet) {
-                    $rows = $sheet->toArray();
-                    if (count($rows) >= 2) {
-                        $data = $rows[1];
-                        // Column 0 is ID, column 1 is FACULTAD name
-                        $facultadCodigo = !empty($data[0]) ? (int)$data[0] : null;
-                        $facultadNombre = $this->cleanCell($data[1] ?? '');
-                        
-                        if ($facultadCodigo && $facultadNombre) {
-                            // Try to find by Codigo_Facultad
-                            $facultad = \App\Models\Facultad::where('Codigo_Facultad', $facultadCodigo)->first();
-                            if ($facultad) {
-                                return $facultad->ID_Facultad;
-                            }
-                            
-                            // Try to find by name
-                            $facultad = \App\Models\Facultad::where('Nombre_Facultad', 'like', '%' . $facultadNombre . '%')->first();
-                            if ($facultad) {
-                                $facultad->update(['Codigo_Facultad' => $facultadCodigo]);
-                                return $facultad->ID_Facultad;
-                            }
-                            
-                            // Create new
-                            $sedeIdToUse = $sedeId ?: (\App\Models\Sede::first()?->ID_Sede);
-                            if ($sedeIdToUse) {
-                                $newFacultad = \App\Models\Facultad::create([
-                                    'ID_Sede' => $sedeIdToUse,
-                                    'Codigo_Facultad' => $facultadCodigo,
-                                    'Nombre_Facultad' => $facultadNombre,
-                                    'Esta_Activo' => 1,
-                                ]);
-                                return $newFacultad->ID_Facultad;
-                            }
-                        }
-                    }
-                }
-            }
-            
-            // If still nothing, get the first available faculty
-            $facultad = \App\Models\Facultad::first();
-            if ($facultad) {
-                return $facultad->ID_Facultad;
-            }
-            
-            // Create a default faculty
-            $sede = \App\Models\Sede::first();
-            if ($sede) {
-                $newFacultad = \App\Models\Facultad::create([
-                    'ID_Sede' => $sede->ID_Sede,
-                    'Codigo_Facultad' => 1,
-                    'Nombre_Facultad' => 'Facultad de Ingeniería',
-                    'Esta_Activo' => 1,
-                ]);
-                return $newFacultad->ID_Facultad;
-            }
-            
-            return null;
-        } catch (\Exception $e) {
-            \Log::error('Error parsing facultad from Excel:', ['error' => $e->getMessage()]);
-            return null;
-        }
-    }
-
-    private function findOrCreateNormativaFromExcel($spreadsheet, int $programaId): int
-    {
-        try {
-            $sheet = $spreadsheet->getSheetByName('Normativas');
-            if (!$sheet) {
-                return $this->createDefaultNormativa($programaId);
-            }
-            
-            $rows = $sheet->toArray();
-            if (count($rows) < 2) {
-                return $this->createDefaultNormativa($programaId);
-            }
-            
-            $data = $rows[1];
-            $tipo = $this->cleanCell($data[1] ?? 'Acuerdo');
-            $numero = $this->cleanCell($data[2] ?? '001');
-            $anio = (int) ($data[3] ?? date('Y'));
-            
-            $normativa = Normativa::where('ID_Programa', $programaId)
-                ->where('Tipo_Normativa', $tipo)
-                ->where('Numero_Normativa', $numero)
-                ->where('Anio_Normativa', $anio)
-                ->first();
-            
-            if ($normativa) {
-                return $normativa->ID_Normativa;
-            }
-            
-            return Normativa::create([
-                'ID_Programa' => $programaId,
-                'Tipo_Normativa' => $this->sanitizeUtf8($tipo),
-                'Numero_Normativa' => $this->sanitizeUtf8($numero),
-                'Anio_Normativa' => $anio,
-                'Instancia' => $this->sanitizeUtf8($this->cleanCell($data[4] ?? 'Consejo de Facultad')),
-                'Esta_Activo' => 1,
-            ])->ID_Normativa;
-            
-        } catch (\Exception $e) {
-            return $this->createDefaultNormativa($programaId);
-        }
-    }
-
-    private function createDefaultNormativa(int $programaId): int
-    {
-        $normativa = Normativa::create([
-            'ID_Programa' => $programaId,
-            'Tipo_Normativa' => 'Acuerdo',
-            'Numero_Normativa' => '001',
-            'Anio_Normativa' => date('Y'),
-            'Instancia' => 'Consejo de Facultad',
-            'Esta_Activo' => 1,
-            'Descripcion_Normativa' => 'Normativa creada automáticamente desde el archivo Excel',
-        ]);
-        
-        return $normativa->ID_Normativa;
-    }
-
-    private function cleanCell($value): ?string
-    {
-        if ($value === null || $value === '') {
-            return null;
-        }
-        $cleaned = trim(str_replace(["\n", "\r", "\t"], ' ', (string) $value));
-        return $this->sanitizeUtf8($cleaned);
-    }
-
     private function sanitizeUtf8(string $value): string
     {
-        $clean = mb_scrub($value, 'UTF-8');
-
-        // También eliminar caracteres de control no imprimibles (excepto tab/newline)
-        $clean = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/u', '', $clean);
-
-        return $clean;
-    }
-
-    private function sanitizeForResponse(array $data): array
-    {
-        return array_map(function ($item) {
-            if (is_array($item)) {
-                return $this->sanitizeForResponse($item);
-            }
-            if (is_string($item)) {
-                return $this->sanitizeUtf8($item);
-            }
-            return $item;
-        }, $data);
+        // Convertir a UTF-8 ignorando secuencias inválidas
+        $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $value);
+        if ($converted === false) {
+            return '';
+        }
+        // Eliminar caracteres de control no imprimibles
+        $converted = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $converted);
+        return $converted;
     }
 
     private function getNextVersionNumber(int $programaId): int

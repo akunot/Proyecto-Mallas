@@ -1,172 +1,226 @@
-import { useState } from 'react';
-import { Head, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
 interface Programa {
-  ID_Programa: number;
-  ID_Facultad: number;
-  Codigo_Programa: string;
-  Nombre_Programa: string;
-  Titulo_Otorgado: string | null;
-  Nivel_Formacion: string | null;
-  Creditos_Totales: number | null;
-  Duracion_Semestres: number | null;
-  Codigo_SNIES: string | null;
-  Campus_Programa: string | null;
-  Conmutador: string | null;
-  Extension: string | null;
-  Correo: string | null;
-  Area_Curricular: string | null;
-  Activo_Programa: number;
-  Nombre_Facultad?: string;
+    ID_Programa: number;
+    ID_Facultad: number;
+    Codigo_Programa: string;
+    Nombre_Programa: string;
+    Titulo_Otorgado: string | null;
+    Nivel_Formacion: string | null;
+    Creditos_Totales: number | null;
+    Duracion_Semestres: number | null;
+    Codigo_SNIES: string | null;
+    Campus_Programa: string | null;
+    Conmutador: string | null;
+    Extension: string | null;
+    Correo: string | null;
+    Area_Curricular: string | null;
+    Activo_Programa: number;
+    Nombre_Facultad?: string;
 }
 
 interface Props {
-  programas: {
-    data: Programa[];
-    meta: {
-      current_page: number;
-      total: number;
-      per_page: number;
-      last_page: number;
+    programas: {
+        data: Programa[];
+        meta: {
+            current_page: number;
+            total: number;
+            per_page: number;
+            last_page: number;
+            sort_by?: string;
+            sort_order?: 'asc' | 'desc';
+        };
     };
-  };
-  facultades: { ID_Facultad: number; Nombre_Facultad: string }[];
+    facultades: { ID_Facultad: number; Nombre_Facultad: string }[];
 }
 
 export default function Programas({ programas, facultades }: Props) {
-  const initialData = programas?.data || [];
-  const initialMeta = programas?.meta || { current_page: 1, total: 0, per_page: 20, last_page: 1 };
-  
-  const [data, setData] = useState<Programa[]>(initialData);
-  const [meta, setMeta] = useState(initialMeta);
-  const [loading, setLoading] = useState(false);
+    const { url } = usePage();
+    const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
 
-  const columns = [
-    { key: 'ID_Programa', label: 'ID', sortable: true },
-    { key: 'Codigo_Programa', label: 'Código', sortable: true },
-    { key: 'Nombre_Programa', label: 'Nombre', sortable: true },
-    { 
-      key: 'Nivel_Formacion', 
-      label: 'Nivel',
-      render: (value: string | null) => value || '-'
-    },
-    { 
-      key: 'Creditos_Totales', 
-      label: 'Créditos',
-      render: (value: number | null) => value || '-'
-    },
-    { 
-      key: 'Duracion_Semestres', 
-      label: 'Semestres',
-      render: (value: number | null) => value || '-'
-    },
-    { 
-      key: 'Activo_Programa', 
-      label: 'Estado',
-      render: (value: number) => (
-        <span className={`badge ${value ? 'badge-success' : 'badge-danger'}`}>
-          {value ? 'Activo' : 'Inactivo'}
-        </span>
-      )
-    },
-  ];
+    const sortBy = programas.meta.sort_by || 'ID_Programa';
+    const sortOrder = programas.meta.sort_order || 'asc';
 
-  // Los datos se cargan desde el servidor via Inertia props
-  const handleSearch = async (search: string, page: number = 1) => {
-    setLoading(true);
-    try {
-      if (!search) {
-        setData(initialData);
-        setMeta(initialMeta);
-      } else {
-        const filtered = initialData.filter(p => 
-          p.Nombre_Programa.toLowerCase().includes(search.toLowerCase()) ||
-          p.Codigo_Programa?.toLowerCase().includes(search.toLowerCase())
-        );
-        setData(filtered);
-        setMeta({ ...meta, total: filtered.length });
-      }
-    } finally {
-      setLoading(false);
-    }
-  };
+    const columns = [
+        { key: 'ID_Programa', label: 'ID', sortable: true },
+        { key: 'Codigo_Programa', label: 'Código', sortable: true },
+        { key: 'Nombre_Programa', label: 'Nombre', sortable: true },
+        {
+            key: 'Nivel_Formacion',
+            label: 'Nivel',
+            render: (value: string | null) => value || '-',
+        },
+        {
+            key: 'Creditos_Totales',
+            label: 'Créditos',
+            render: (value: number | null) => value || '-',
+        },
+        {
+            key: 'Duracion_Semestres',
+            label: 'Semestres',
+            render: (value: number | null) => value || '-',
+        },
+        {
+            key: 'Activo_Programa',
+            label: 'Estado',
+            render: (value: number) => (
+                <span
+                    className={`badge ${value ? 'badge-success' : 'badge-danger'}`}
+                >
+                    {value ? 'Activo' : 'Inactivo'}
+                </span>
+            ),
+        },
+    ];
 
-  const handleRefresh = async () => {
-    await handleSearch('', 1);
-  };
+    const handleSearch = (search: string, page: number = 1) => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (page > 1) params.set('page', page.toString());
+        params.set('sort_by', sortBy);
+        params.set('sort_order', sortOrder);
 
-  const handleToggle = async (id: number) => {
-    router.patch(`/programas/${id}/toggle`, {}, {
-      onSuccess: () => handleRefresh(),
-    });
-  };
+        router.visit(`/programas?${params.toString()}`, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
 
-  const actions = (row: Programa) => (
-    <div className="action-buttons">
-      <button
-        className="btn-edit"
-        onClick={() => router.visit(`/programas/${row.ID_Programa}/edit`)}
-        title="Editar"
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-          <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-        </svg>
-      </button>
-      <button 
-        className="btn-delete" 
-        onClick={() => handleToggle(row.ID_Programa)}
-        title={row.Activo_Programa ? 'Desactivar' : 'Activar'}
-      >
-        <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          {row.Activo_Programa ? (
-            <>
-              <path d="M18.36 6.64a9 9 0 1 1-12.73 0"/>
-              <line x1="12" y1="2" x2="12" y2="12"/>
-            </>
-          ) : (
-            <>
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/>
-              <polyline points="22 4 12 14.01 9 11.01"/>
-            </>
-          )}
-        </svg>
-      </button>
-    </div>
-  );
+    const handleRefresh = () => {
+        router.visit('/programas', {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
 
-  return (
-    <MainLayout>
-      <Head title="Programas - Mallas UNAL" />
-      
-      <div className="page-header">
-        <div className="page-title">
-          <h1>Gestión de Programas</h1>
-          <p className="page-subtitle">Administra los programas académicos de la Universidad</p>
+    const handleSort = (column: string) => {
+        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
+
+        const params = new URLSearchParams();
+        if (currentSearch) params.set('search', currentSearch);
+        params.set('sort_by', column);
+        params.set('sort_order', newDirection);
+        params.set('page', '1');
+
+        router.visit(`/programas?${params.toString()}`, {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleToggle = async (id: number) => {
+        await router.patch(`/programas/${id}/toggle`, {}, {
+            onSuccess: () => handleRefresh(),
+        });
+    };
+
+    const actions = (row: Programa) => (
+        <div className="action-buttons">
+            <button
+                className="btn-edit"
+                onClick={() =>
+                    router.visit(`/programas/${row.ID_Programa}/edit`)
+                }
+                title="Editar"
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                >
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
+                </svg>
+            </button>
+            <button
+                className="btn-delete"
+                onClick={() => handleToggle(row.ID_Programa)}
+                title={row.Activo_Programa ? 'Desactivar' : 'Activar'}
+            >
+                <svg
+                    xmlns="http://www.w3.org/2000/svg"
+                    width="16"
+                    height="16"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                    stroke="currentColor"
+                    strokeWidth="2"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                >
+                    {row.Activo_Programa ? (
+                        <>
+                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
+                            <line x1="12" y1="2" x2="12" y2="12" />
+                        </>
+                    ) : (
+                        <>
+                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
+                            <polyline points="22 4 12 14.01 9 11.01" />
+                        </>
+                    )}
+                </svg>
+            </button>
         </div>
-        <div className="page-actions">
-          <button className="btn-primary" onClick={() => router.visit('/programas/create')}>
-            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            Nuevo Programa
-          </button>
-        </div>
-      </div>
+    );
 
-      <DataTable
-        columns={columns}
-        data={data}
-        meta={meta}
-        loading={loading}
-        searchPlaceholder="Buscar por nombre o código..."
-        onSearch={handleSearch}
-        onRefresh={handleRefresh}
-        actions={actions}
-        emptyMessage="No hay programas registrados"
-      />
-    </MainLayout>
-  );
+    return (
+        <MainLayout>
+            <Head title="Programas - Mallas UNAL" />
+
+            <div className="page-header">
+                <div className="page-title">
+                    <h1>Gestión de Programas</h1>
+                    <p className="page-subtitle">
+                        Administra los programas académicos de la Universidad
+                    </p>
+                </div>
+                <div className="page-actions">
+                    <button
+                        className="btn-primary"
+                        onClick={() => router.visit('/programas/create')}
+                    >
+                        <svg
+                            xmlns="http://www.w3.org/2000/svg"
+                            width="16"
+                            height="16"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                        >
+                            <line x1="12" y1="5" x2="12" y2="19" />
+                            <line x1="5" y1="12" x2="19" y2="12" />
+                        </svg>
+                        Nuevo Programa
+                    </button>
+                </div>
+            </div>
+
+            <DataTable
+                columns={columns}
+                data={programas.data}
+                meta={programas.meta}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                searchValue={currentSearch}
+                onSort={handleSort}
+                searchPlaceholder="Buscar por nombre o código..."
+                onSearch={handleSearch}
+                onRefresh={handleRefresh}
+                actions={actions}
+                emptyMessage="No hay programas registrados"
+            />
+        </MainLayout>
+    );
 }

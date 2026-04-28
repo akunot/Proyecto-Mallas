@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Head, usePage, router } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -21,23 +20,18 @@ interface Props {
             total: number;
             per_page: number;
             last_page: number;
+            sort_by?: string;
+            sort_order?: 'asc' | 'desc';
         };
     };
 }
 
 export default function Sedes({ sedes: initialSedes }: Props) {
-    // Usar datos iniciales si existen, sino array vacío
-    const initialData = initialSedes?.data || [];
-    const initialMeta = initialSedes?.meta || {
-        current_page: 1,
-        total: 0,
-        per_page: 20,
-        last_page: 1,
-    };
+    const { url } = usePage();
+    const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
 
-    const [data, setData] = useState<Sede[]>(initialData);
-    const [meta, setMeta] = useState(initialMeta);
-    const [loading, setLoading] = useState(false);
+    const sortBy = initialSedes.meta.sort_by || 'ID_Sede';
+    const sortOrder = initialSedes.meta.sort_order || 'asc';
 
     const columns = [
         { key: 'Codigo_Sede', label: 'Código', sortable: true },
@@ -53,65 +47,61 @@ export default function Sedes({ sedes: initialSedes }: Props) {
         },
     ];
 
-    // Los datos se cargan desde el servidor via Inertia props
-    // No se necesitan llamadas API adicionales
-    const handleSearch = async (search: string, page: number = 1) => {
-        // TODO: Implementar búsqueda server-side si es necesario
-        // Por ahora, filtramos localmente
-        setLoading(true);
-        try {
-            if (!search) {
-                setData(initialData);
-                setMeta(initialMeta);
-            } else {
-                const filtered = initialData.filter(
-                    (sede) =>
-                        sede.Nombre_Sede.toLowerCase().includes(
-                            search.toLowerCase(),
-                        ) ||
-                        sede.Ciudad_Sede?.toLowerCase().includes(
-                            search.toLowerCase(),
-                        ),
-                );
-                setData(filtered);
-                setMeta({ ...meta, total: filtered.length });
-            }
-        } finally {
-            setLoading(false);
-        }
+    const handleSearch = (search: string, page: number = 1) => {
+        const params = new URLSearchParams();
+        if (search) params.set('search', search);
+        if (page > 1) params.set('page', page.toString());
+        params.set('sort_by', sortBy);
+        params.set('sort_order', sortOrder);
+
+        router.visit(`/sedes?${params.toString()}`, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
-    const handleRefresh = async () => {
-        // Recargar la página para obtener datos actualizados del servidor
-        window.location.reload();
+    const handleRefresh = () => {
+        router.visit('/sedes', {
+            preserveState: true,
+            preserveScroll: true,
+        });
+    };
+
+    const handleSort = (column: string) => {
+        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
+
+        const params = new URLSearchParams();
+        if (currentSearch) params.set('search', currentSearch);
+        params.set('sort_by', column);
+        params.set('sort_order', newDirection);
+        params.set('page', '1');
+
+        router.visit(`/sedes?${params.toString()}`, {
+            preserveState: true,
+            preserveScroll: true,
+        });
     };
 
     const handleDelete = async (id: number) => {
         if (!confirm('¿Está seguro de eliminar esta sede?')) return;
 
-        try {
-            const response = await fetch(`/sedes/${id}`, {
-                method: 'DELETE',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                },
-                credentials: 'same-origin',
-            });
-
-            if (response.ok) {
-                handleRefresh();
-            }
-        } catch (error) {
-            console.error('Error deleting sede:', error);
-        }
+        await fetch(`/sedes/${id}`, {
+            method: 'DELETE',
+            headers: {
+                'Content-Type': 'application/json',
+                Accept: 'application/json',
+            },
+            credentials: 'same-origin',
+        }).then(() => handleRefresh());
     };
 
     const actions = (row: Sede) => (
         <div className="action-buttons">
             <button
                 className="btn-edit"
-                onClick={() => router.visit(`/sedes/${row.ID_Sede}/edit`)}
+                onClick={() =>
+                    router.visit(`/sedes/${row.ID_Sede}/edit`)
+                }
                 title="Editar"
             >
                 <svg
@@ -192,9 +182,12 @@ export default function Sedes({ sedes: initialSedes }: Props) {
 
             <DataTable
                 columns={columns}
-                data={data}
-                meta={meta}
-                loading={loading}
+                data={initialSedes.data}
+                meta={initialSedes.meta}
+                sortBy={sortBy}
+                sortOrder={sortOrder}
+                searchValue={currentSearch}
+                onSort={handleSort}
                 searchPlaceholder="Buscar por nombre o ciudad..."
                 onSearch={handleSearch}
                 onRefresh={handleRefresh}

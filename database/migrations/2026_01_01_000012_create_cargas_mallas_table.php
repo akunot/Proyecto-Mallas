@@ -69,13 +69,13 @@ return new class extends Migration
 
             $table->foreign('ID_Programa')
                 ->references('ID_Programa')
-                ->on('programa')
+                ->on('programas')
                 ->onDelete('restrict')
                 ->onUpdate('cascade');
 
             $table->foreign('ID_Normativa')
                 ->references('ID_Normativa')
-                ->on('normativa')
+                ->on('normativas')
                 ->onDelete('restrict')
                 ->onUpdate('cascade');
 

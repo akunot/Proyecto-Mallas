@@ -22,6 +22,7 @@ class CargaMalla extends Model
         'ID_Usuario',
         'ID_Programa',
         'ID_Normativa',
+        'tipo_carga',
         'Estado_Carga',
         'Comentario_Carga',
         'Comentario_Revisor',

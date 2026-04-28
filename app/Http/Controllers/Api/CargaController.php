@@ -26,20 +26,31 @@ class CargaController extends Controller
         $result = $this->uploadService->createCarga(
             $request->input('normativa_id'),
             $request->input('malla_base_id'),
-            $request->user()->ID_Usuario
+            $request->user()->ID_Usuario,
+            $request->input('tipo_carga')
         );
 
         if (!$result['success']) {
-            return response()->json([
-                'message' => $result['message'] ?? 'Error al crear la carga.',
-                'data' => $result['data'] ?? null,
-            ], $result['status'] ?? 400);
+            return response()->json(
+                $this->sanitizeForJson([
+                    'message' => $result['message'] ?? 'Error al crear la carga.',
+                    'data' => $result['data'] ?? null,
+                ]),
+                $result['status'] ?? 400,
+                [],
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+            );
         }
 
-        return response()->json([
-            'data' => $result['data'],
-            'message' => 'Carga creada correctamente. Sube el archivo correspondiente para continuar.',
-        ], 201);
+        return response()->json(
+            $this->sanitizeForJson([
+                'data' => $result['data'],
+                'message' => 'Carga creada correctamente. Sube el archivo correspondiente para continuar.',
+            ]),
+            201,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 
     public function uploadArchivo(int $id, UploadCargaArchivoRequest $request): JsonResponse
@@ -52,16 +63,26 @@ class CargaController extends Controller
         );
 
         if (!$result['success']) {
-            return response()->json([
-                'message' => $result['message'] ?? 'Error al subir el archivo.',
-                'data' => $result['data'] ?? null,
-            ], $result['status'] ?? 400);
+            return response()->json(
+                $this->sanitizeForJson([
+                    'message' => $result['message'] ?? 'Error al subir el archivo.',
+                    'data' => $result['data'] ?? null,
+                ]),
+                $result['status'] ?? 400,
+                [],
+                JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+            );
         }
 
-        return response()->json([
-            'data' => $result['data'],
-            'message' => 'Archivo subido correctamente.',
-        ], 200);
+        return response()->json(
+            $this->sanitizeForJson([
+                'data' => $result['data'],
+                'message' => 'Archivo subido correctamente.',
+            ]),
+            200,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 
     public function procesar(int $id): JsonResponse
@@ -71,7 +92,7 @@ class CargaController extends Controller
         if ($carga->Estado_Carga !== 'listo_para_procesar') {
             return response()->json([
                 'message' => 'La carga debe estar en estado listo_para_procesar para iniciar el procesamiento.',
-            ], 409);
+            ], 409, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         $carga->update(['Estado_Carga' => 'iniciado']);
@@ -83,13 +104,18 @@ class CargaController extends Controller
             ProcesarExcelJob::dispatch($id);
         }
 
-        return response()->json([
-            'data' => [
-                'carga_id' => $id,
-                'estado' => 'iniciado',
-            ],
-            'message' => 'El procesamiento de la carga se ha iniciado.',
-        ], 202);
+        return response()->json(
+            $this->sanitizeForJson([
+                'data' => [
+                    'carga_id' => $id,
+                    'estado' => 'iniciado',
+                ],
+                'message' => 'El procesamiento de la carga se ha iniciado.',
+            ]),
+            202,
+            [],
+            JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE
+        );
     }
 
     public function index(Request $request): JsonResponse
@@ -127,7 +153,7 @@ class CargaController extends Controller
                 'last_page' => $cargas->lastPage(),
             ],
             'message' => '',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function show(int $id): JsonResponse
@@ -148,7 +174,7 @@ class CargaController extends Controller
         return response()->json([
             'data' => $cargaArray,
             'message' => '',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function estado(int $id): JsonResponse
@@ -172,17 +198,20 @@ class CargaController extends Controller
             $percentage = 100;
         }
 
-        return response()->json([
-            'data' => [
-                'carga_id' => $carga->ID_Carga,
-                'estado' => $carga->Estado_Carga,
-                'Estado_Carga' => $carga->Estado_Carga,
-                'errores_count' => $errorsCount,
-                'advertencias_count' => $warningsCount,
-                'porcentaje' => $percentage,
-            ],
-            'message' => '',
-        ]);
+        return response()->json(
+            $this->sanitizeForJson([
+                'data' => [
+                    'carga_id' => $carga->ID_Carga,
+                    'estado' => $carga->Estado_Carga,
+                    'Estado_Carga' => $carga->Estado_Carga,
+                    'errores_count' => $errorsCount,
+                    'advertencias_count' => $warningsCount,
+                    'porcentaje' => $percentage,
+                ],
+                'message' => '',
+            ]),
+            200
+        );
     }
 
     public function errores(int $id): JsonResponse
@@ -193,9 +222,9 @@ class CargaController extends Controller
             ->get();
 
         return response()->json([
-            'data' => $errores,
+            'data' => $this->sanitizeForJson($errores),
             'message' => '',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function diff(int $id): JsonResponse
@@ -206,13 +235,13 @@ class CargaController extends Controller
             return response()->json([
                 'data' => [],
                 'message' => 'Esta carga no tiene una malla base para comparar.',
-            ]);
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         return response()->json([
             'data' => [],
             'message' => 'Diff no implementado aún.',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function enviarRevision(int $id, Request $request): JsonResponse
@@ -222,21 +251,21 @@ class CargaController extends Controller
         if ($carga->ID_Usuario !== $request->user()->ID_Usuario) {
             return response()->json([
                 'message' => 'No tienes permiso para enviar esta carga a revisión.',
-            ], 403);
+            ], 403, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         if ($carga->Estado_Carga !== 'borrador') {
             return response()->json([
                 'message' => 'Solo las cargas en estado borrador pueden enviarse a revisión.',
-            ], 400);
+            ], 400, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         $carga->update(['Estado_Carga' => 'pendiente_aprobacion']);
 
         return response()->json([
-            'data' => $carga,
+            'data' => $this->sanitizeForJson($carga),
             'message' => 'Carga enviada a revisión correctamente.',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
     public function revisar(int $id, Request $request): JsonResponse
@@ -251,13 +280,13 @@ class CargaController extends Controller
         if ($carga->ID_Usuario === $request->user()->ID_Usuario) {
             return response()->json([
                 'message' => 'No puedes revisar tu propia carga.',
-            ], 403);
+            ], 403, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         if (!in_array($carga->Estado_Carga, ['pendiente_aprobacion'])) {
             return response()->json([
                 'message' => 'Solo las cargas pendientes de aprobación pueden ser revisadas.',
-            ], 400);
+            ], 400, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         $accion = $request->input('accion');
@@ -288,8 +317,8 @@ class CargaController extends Controller
         }
 
         return response()->json([
-            'data' => $carga,
+            'data' => $this->sanitizeForJson($carga),
             'message' => $accion === 'aprobar' ? 'Malla aprobada correctamente.' : 'Malla rechazada.',
-        ]);
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 }

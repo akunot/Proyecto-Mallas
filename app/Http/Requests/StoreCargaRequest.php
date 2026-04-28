@@ -15,15 +15,18 @@ class StoreCargaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'normativa_id' => ['required', 'integer', Rule::exists('normativa', 'ID_Normativa')],
-            'malla_base_id' => ['nullable', 'integer', Rule::exists('malla_curricular', 'ID_Malla')],
+            'tipo_carga' => ['required', 'string', Rule::in(['asignaturas', 'electivas', 'malla'])],
+            'normativa_id' => ['required_if:tipo_carga,malla', 'nullable', 'integer', Rule::exists('normativas', 'ID_Normativa')],
+            'malla_base_id' => ['nullable', 'integer', Rule::exists('mallas_curriculares', 'ID_Malla')],
         ];
     }
 
     public function messages(): array
     {
         return [
-            'normativa_id.required' => 'La normativa es requerida.',
+            'tipo_carga.required' => 'El tipo de carga es requerido.',
+            'tipo_carga.in' => 'El tipo de carga debe ser asignaturas, electivas o malla.',
+            'normativa_id.required_if' => 'La normativa es requerida para cargas de malla.',
             'normativa_id.integer' => 'El ID de la normativa debe ser un número entero.',
             'normativa_id.exists' => 'La normativa seleccionada no existe.',
             'malla_base_id.integer' => 'El ID de la malla base debe ser un número entero.',

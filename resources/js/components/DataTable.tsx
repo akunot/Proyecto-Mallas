@@ -12,15 +12,21 @@ interface PaginationMeta {
   total: number;
   per_page: number;
   last_page: number;
+  sort_by?: string;
+  sort_order?: 'asc' | 'desc';
 }
 
 interface DataTableProps {
   columns: Column[];
   data: any[];
   meta?: PaginationMeta;
+  sortBy?: string;
+  sortOrder?: 'asc' | 'desc';
   loading?: boolean;
   searchPlaceholder?: string;
+  searchValue?: string;
   onSearch?: (search: string, page?: number) => void;
+  onSort?: (column: string, direction: 'asc' | 'desc') => void;
   onRefresh?: () => void;
   actions?: (row: any) => React.ReactNode;
   emptyMessage?: string;
@@ -30,14 +36,23 @@ export default function DataTable({
   columns,
   data,
   meta,
+  sortBy,
+  sortOrder,
   loading = false,
   searchPlaceholder = 'Buscar...',
+  searchValue = '',
   onSearch,
+  onSort,
   onRefresh,
   actions,
   emptyMessage = 'No hay datos disponibles',
 }: DataTableProps) {
-  const [search, setSearch] = useState('');
+  const [search, setSearch] = useState(searchValue);
+
+  // Sincronizar búsqueda con prop externa (cambios en URL)
+  useEffect(() => {
+    setSearch(searchValue);
+  }, [searchValue]);
 
   const handleSearchChange = useCallback((value: string) => {
     setSearch(value);
@@ -65,6 +80,18 @@ export default function DataTable({
     }
   };
 
+  const handleSortClick = (columnKey: string) => {
+    if (onSort) {
+      const column = columns.find(c => c.key === columnKey);
+      if (column?.sortable) {
+        const currentSortBy = sortBy || columnKey;
+        const currentSortOrder = sortOrder || 'asc';
+        const newDirection = (columnKey === currentSortBy && currentSortOrder === 'asc') ? 'desc' : 'asc';
+        onSort(columnKey, newDirection);
+      }
+    }
+  };
+
   return (
     <div className="data-table-container">
       {/* Barra de búsqueda y acciones */}
@@ -88,19 +115,28 @@ export default function DataTable({
         </div>
       </div>
 
-      {/* Tabla */}
-      <div className="table-wrapper">
-        <table className="data-table">
-          <thead>
-            <tr>
-              {columns.map((column) => (
-                <th key={column.key} className={column.sortable ? 'sortable' : ''}>
-                  {column.label}
-                </th>
-              ))}
-              {actions && <th>Acciones</th>}
-            </tr>
-          </thead>
+       {/* Tabla */}
+       <div className="table-wrapper">
+         <table className="data-table">
+           <thead>
+             <tr>
+               {columns.map((column) => (
+                 <th 
+                   key={column.key} 
+                   className={column.sortable ? 'sortable' : ''}
+                   onClick={() => column.sortable && handleSortClick(column.key)}
+                 >
+                   {column.label}
+                   {sortBy === column.key && sortOrder && (
+                     <span className="sort-arrow">
+                       {sortOrder === 'asc' ? ' ↑' : ' ↓'}
+                     </span>
+                   )}
+                 </th>
+               ))}
+               {actions && <th>Acciones</th>}
+             </tr>
+           </thead>
           <tbody>
             {loading ? (
               <tr>

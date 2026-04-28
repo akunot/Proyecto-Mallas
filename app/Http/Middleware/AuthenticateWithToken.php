@@ -14,7 +14,7 @@ class AuthenticateWithToken
             \Log::info('Session ID: ' . session()->getId());
             \Log::info('auth web check: ' . (auth('web')->check() ? 'true' : 'false'));
             \Log::info('Session started: ' . (session()->isStarted() ? 'true' : 'false'));
-            \Log::info('All session data: ' . json_encode(session()->all()));
+            \Log::info('All session data: ' . (json_encode(session()->all()) ?: '[no serializable]'));
             
             if (!auth('web')->check()) {
                 return response()->json(['message' => 'Unauthenticated.'], 401);

@@ -4,6 +4,7 @@ namespace App\Jobs;
 
 use App\Models\CargaMalla;
 use App\Models\LogActividad;
+use App\Models\MallaCurricular;
 use App\Services\ExcelParserService;
 use Illuminate\Bus\Queueable;
 use Illuminate\Contracts\Queue\ShouldQueue;
@@ -17,7 +18,9 @@ class ProcesarExcelJob implements ShouldQueue
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
     public int $tries = 3;
+
     public array $backoff = [30, 60, 120];
+
     public int $timeout = 120;
 
     private int $cargaId;
@@ -31,7 +34,7 @@ class ProcesarExcelJob implements ShouldQueue
     {
         $carga = CargaMalla::findOrFail($this->cargaId);
 
-        if (!$carga->ID_Malla) {
+        if ($carga->tipo_carga === 'malla' && ! $carga->ID_Malla) {
             $malla = MallaCurricular::create([
                 'ID_Normativa' => $carga->ID_Normativa,
                 'ID_Programa' => $carga->ID_Programa,
@@ -52,15 +55,19 @@ class ProcesarExcelJob implements ShouldQueue
 
             if ($hasErrors) {
                 $carga->update(['Estado_Carga' => 'con_errores']);
-                $carga->malla->update(['Estado' => 'borrador']);
+                if ($carga->malla) {
+                    $carga->malla->update(['Estado' => 'borrador']);
+                }
             } else {
                 $carga->update(['Estado_Carga' => 'borrador']);
-                $carga->malla->update(['Estado' => 'borrador']);
+                if ($carga->malla) {
+                    $carga->malla->update(['Estado' => 'borrador']);
+                }
             }
 
             Log::info("Excel processing completed for carga {$this->cargaId}", $result);
         } catch (\Exception $e) {
-            Log::error("Excel processing failed for carga {$this->cargaId}: " . $e->getMessage());
+            Log::error("Excel processing failed for carga {$this->cargaId}: ".$e->getMessage());
 
             $carga->update(['Estado_Carga' => 'con_errores']);
             if ($carga->malla) {
@@ -90,7 +97,7 @@ class ProcesarExcelJob implements ShouldQueue
 
         if ($carga) {
             $carga->update(['Estado_Carga' => 'con_errores']);
-            
+
             if ($carga->malla) {
                 $carga->malla->update(['Estado' => 'borrador']);
             }
