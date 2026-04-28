@@ -14,6 +14,7 @@ class Asignatura extends Model
 
     protected $fillable = [
         'Codigo_Asignatura',
+        'Codigo_Base',
         'Nombre_Asignatura',
         'Creditos_Asignatura',
         'Horas_Presencial',
