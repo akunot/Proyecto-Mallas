@@ -14,8 +14,8 @@ return new class extends Migration
     {
         Schema::create('programas', function (Blueprint $table) {
             $table->id('ID_Programa');
-            $table->unsignedBigInteger('ID_Facultad');
-            $table->string('Codigo_Programa', 20)->unique();
+            $table->unsignedBigInteger('Codigo_Facultad');
+            $table->unsignedBigInteger('Codigo_Programa')->unique();
             $table->string('Nombre_Programa', 200);
             $table->string('Titulo_Otorgado', 200)->nullable();
             $table->string('Nivel_Formacion', 50)->nullable();
@@ -25,14 +25,14 @@ return new class extends Migration
             $table->string('Url_Programa', 300)->nullable();
             $table->string('Campus_Programa', 100)->nullable();
             $table->string('Conmutador', 30)->nullable();
-            $table->string('Extension', 10)->nullable();
+            $table->string('Extension', 80)->nullable();
             $table->string('Correo', 200)->nullable();
             $table->string('Area_Curricular', 100)->nullable();
-            $table->tinyInteger('Activo_Programa')->default(1);
+            $table->tinyInteger('Esta_Activo')->default(1);
             $table->timestamps();
 
-            $table->foreign('ID_Facultad')
-                ->references('ID_Facultad')
+            $table->foreign('Codigo_Facultad')
+                ->references('Codigo_Facultad')
                 ->on('facultades')
                 ->onDelete('restrict')
                 ->onUpdate('cascade');

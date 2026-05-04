@@ -351,4 +351,79 @@ Route::middleware(['auth'])->group(function () {
     
     // Mallas y cargas (Fase 3+)
     Route::inertia('/cargas', 'Cargas/Cargas')->name('cargas');
+    
+    // Auditoría y Aprobación (módulos nuevos)
+    Route::get('/auditoria', function () {
+        // Obtener logs iniciales
+        $logs = \App\Models\LogActividad::with('usuario')
+            ->orderBy('Creacion_Log', 'desc')
+            ->paginate(20);
+        
+        // Obtener estadísticas
+        $totalLogs = \App\Models\LogActividad::count();
+        $porAccion = \App\Models\LogActividad::select('Accion_Log')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('Accion_Log')
+            ->orderBy('total', 'desc')
+            ->get();
+            
+        $porEntidad = \App\Models\LogActividad::select('Entidad_Log')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('Entidad_Log')
+            ->orderBy('total', 'desc')
+            ->get();
+            
+        $porUsuario = \App\Models\LogActividad::with('usuario')
+            ->select('ID_Usuario')
+            ->selectRaw('COUNT(*) as total')
+            ->groupBy('ID_Usuario')
+            ->orderBy('total', 'desc')
+            ->limit(10)
+            ->get();
+        
+        // Obtener acciones y entidades disponibles
+        $acciones = \App\Models\LogActividad::select('Accion_Log')
+            ->distinct()
+            ->pluck('Accion_Log')
+            ->sort()
+            ->values();
+            
+        $entidades = \App\Models\LogActividad::select('Entidad_Log')
+            ->distinct()
+            ->pluck('Entidad_Log')
+            ->sort()
+            ->values();
+        
+        return Inertia::render('Auditoria/AuditoriaPage', [
+            'logs' => $logs->items(),
+            'estadisticas' => [
+                'total_logs' => $totalLogs,
+                'por_accion' => $porAccion,
+                'por_entidad' => $porEntidad,
+                'por_usuario' => $porUsuario,
+            ],
+            'acciones' => $acciones,
+            'entidades' => $entidades,
+        ]);
+    })->name('auditoria');
+    
+    Route::get('/aprobacion', function () {
+        // Obtener cargas pendientes de revisión
+        $pendientes = \App\Models\CargaMalla::with(['malla', 'usuario', 'programa'])
+            ->where('Estado_Carga', 'pendiente_aprobacion')
+            ->where('ID_Usuario', '!=', auth()->user()->ID_Usuario)
+            ->orderBy('Creacion_Carga', 'desc')
+            ->get();
+        
+        // Obtener mis cargas
+        $misCargas = \App\Models\CargaMalla::with(['malla', 'usuarioRevisor', 'programa'])
+            ->where('ID_Usuario', auth()->user()->ID_Usuario)
+            ->orderBy('Creacion_Carga', 'desc')
+            ->get();
+        
+        return Inertia::render('Aprobacion/AprobacionPage', [
+            'pendientes' => $pendientes,
+            'misCargas' => $misCargas,
+        ]);
+    })->name('aprobacion');
 });

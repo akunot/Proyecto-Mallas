@@ -14,19 +14,20 @@ return new class extends Migration
     {
         Schema::create('facultades', function (Blueprint $table) {
             $table->id('ID_Facultad');
-            $table->unsignedBigInteger('ID_Sede');
+            $table->unsignedBigInteger('Codigo_Facultad')->unique();
+            $table->unsignedBigInteger('Codigo_Sede');
             $table->string('Nombre_Facultad', 150);
             $table->string('Conmutador_Facultad', 30)->nullable();
-            $table->string('Extension_Facultad', 10)->nullable();
+            $table->string('Extension_Facultad', 80)->nullable();
             $table->string('Campus_Facultad', 100)->nullable();
             $table->string('Url_Facultad', 300)->nullable();
             $table->timestamps();
 
-            $table->foreign('ID_Sede')
-                ->references('ID_Sede')
-                ->on('sedes')
-                ->onDelete('restrict')
-                ->onUpdate('cascade');
+             $table->foreign('Codigo_Sede')
+                 ->references('Codigo_Sede')
+                 ->on('sedes')
+                 ->onDelete('restrict')
+                 ->onUpdate('cascade');
         });
     }
 

@@ -13,13 +13,13 @@ class SedeSeeder extends Seeder
     public function run(): void
     {
         Sede::create([
-            'Codigo_Sede' => 1,
-            'Nombre_Sede' => 'Universidad Nacional de Colombia - Sede Manizales',
+            'Codigo_Sede' => 1103,
+            'Nombre_Sede' => 'Manizales',
             'Ciudad_Sede' => 'Manizales',
             'Direccion_Sede' => 'Carrera 27 # 64-60',
-            'Conmutador_Sede' => '6068879300',
-            'Campus_Sede' => 'Campus La Nubia',
-            'Url_Sede' => 'https://manizales.unal.edu.co',
+            'Conmutador_Sede' => '8879300',
+            'Campus_Sede' => 'Campus Palogrande',
+            'Url_Sede' => 'https://manizales.unal.edu.co/',
         ]);
     }
 }

@@ -12,52 +12,61 @@ class FacultadSeeder extends Seeder
      */
     public function run(): void
     {
-        $sedeId = 1; // UNAL Manizales
-
         $facultades = [
             [
-                'Codigo_Facultad' => 1,
+                'Codigo_Facultad' => 4036,
                 'Nombre_Facultad' => 'Facultad de Ingeniería y Arquitectura',
-                'Conmutador_Facultad' => '6068879350',
-                'Extension_Facultad' => '1350',
-                'Campus_Facultad' => 'Campus La Nubia',
-                'Url_Facultad' => 'https://manizales.unal.edu.co/facultades/ingenieria',
+                'Conmutador_Facultad' => '8879300',
+                'Extension_Facultad' => '50111',
+                'Campus_Facultad' => 'Campus Palogrande',
+                'Codigo_Sede' => 1103,
+                'Url_Facultad' => 'https://fia.unal.edu.co/',
                 'Esta_Activo' => 1,
             ],
             [
-                'Codigo_Facultad' => 2,
-                'Nombre_Facultad' => 'Facultad de Ciencias',
-                'Conmutador_Facultad' => '6068879360',
-                'Extension_Facultad' => '1360',
-                'Campus_Facultad' => 'Campus La Nubia',
-                'Url_Facultad' => 'https://manizales.unal.edu.co/facultades/ciencias',
+                'Codigo_Facultad' => 4037,
+                'Nombre_Facultad' => 'Facultad de Ciencias Exactas y Naturales', 
+                'Conmutador_Facultad' => '8879300',
+                'Extension_Facultad' => '50423',
+                'Campus_Facultad' => 'Campus Palogrande',
+                'Codigo_Sede' => 1103,
+                'Url_Facultad' => 'https://fcen.unal.edu.co/',
                 'Esta_Activo' => 1,
             ],
             [
-                'Codigo_Facultad' => 3,
+                'Codigo_Facultad' => 4046,
                 'Nombre_Facultad' => 'Facultad de Administración',
-                'Conmutador_Facultad' => '6068879370',
-                'Extension_Facultad' => '1370',
+                'Conmutador_Facultad' => '8879300',
+                'Extension_Facultad' => '50133',
                 'Campus_Facultad' => 'Campus Palogrande',
-                'Url_Facultad' => 'https://manizales.unal.edu.co/facultades/administracion',
+                'Codigo_Sede' => 1103,
+                'Url_Facultad' => 'https://fadmon.unal.edu.co/',
                 'Esta_Activo' => 1,
             ],
             [
-                'Codigo_Facultad' => 4,
-                'Nombre_Facultad' => 'Facultad de Medicina',
-                'Conmutador_Facultad' => '6068879380',
-                'Extension_Facultad' => '1380',
+                'Codigo_Facultad' => 4191,
+                'Nombre_Facultad' => 'Facultad de Ciencias Humanas y Sociales',
+                'Conmutador_Facultad' => '8879300',
+                'Extension_Facultad' => '50136 - 50138',
                 'Campus_Facultad' => 'Campus Palogrande',
-                'Url_Facultad' => 'https://manizales.unal.edu.co/facultades/medicina',
+                'Codigo_Sede' => 1103,
+                'Url_Facultad' => '',
                 'Esta_Activo' => 1,
             ],
         ];
 
         foreach ($facultades as $facultad) {
             Facultad::create([
-                'ID_Sede' => $sedeId,
-                ...$facultad,
+                'Codigo_Facultad' => $facultad['Codigo_Facultad'],
+                'Nombre_Facultad' => $facultad['Nombre_Facultad'],
+                'Conmutador_Facultad' => $facultad['Conmutador_Facultad'],
+                'Extension_Facultad' => $facultad['Extension_Facultad'],
+                'Campus_Facultad' => $facultad['Campus_Facultad'],
+                'Codigo_Sede' => $facultad['Codigo_Sede'],
+                'Url_Facultad' => $facultad['Url_Facultad'],
+                'Esta_Activo' => $facultad['Esta_Activo'],
             ]);
         }
     }
 }
+

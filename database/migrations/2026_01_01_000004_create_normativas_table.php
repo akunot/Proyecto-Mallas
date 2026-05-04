@@ -14,7 +14,7 @@ return new class extends Migration
     {
         Schema::create('normativas', function (Blueprint $table) {
             $table->id('ID_Normativa');
-            $table->unsignedBigInteger('ID_Programa');
+            $table->unsignedBigInteger('Codigo_Programa');
             $table->string('Tipo_Normativa', 50);
             $table->string('Numero_Normativa', 50);
             $table->integer('Anio_Normativa');
@@ -24,8 +24,8 @@ return new class extends Migration
             $table->tinyInteger('Esta_Activo')->default(1);
             $table->timestamps();
 
-            $table->foreign('ID_Programa')
-                ->references('ID_Programa')
+            $table->foreign('Codigo_Programa')
+                ->references('Codigo_Programa')
                 ->on('programas')
                 ->onDelete('restrict')
                 ->onUpdate('cascade');

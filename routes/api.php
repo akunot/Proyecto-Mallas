@@ -9,6 +9,8 @@ use App\Http\Controllers\Api\ComponenteController;
 use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\CargaController;
+use App\Http\Controllers\Api\AuditoriaController;
+use App\Http\Controllers\Api\MallaAprobacionController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -143,6 +145,28 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::get('/cargas/{id}/diff', [CargaController::class, 'diff']);
         Route::patch('/cargas/{id}/enviar-revision', [CargaController::class, 'enviarRevision']);
         Route::patch('/cargas/{id}/revisar', [CargaController::class, 'revisar']);
+        
+        // Flujo de aprobación de mallas
+        Route::get('/aprobacion/pendientes', [MallaAprobacionController::class, 'pendientesRevision']);
+        Route::get('/aprobacion/mis-cargas', [MallaAprobacionController::class, 'misCargas']);
+        Route::get('/aprobacion/historial-programa/{programaId}', [MallaAprobacionController::class, 'historialPrograma']);
+        Route::get('/aprobacion/comparar-versiones', [MallaAprobacionController::class, 'compararVersiones']);
+        Route::get('/aprobacion/estadisticas-programa/{programaId}', [MallaAprobacionController::class, 'estadisticasPrograma']);
+        Route::post('/cargas/{id}/enviar-revision', [MallaAprobacionController::class, 'enviarRevision']);
+        Route::patch('/cargas/{id}/revisar', [MallaAprobacionController::class, 'revisar']);
+        Route::get('/cargas/{id}/puede-revisar', [MallaAprobacionController::class, 'puedeRevisar']);
+        Route::get('/cargas/{id}/puede-enviar-revision', [MallaAprobacionController::class, 'puedeEnviarRevision']);
+        Route::get('/cargas/{id}/detalles-revision', [MallaAprobacionController::class, 'detallesRevision']);
+        
+        // Auditoría y logs
+        Route::get('/auditoria/logs', [AuditoriaController::class, 'index']);
+        Route::get('/auditoria/diffs/{id}', [AuditoriaController::class, 'diffs']);
+        Route::get('/auditoria/resumen-cambios/{id}', [AuditoriaController::class, 'resumenCambios']);
+        Route::get('/auditoria/acciones-disponibles', [AuditoriaController::class, 'accionesDisponibles']);
+        Route::get('/auditoria/entidades-disponibles', [AuditoriaController::class, 'entidadesDisponibles']);
+        Route::get('/auditoria/estadisticas', [AuditoriaController::class, 'estadisticas']);
+        Route::get('/auditoria/timeline', [AuditoriaController::class, 'timelineEntidad']);
+        Route::get('/auditoria/exportar-logs', [AuditoriaController::class, 'exportarLogs']);
         
         // Test endpoint autenticado
         Route::get('/test-auth', function() {

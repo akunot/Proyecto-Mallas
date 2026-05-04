@@ -211,7 +211,7 @@ class CatalogoController extends Controller
                 $rules[$field] = 'required|string|max:20';
             } elseif (str_contains($field, 'Email')) {
                 $rules[$field] = 'required|email';
-            } elseif (str_contains($field, 'Creditos') || str_contains($field, 'Duracion')) {
+            } elseif (str_contains($field, 'Creditos') || str_contains($field, 'Duracion') || str_contains($field, 'Horas_')) {
                 $rules[$field] = 'nullable|integer|min:0';
             } elseif (str_contains($field, 'ID_')) {
                 $rules[$field] = 'required|integer';
