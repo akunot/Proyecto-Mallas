@@ -3,6 +3,7 @@ import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createRoot } from 'react-dom/client';
 import { AuthProvider } from './context/AuthContext';
 import { getAuthToken } from './hooks/useAuthToken';
+import './bootstrap';
 import '../css/app.css';
 
 const appName = import.meta.env.VITE_APP_NAME || 'Mallas UNAL';

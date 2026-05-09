@@ -11,9 +11,11 @@ use App\Models\ErrorCarga;
 use App\Models\Facultad;
 use App\Models\MallaCurricular;
 use App\Models\Normativa;
+use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
 use App\Models\Requisito;
 use App\Models\Sede;
+use App\Models\SlotAgrupacion;
 use App\Services\CodeNormalizationService;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -1248,6 +1250,12 @@ class ExcelParserService
             return;
         }
 
+        // Verificar si es un placeholder (slot)
+        if ($this->esPlaceholder($codigoAsignatura)) {
+            $this->procesarPlaceholder($data, $rowNumber);
+            return;
+        }
+
         // Resolver IDs
         $componenteId = $this->resolveComponenteId($componenteValue);
         if (!$componenteId) {
@@ -1303,11 +1311,24 @@ class ExcelParserService
 
             $this->totalRows = count($rows) - 1;
 
+            // Obtener ID de normativa desde la primera fila de datos
+            $firstRow = $rows[1] ?? null;
+            if (!$firstRow) {
+                $this->recordError(0, 'Malla', 'No hay datos en el archivo', null, 'error');
+                return false;
+            }
+
+            $normativaId = $this->cleanCell($firstRow[0] ?? null);
+            if (empty($normativaId)) {
+                $this->recordError(0, 'Malla', 'El ID de normativa es obligatorio en la columna A', null, 'error');
+                return false;
+            }
+
             // Crear la malla si no existe
             if (!$this->malla) {
-                $normativa = Normativa::with(['programa.facultad.sede'])->find($this->carga->ID_Normativa);
+                $normativa = Normativa::with(['programa.facultad.sede'])->find($normativaId);
                 if (!$normativa) {
-                    $this->recordError(0, 'Malla', 'La carga no tiene normativa asociada', null, 'error');
+                    $this->recordError(0, 'Malla', "Normativa no encontrada con ID: {$normativaId}", null, 'error');
                     return false;
                 }
 
@@ -1341,5 +1362,97 @@ class ExcelParserService
             $this->recordError(0, 'Malla', 'Error procesando archivo: ' . $e->getMessage(), null, 'error');
             return false;
         }
+    }
+
+    /**
+     * Verifica si un código de asignatura es un placeholder (slot).
+     */
+    private function esPlaceholder(string $codigoAsignatura): bool
+    {
+        $placeholders = [
+            'OPTATIVA1', 'OPTATIVA2', 'OPTATIVA3', 'OPTATIVA4', 'OPTATIVA5', 'OPTATIVA6', 'OPTATIVA7', 'OPTATIVA8',
+            'LIBRE1', 'LIBRE2', 'LIBRE3', 'LIBRE4', 'LIBRE5',
+            'LIBRE6', 'LIBRE7', 'LIBRE8', 'LIBRE9', 'LIBRE10', 'LIBRE11',
+            'NIVELATORIO1', 'NIVELATORIO2'
+        ];
+        
+        return in_array(trim($codigoAsignatura), $placeholders);
+    }
+
+    /**
+     * Procesa un placeholder creando un slot en lugar de una relación con asignatura.
+     */
+    private function procesarPlaceholder(array $data, int $rowNumber): void
+    {
+        // Extraer datos
+        $componenteValue = $this->cleanCell($data[1] ?? null);
+        $agrupacionValue = $this->cleanCell($data[2] ?? null);
+        $codigoPlaceholder = trim($this->cleanCell($data[3] ?? null));
+        $obligatoria = $this->cleanCell($data[4] ?? null);
+        $semestre = $this->cleanCell($data[7] ?? null);
+
+        // Resolver IDs
+        $componenteId = $this->resolveComponenteId($componenteValue);
+        if (!$componenteId) {
+            $this->recordError($rowNumber, 'Malla', "Componente no encontrado: {$componenteValue}", $codigoPlaceholder, 'error');
+            return;
+        }
+
+        $agrupacionId = $this->resolveAgrupacionId($agrupacionValue, $componenteId);
+        if (!$agrupacionId) {
+            $this->recordError($rowNumber, 'Malla', "Agrupación no encontrada: {$agrupacionValue}", $codigoPlaceholder, 'error');
+            return;
+        }
+
+        // Determinar tipo de slot
+        $tipoSlot = $this->determinarTipoSlot($codigoPlaceholder);
+        $semestreNum = is_numeric($semestre) ? (int) $semestre : null;
+
+        try {
+            // Crear slot
+            $slot = SlotAgrupacion::create([
+                'ID_Agrupacion' => $agrupacionId,
+                'Nombre_Slot' => $codigoPlaceholder,
+                'Tipo_Slot' => $tipoSlot,
+                'Semestre' => $semestreNum,
+            ]);
+
+            $this->processedRows++;
+            
+            // Registrar información de procesamiento
+            $this->recordError($rowNumber, 'Malla', 
+                "Slot creado: {$codigoPlaceholder} (Tipo: {$tipoSlot})", 
+                $codigoPlaceholder, 'info'
+            );
+
+        } catch (\Exception $e) {
+            $this->recordError($rowNumber, 'Malla', 
+                "Error creando slot '{$codigoPlaceholder}': " . $e->getMessage(), 
+                $codigoPlaceholder, 'error'
+            );
+        }
+    }
+
+    /**
+     * Determina el tipo de slot basado en el nombre del placeholder.
+     */
+    private function determinarTipoSlot(string $nombrePlaceholder): string
+    {
+        $nombreUpper = strtoupper($nombrePlaceholder);
+
+        if (str_contains($nombreUpper, 'OPTATIVA')) {
+            return SlotAgrupacion::TIPO_OPTATIVA;
+        }
+
+        if (str_contains($nombreUpper, 'LIBRE')) {
+            return SlotAgrupacion::TIPO_LIBRE;
+        }
+
+        if (str_contains($nombreUpper, 'NIVELATORIO')) {
+            return SlotAgrupacion::TIPO_NIVELATORIO;
+        }
+
+        // Por defecto, si no se puede determinar
+        return SlotAgrupacion::TIPO_LIBRE;
     }
 }

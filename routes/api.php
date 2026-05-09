@@ -6,6 +6,7 @@ use App\Http\Controllers\Api\FacultadController;
 use App\Http\Controllers\Api\ProgramaController;
 use App\Http\Controllers\Api\NormativaController;
 use App\Http\Controllers\Api\ComponenteController;
+use App\Http\Controllers\Api\AgrupacionController;
 use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\CargaController;
@@ -121,6 +122,12 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::get('/componentes/{id}', [ComponenteController::class, 'show']);
         Route::put('/componentes/{id}', [ComponenteController::class, 'update']);
 
+        // Agrupaciones
+        Route::get('/agrupaciones', [AgrupacionController::class, 'index']);
+        Route::post('/agrupaciones', [AgrupacionController::class, 'store']);
+        Route::get('/agrupaciones/{id}', [AgrupacionController::class, 'show']);
+        Route::put('/agrupaciones/{id}', [AgrupacionController::class, 'update']);
+
         // Asignaturas
         Route::get('/asignaturas', [AsignaturaController::class, 'index']);
         Route::post('/asignaturas', [AsignaturaController::class, 'store']);
@@ -143,8 +150,6 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::get('/cargas/{id}/estado', [CargaController::class, 'estado']);
         Route::get('/cargas/{id}/errores', [CargaController::class, 'errores']);
         Route::get('/cargas/{id}/diff', [CargaController::class, 'diff']);
-        Route::patch('/cargas/{id}/enviar-revision', [CargaController::class, 'enviarRevision']);
-        Route::patch('/cargas/{id}/revisar', [CargaController::class, 'revisar']);
         
         // Flujo de aprobación de mallas
         Route::get('/aprobacion/pendientes', [MallaAprobacionController::class, 'pendientesRevision']);
@@ -169,11 +174,10 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::get('/auditoria/exportar-logs', [AuditoriaController::class, 'exportarLogs']);
         
         // Test endpoint autenticado
-        Route::get('/test-auth', function() {
+        Route::get('/test-auth', function(Illuminate\Http\Request $request) {
             return response()->json([
                 'message' => 'Autenticado correctamente',
-                'user_id' => auth('web')->user()?->ID_Usuario,
-                'user_name' => auth('web')->user()?->Nombre_Usuario,
+                'user' => $request->user(),
             ]);
         });
 });

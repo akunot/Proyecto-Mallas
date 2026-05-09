@@ -17,6 +17,8 @@ class DatabaseSeeder extends Seeder
             ProgramaSeeder::class,
             NormativaSeeder::class,
             UsuarioSeeder::class,
+            ComponenteSeeder::class,
+            PlantillaAgrupacionSeeder::class,
         ]);
     }
 }

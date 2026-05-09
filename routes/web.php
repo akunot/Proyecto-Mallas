@@ -8,6 +8,7 @@ use App\Http\Controllers\Api\FacultadController;
 use App\Http\Controllers\Api\ProgramaController;
 use App\Http\Controllers\Api\NormativaController;
 use App\Http\Controllers\Api\ComponenteController;
+use App\Http\Controllers\Api\AgrupacionController;
 use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\AuthController;
@@ -228,11 +229,11 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'programas' => Programa::select('ID_Programa', 'Nombre_Programa')->where('Activo_Programa', 1)->get(),
+            'programas' => Programa::select('ID_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get(),
         ]);
     })->name('normativas');
     Route::get('/normativas/create', function () {
-        $programas = Programa::select('ID_Programa', 'Nombre_Programa')->where('Activo_Programa', 1)->get();
+        $programas = Programa::select('ID_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get();
         return Inertia::render('Catalogos/NormativasForm', [
             'programas' => $programas,
         ]);
@@ -245,7 +246,7 @@ Route::middleware(['auth'])->group(function () {
         $query = \App\Models\Componente::query();
 
         // Búsqueda por nombre
-        if ($request->filled('search')) {
+        if ($request->has('search') && $request->search) {
             $query->where('Nombre_Componente', 'like', '%' . $request->search . '%');
         }
 
@@ -273,6 +274,41 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/componentes/create', 'Catalogos/ComponentesForm')->name('componentes.create');
     Route::get('/componentes/{id}/edit', [ComponenteController::class, 'edit']);
     Route::patch('/componentes/{id}/toggle', [ComponenteController::class, 'toggle']);
+    
+    // Catálogos - Agrupaciones
+    Route::get('/agrupaciones', function (Illuminate\Http\Request $request) {
+        $query = \App\Models\PlantillaAgrupacion::with(['programa', 'componente']);
+
+        // Búsqueda por nombre
+        if ($request->has('search') && $request->search) {
+            $query->where('Nombre_Agrupacion', 'like', '%' . $request->search . '%');
+        }
+
+        // Ordenamiento
+        $sortField = $request->sort_by ?? 'ID_Plantilla_Agrupacion';
+        $sortOrder = $request->sort_order ?? 'asc';
+        $query->orderBy($sortField, $sortOrder);
+
+        $agrupaciones = $query->paginate(20)->withQueryString();
+
+        return Inertia::render('Catalogos/Agrupaciones', [
+            'agrupaciones' => [
+                'data' => $agrupaciones->items(),
+                'meta' => [
+                    'current_page' => $agrupaciones->currentPage(),
+                    'total' => $agrupaciones->total(),
+                    'per_page' => $agrupaciones->perPage(),
+                    'last_page' => $agrupaciones->lastPage(),
+                    'sort_by' => $sortField,
+                    'sort_order' => $sortOrder,
+                ],
+            ],
+        ]);
+    })->name('agrupaciones');
+    Route::inertia('/agrupaciones/create', 'Catalogos/AgrupacionesForm')->name('agrupaciones.create');
+    Route::get('/agrupaciones/{id}/edit', [AgrupacionController::class, 'edit']);
+    Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
+    Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
     
     // Catálogos - Asignaturas
     Route::get('/asignaturas', function (Illuminate\Http\Request $request) {

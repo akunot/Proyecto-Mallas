@@ -33,13 +33,6 @@ interface Carga {
     advertencias_count?: number;
 }
 
-interface Normativa {
-    ID_Normativa: number;
-    Tipo_Normativa: string;
-    Numero_Normativa: string;
-    Anio_Normativa: number;
-    programa: { ID_Programa: number; Nombre_Programa: string };
-}
 
 type TipoCarga = 'asignaturas' | 'electivas' | 'malla' | '';
 
@@ -112,14 +105,12 @@ const formatDate = (d: string) =>
 
 export default function Cargas() {
     const [cargas, setCargas]           = useState<Carga[]>([]);
-    const [normativas, setNormativas]   = useState<Normativa[]>([]);
     const [loading, setLoading]         = useState(true);
 
     // Modal de subida
     const [showModal, setShowModal]             = useState(false);
     const [uploading, setUploading]             = useState(false);
     const [selectedTipo, setSelectedTipo]       = useState<TipoCarga>('');
-    const [selectedNormativa, setSelectedNormativa] = useState<number | ''>('');
     const [selectedFile, setSelectedFile]       = useState<File | null>(null);
 
     // Modal de errores
@@ -143,7 +134,6 @@ export default function Cargas() {
 
     useEffect(() => {
         fetchCargas();
-        fetchNormativas();
     }, []);
 
     // ── Polling ────────────────────────────────────────────────────────────────
@@ -173,20 +163,6 @@ export default function Cargas() {
         }
     };
 
-    const fetchNormativas = async () => {
-        try {
-            const res = await fetch(`${apiUrl}/api/v1/normativas`, {
-                headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
-                credentials: 'same-origin',
-            });
-            if (res.ok) {
-                const data = await res.json();
-                setNormativas(data.data ?? []);
-            }
-        } catch (e) {
-            console.error('Error fetching normativas:', e);
-        }
-    };
 
     const fetchEstado = async (id: number) => {
         try {
@@ -231,12 +207,8 @@ export default function Cargas() {
     const handleUpload = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!selectedFile || !selectedTipo) {
+        if (!selectedTipo || !selectedFile) {
             alert('Seleccione el tipo de archivo y un archivo Excel.');
-            return;
-        }
-        if (selectedTipo === 'malla' && !selectedNormativa) {
-            alert('Debe seleccionar una normativa para cargar una malla.');
             return;
         }
 
@@ -253,7 +225,6 @@ export default function Cargas() {
                 },
                 credentials: 'same-origin',
                 body: JSON.stringify({
-                    normativa_id: selectedTipo === 'malla' ? selectedNormativa : null,
                     tipo_carga: selectedTipo,
                 }),
             });
@@ -339,7 +310,6 @@ export default function Cargas() {
     const handleCloseModal = () => {
         setShowModal(false);
         setSelectedTipo('');
-        setSelectedNormativa('');
         setSelectedFile(null);
     };
 
@@ -602,10 +572,7 @@ export default function Cargas() {
                                             <button
                                                 key={tipo}
                                                 type="button"
-                                                onClick={() => {
-                                                    setSelectedTipo(tipo);
-                                                    if (tipo !== 'malla') setSelectedNormativa('');
-                                                }}
+                                                onClick={() => setSelectedTipo(tipo)}
                                                 className={`rounded-lg border-2 px-3 py-2.5 text-sm font-medium transition-all ${
                                                     selected
                                                         ? 'border-green-600 bg-green-50 text-green-800'
@@ -619,27 +586,6 @@ export default function Cargas() {
                                 </div>
                             </div>
 
-                            {/* Normativa — solo para tipo malla */}
-                            {selectedTipo === 'malla' && (
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                                        Normativa <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={selectedNormativa}
-                                        onChange={(e) => setSelectedNormativa(e.target.value ? parseInt(e.target.value) : '')}
-                                        required
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                                    >
-                                        <option value="">Seleccione una normativa…</option>
-                                        {normativas.map((n) => (
-                                            <option key={n.ID_Normativa} value={n.ID_Normativa}>
-                                                {n.Tipo_Normativa} {n.Numero_Normativa}/{n.Anio_Normativa} — {n.programa?.Nombre_Programa ?? 'Sin programa'}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
 
                             {/* Archivo */}
                             <div>
@@ -666,7 +612,7 @@ export default function Cargas() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading || !selectedFile || !selectedTipo || (selectedTipo === 'malla' && !selectedNormativa)}
+                                    disabled={uploading || !selectedFile || !selectedTipo}
                                     className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {uploading ? (

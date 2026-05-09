@@ -24,6 +24,7 @@ export default function Layout({ children }: LayoutProps) {
         { name: 'Normativas', href: '/normativas' },
         { name: 'Asignaturas', href: '/asignaturas' },
         { name: 'Componentes', href: '/componentes' },
+        { name: 'Agrupaciones', href: '/agrupaciones' },
     ];
 
     const isActive = (href: string) => url.startsWith(href);
