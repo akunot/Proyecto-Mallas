@@ -94,7 +94,7 @@ class ExcelUploadService
 
         $isReadyToProcess = false;
         if ($carga->tipo_carga === 'malla') {
-            $isReadyToProcess = $carga->ID_Archivo_Asignaturas && $carga->ID_Archivo_Electivas && $carga->ID_Archivo_Malla;
+            $isReadyToProcess = $carga->ID_Archivo_Malla !== null;
         } elseif ($carga->tipo_carga === 'asignaturas') {
             $isReadyToProcess = $field === 'ID_Archivo_Asignaturas';
         } elseif ($carga->tipo_carga === 'electivas') {

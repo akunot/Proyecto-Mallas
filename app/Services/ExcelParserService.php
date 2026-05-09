@@ -52,11 +52,11 @@ class ExcelParserService
         $tipoCarga = $this->carga->tipo_carga;
 
         if ($tipoCarga === 'malla') {
-            if (!$this->carga->ID_Archivo_Asignaturas || !$this->carga->ID_Archivo_Electivas || !$this->carga->ID_Archivo_Malla) {
+            if (!$this->carga->ID_Archivo_Malla) {
                 $this->recordError(
                     0,
                     'Carga',
-                    'Faltan los tres archivos necesarios para procesar la carga de malla.',
+                    'Falta el archivo principal de la malla.',
                     null,
                     'error'
                 );
@@ -127,13 +127,16 @@ class ExcelParserService
                  // Pre-cargar catálogos en cache para evitar N+1 queries
                  $this->preloadCatalogs();
 
-                 $asignaturasSpreadsheet = $this->loadSpreadsheetFromField('archivoAsignaturas');
-                 $this->parseAsignaturasFile($asignaturasSpreadsheet);
-
-                 $electivasSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
-                 $this->parseElectivasFile($electivasSpreadsheet);
-
                  $mallaSpreadsheet = $this->loadSpreadsheetFromField('archivoMalla');
+                 if (!$this->prepareMalla($mallaSpreadsheet)) {
+                     return [
+                         'success' => false,
+                         'errors_count' => count($this->errors),
+                         'warnings_count' => count($this->warnings),
+                         'processed_rows' => $this->processedRows,
+                         'total_rows' => $this->totalRows,
+                     ];
+                 }
                  $this->parseAgglomerationSheets($mallaSpreadsheet);
                  $result = $this->parseMalla($mallaSpreadsheet);
              } elseif ($tipoCarga === 'asignaturas') {
@@ -438,6 +441,73 @@ class ExcelParserService
         return null;
     }
 
+    private function prepareMalla(Spreadsheet $spreadsheet): bool
+    {
+        if ($this->malla) {
+            return true;
+        }
+
+        $sheetName = $this->findSheetContaining($spreadsheet, 'MALLA');
+        if (!$sheetName) {
+            $this->recordError(1, 'MALLA', 'No se encontró la hoja MALLA en el archivo');
+            return false;
+        }
+
+        $sheet = $spreadsheet->getSheetByName($sheetName);
+        $rows = $sheet->toArray();
+
+        if (count($rows) < 2) {
+            $this->recordError(1, 'MALLA', 'La hoja MALLA está vacía');
+            return false;
+        }
+
+        // Extraer normativa del Excel si no viene en la carga
+        if (!$this->carga->ID_Normativa) {
+            for ($i = 1; $i < count($rows); $i++) {
+                if (!$this->isRowEmpty($rows[$i]) && !empty($rows[$i][0])) {
+                    $normativaIdStr = $this->cleanCell($rows[$i][0]);
+                    $normativaId = is_numeric($normativaIdStr) ? (int) $normativaIdStr : null;
+                    if ($normativaId) {
+                        $this->carga->ID_Normativa = $normativaId;
+                        break;
+                    }
+                }
+            }
+        }
+
+        $normativa = Normativa::with(['programa.facultad.sede'])->find($this->carga->ID_Normativa);
+        if (!$normativa) {
+            $this->recordError(0, 'Malla', 'La carga no tiene normativa asociada ni se encontró en el archivo.', null, 'error');
+            return false;
+        }
+
+        $programa = $normativa->programa;
+        $facultad = $programa->facultad;
+        $sede = $facultad->sede;
+
+        // Actualizamos la carga con el programa y normativa extraídos
+        $this->carga->update([
+            'ID_Normativa' => $normativa->ID_Normativa,
+            'ID_Programa' => $programa->ID_Programa
+        ]);
+
+        $this->malla = MallaCurricular::create([
+            'ID_Normativa' => $normativa->ID_Normativa,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Facultad' => $facultad->ID_Facultad,
+            'ID_Sede' => $sede->ID_Sede,
+            'Version_Numero' => $this->getNextVersionNumber($programa->ID_Programa),
+            'Fecha_Inicio_Vigencia' => now(),
+            'Estado' => 'borrador',
+            'Es_Vigente' => 0,
+        ]);
+
+        $this->carga->update(['ID_Malla' => $this->malla->ID_Malla]);
+
+        // Ya que la malla fue recién creada, también aseguramos que su info esté disponible para la caché
+        return true;
+    }
+
     /**
      * Parsea la hoja MALLA con optimización bulk.
      * Estrategia: precarga de catálogos en memoria + batch building + bulk inserts.
@@ -458,32 +528,6 @@ class ExcelParserService
         }
 
         $this->totalRows = count($rows) - 1;
-
-        // Crear la malla si no existe (ya no se parsea desde Excel)
-        if (!$this->malla) {
-            $normativa = Normativa::with(['programa.facultad.sede'])->find($this->carga->ID_Normativa);
-            if (!$normativa) {
-                $this->recordError(0, 'Malla', 'La carga no tiene normativa asociada.', null, 'error');
-                return false;
-            }
-
-            $programa = $normativa->programa;
-            $facultad = $programa->facultad;
-            $sede = $facultad->sede;
-
-            $this->malla = MallaCurricular::create([
-                'ID_Normativa' => $normativa->ID_Normativa,
-                'ID_Programa' => $programa->ID_Programa,
-                'ID_Facultad' => $facultad->ID_Facultad,
-                'ID_Sede' => $sede->ID_Sede,
-                'Version_Numero' => $this->getNextVersionNumber($programa->ID_Programa),
-                'Fecha_Inicio_Vigencia' => now(),
-                'Estado' => 'borrador',
-                'Es_Vigente' => 0,
-            ]);
-
-            $this->carga->update(['ID_Malla' => $this->malla->ID_Malla]);
-        }
 
         // === BATCHES ===
         $batchComponentes = [];    // Nuevos componentes a insertar
@@ -560,7 +604,7 @@ class ExcelParserService
      * Acumula una fila de la hoja MALLA en los batches.
      * No hace queries, solo construye arrays.
      */
-    private function accumulateMallaRow(
+        private function accumulateMallaRow(
         array $data,
         int $rowNumber,
         array &$batchComponentes,
@@ -570,94 +614,76 @@ class ExcelParserService
         array &$compTempMap,
         array &$agrupTempMap
     ): void {
-        $componenteNombre = $this->cleanCell($data[1] ?? '');
-        $agrupacionNombre = $this->cleanCell($data[2] ?? '');
-        $codigo = $this->cleanCodeCell($data[3] ?? null);
-        $nombreAsignatura = $this->cleanCell($data[4] ?? '');
+        $componenteId = (int) $this->cleanCell($data[1] ?? "");
+        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? "");
+        $codigoAsignatura = $this->cleanCodeCell($data[3] ?? "");
+        $obligatoriaVal = $this->cleanCell($data[4] ?? "");
+        $reqTipo = $this->cleanCell($data[5] ?? null);
+        $reqCodigo = $this->cleanCodeCell($data[6] ?? null);
+        $semestre = !empty($data[7]) ? (int)$data[7] : null;
 
-        if (empty($codigo)) {
-            $this->recordError($rowNumber, 'Código Asignatura', 'Fila sin código de asignatura', $nombreAsignatura ?: 'Sin nombre', 'error');
+        if (empty($codigoAsignatura)) {
+            $this->recordError($rowNumber, "Codigo Asignatura", "Fila sin codigo de asignatura", "", "error");
             return;
         }
 
-        // Resolver asignatura (puede ser existente o nueva)
-        $asignatura = $this->resolveAsignatura($codigo, $nombreAsignatura, $data[5] ?? null, $rowNumber, 'regular');
-        if (!$asignatura) {
-            $this->recordError($rowNumber, 'Asignatura', 'No se pudo resolver la asignatura', "codigo: {$codigo}, nombre: {$nombreAsignatura}", 'error');
+        $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoAsignatura));
+        if (!$asignaturaReqId) {
+            $this->recordError($rowNumber, "Asignatura", "Asignatura no encontrada en el catalogo. Asegurese de subirla primero.", $codigoAsignatura, "error");
             return;
         }
 
-        // Componente
-        if (empty($componenteNombre)) {
-            $this->recordError($rowNumber, 'Componente', 'Componente vacío', $codigo, 'error');
-            return;
+        static $plantillasCache = null;
+        if ($plantillasCache === null) {
+             $plantillasCache = \App\Models\PlantillaAgrupacion::all()->keyBy("ID_Plantilla_Agrupacion");
         }
 
-        $componenteKey = $componenteNombre;
-        if (!isset($this->componentesCache[$componenteKey])) {
-            // No existe → agregar a batch
-            $batchComponentes[] = [
-                'Nombre_Componente' => $componenteNombre,
-                'Descripcion_Componente' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
-            ];
-            // Asignar ID temporal (último + offset)
-            $tempId = count($batchComponentes) * -1; // negativo para identificar temporales
-            $compTempMap[$componenteKey] = $tempId;
-            $this->componentesCache[$componenteKey] = $tempId; // provisional
+        if (!isset($plantillasCache[$plantillaAgrupacionId])) {
+              $this->recordError($rowNumber, "Agrupacion", "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no valida.", $codigoAsignatura, "error");
+              return;
         }
 
-        $componenteId = $this->componentesCache[$componenteKey];
-
-        // Agrupación
-        if (empty($agrupacionNombre)) {
-            $this->recordError($rowNumber, 'Agrupación', 'Agrupación vacía', $codigo, 'error');
-            return;
-        }
-
-        $agrupKey = $componenteId . '|' . $agrupacionNombre;
+        $plantilla = $plantillasCache[$plantillaAgrupacionId];
+        $agrupKey = $componenteId . "|" . $plantilla->Nombre_Agrupacion;
+        
         if (!isset($this->agrupacionesCache[$agrupKey])) {
-            // No existe → agregar a batch
             $batchAgrupaciones[] = [
-                'ID_Malla' => $this->malla->ID_Malla,
-                'ID_Componente' => is_int($componenteId) ? $componenteId : null, // se resolverá después
-                'Nombre_Agrupacion' => $agrupacionNombre,
-                'Creditos_Requeridos' => null,
-                'Es_Obligatoria' => 0,
-                'created_at' => now(),
-                'updated_at' => now(),
+                "ID_Malla" => $this->malla->ID_Malla,
+                "ID_Componente" => $componenteId,
+                "Nombre_Agrupacion" => $plantilla->Nombre_Agrupacion,
+                "Creditos_Requeridos" => $plantilla->Creditos_Requeridos,
+                "Es_Obligatoria" => $plantilla->Es_Obligatoria,
+                "created_at" => now(),
+                "updated_at" => now(),
             ];
             $tempAgrupId = count($batchAgrupaciones) * -1;
             $agrupTempMap[$agrupKey] = $tempAgrupId;
             $this->agrupacionesCache[$agrupKey] = $tempAgrupId;
         }
 
-        // Nota: los IDs reales se resolverán después de los inserts
-
-        // Relación agrupacion_asignatura
-        $tipoAsignatura = $this->mapObligatoria($data[6] ?? '');
-        $semestre = !empty($data[7]) ? (int)$data[7] : null;
+        $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
 
         $batchRelaciones[] = [
-            'ID_Agrupacion' => $agrupKey, // temporal, se resolverá después
-            'ID_Asignatura' => $asignatura->ID_Asignatura,
-            'Tipo_Asignatura' => $tipoAsignatura,
-            'Semestre_Sugerido' => $semestre,
-            'created_at' => now(),
-            'updated_at' => now(),
+            "ID_Agrupacion" => $agrupKey,
+            "ID_Asignatura" => $asignaturaReqId,
+            "Tipo_Asignatura" => $tipoAsignatura,
+            "Semestre_Sugerido" => $semestre,
+            "created_at" => now(),
+            "updated_at" => now(),
         ];
+        
+        $this->asignaturasProcessed[$codigoAsignatura] = true;
 
-        $this->asignaturasProcessed[$asignatura->Codigo_Asignatura] = true;
-
-        // Requisitos
-        $this->processRequisitoBatch(
-            $batchRelaciones[count($batchRelaciones) - 1],
-            $data[8] ?? null,
-            $data[9] ?? null,
-            $rowNumber,
-            $batchRequisitos
-        );
+        if (!empty($reqTipo) && (!empty($reqCodigo) || $reqTipo == "CREDITOS")) {
+            $this->processRequisitoBatch(
+                $asignaturaReqId,
+                $this->malla->normativa->ID_Programa,
+                $reqTipo,
+                $reqCodigo,
+                $rowNumber,
+                $batchRequisitos
+            );
+        }
     }
 
     private function isRowEmpty(array $row): bool
@@ -1064,42 +1090,40 @@ class ExcelParserService
     /**
      * Procesa requisitos para una relación agrupación-asignatura en batch.
      */
-    private function processRequisitoBatch(array $relacion, ?string $reqTipo, ?string $reqCodigo, int $rowNumber, array &$batchRequisitos): void
+        private function processRequisitoBatch(int $asignaturaBaseId, int $idPrograma, ?string $reqTipo, ?string $reqCodigo, int $rowNumber, array &$batchRequisitos): void
     {
-        if (empty($reqTipo) && empty($reqCodigo)) {
+        if (empty($reqTipo)) {
             return;
         }
 
-        $reqCodigo = $this->cleanCodeCell($reqCodigo);
-        if (empty($reqCodigo)) {
-            return;
-        }
+        $asignaturaReqId = null;
+        $reqCodigoLimpiado = $this->cleanCodeCell($reqCodigo);
 
-        // Buscar asignatura requisito por código base
-        $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($reqCodigo));
-        if (!$asignaturaReqId) {
-            $this->recordError(
-                $rowNumber,
-                'Requisito',
-                'Asignatura requisito no encontrada: ' . $reqCodigo,
-                $reqCodigo,
-                'advertencia'
-            );
-            return;
+        if (!empty($reqCodigoLimpiado) && !is_numeric($reqCodigoLimpiado)) {
+            $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($reqCodigoLimpiado));
+            if (!$asignaturaReqId) {
+                $this->recordError(
+                    $rowNumber,
+                    "Requisito",
+                    "Asignatura requisito no encontrada: " . $reqCodigoLimpiado,
+                    $reqCodigoLimpiado,
+                    "advertencia"
+                );
+                return;
+            }
         }
 
         $batchRequisitos[] = [
-            'ID_Agrupacion_Asignatura' => null, // Se resolverá después del insert
-            'ID_Asignatura_Requisito' => $asignaturaReqId,
-            'Tipo_Requisito' => $this->mapTipoRequisito($reqTipo),
-            'created_at' => now(),
-            'updated_at' => now(),
+            "ID_Asignatura" => $asignaturaBaseId,
+            "ID_Programa" => $idPrograma,
+            "ID_Asignatura_Requerida" => $asignaturaReqId,
+            "Tipo_Requisito" => $this->mapTipoRequisito($reqTipo),
+            "Valor_Creditos" => is_numeric($reqCodigoLimpiado) ? (int)$reqCodigoLimpiado : null,
+            "created_at" => now(),
+            "updated_at" => now(),
         ];
     }
 
-    /**
-     * Procesa requisitos para una relación agrupación-asignatura individual.
-     */
     private function processRequisito(AgrupacionAsignatura $relacion, ?string $reqTipo, ?string $reqCodigo, int $rowNumber): void
     {
         if (empty($reqTipo) && empty($reqCodigo)) {
