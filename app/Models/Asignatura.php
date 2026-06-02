@@ -7,23 +7,34 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Asignatura extends Model
 {
-    protected $table = 'asignaturas';
-    protected $primaryKey = 'ID_Asignatura';
+    protected $table = "asignaturas";
+    protected $primaryKey = "ID_Asignatura";
     public $incrementing = true;
-    protected $keyType = 'int';
+    protected $keyType = "int";
 
     protected $fillable = [
-        'Codigo_Asignatura',
-        'Codigo_Base',
-        'Nombre_Asignatura',
-        'Creditos_Asignatura',
-        'Horas_Presencial',
-        'Horas_Estudiante',
-        'Descripcion_Asignatura',
+        "Codigo_Asignatura",
+        "Codigo_Base",
+        "Nombre_Asignatura",
+        "Creditos_Asignatura",
+        "Horas_Presencial",
+        "Horas_Estudiante",
+        "Descripcion_Asignatura",
     ];
 
     public function agrupaciones(): HasMany
     {
-        return $this->hasMany(AgrupacionAsignatura::class, 'ID_Asignatura', 'ID_Asignatura');
+        return $this->hasMany(AgrupacionAsignatura::class, "ID_Asignatura", "ID_Asignatura");
+    }
+
+    public function requisitos(): HasMany
+    {
+        return $this->hasMany(Requisito::class, "ID_Asignatura", "ID_Asignatura");
+    }
+
+    public function esRequisitoDe(): HasMany
+    {
+        return $this->hasMany(Requisito::class, "ID_Asignatura_Requerida", "ID_Asignatura");
     }
 }
+

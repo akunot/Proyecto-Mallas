@@ -34,17 +34,6 @@ class ProcesarExcelJob implements ShouldQueue
     {
         $carga = CargaMalla::findOrFail($this->cargaId);
 
-        if ($carga->tipo_carga === 'malla' && ! $carga->ID_Malla) {
-            $malla = MallaCurricular::create([
-                'ID_Normativa' => $carga->ID_Normativa,
-                'ID_Programa' => $carga->ID_Programa,
-                'Version_Numero' => $this->getNextVersionNumber($carga->ID_Programa),
-                'Fecha_Vigencia' => now()->toDateString(),
-                'Estado' => 'borrador',
-                'Es_Vigente' => 0,
-            ]);
-            $carga->update(['ID_Malla' => $malla->ID_Malla]);
-        }
 
         $carga->update(['Estado_Carga' => 'validando']);
 
