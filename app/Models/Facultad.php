@@ -14,7 +14,7 @@ class Facultad extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'ID_Sede',
+        'Codigo_Sede',
         'Codigo_Facultad',
         'Nombre_Facultad',
         'Conmutador_Facultad',
@@ -26,11 +26,11 @@ class Facultad extends Model
 
     public function sede(): BelongsTo
     {
-        return $this->belongsTo(Sede::class, 'ID_Sede', 'ID_Sede');
+        return $this->belongsTo(Sede::class, 'Codigo_Sede', 'Codigo_Sede');
     }
 
     public function programas(): HasMany
     {
-        return $this->hasMany(Programa::class, 'ID_Facultad', 'ID_Facultad');
+        return $this->hasMany(Programa::class, 'Codigo_Facultad', 'Codigo_Facultad');
     }
 }

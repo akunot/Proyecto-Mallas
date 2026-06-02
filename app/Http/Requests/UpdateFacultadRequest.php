@@ -14,10 +14,11 @@ class UpdateFacultadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID_Sede' => 'sometimes|integer|exists:sede,ID_Sede',
+            'Codigo_Sede' => 'sometimes|integer|exists:sedes,Codigo_Sede',
+            'Codigo_Facultad' => 'sometimes|integer|unique:facultades,Codigo_Facultad,' . $this->route('id') . ',ID_Facultad',
             'Nombre_Facultad' => 'sometimes|string|max:150',
             'Conmutador_Facultad' => 'nullable|string|max:30',
-            'Extension_Facultad' => 'nullable|string|max:10',
+            'Extension_Facultad' => 'nullable|string|max:80',
             'Campus_Facultad' => 'nullable|string|max:100',
             'Url_Facultad' => 'nullable|string|max:300',
         ];

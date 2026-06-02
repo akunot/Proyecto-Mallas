@@ -11,8 +11,8 @@ class ProgramaResource extends JsonResource
     {
         return [
             'id' => $this->ID_Programa,
-            'id_facultad' => $this->ID_Facultad,
-            'codigo' => $this->Codigo_Programa,
+            'codigo_facultad' => $this->Codigo_Facultad,
+            'codigo_programa' => $this->Codigo_Programa,
             'nombre' => $this->Nombre_Programa,
             'titulo' => $this->Titulo_Otorgado,
             'nivel' => $this->Nivel_Formacion,
@@ -25,10 +25,11 @@ class ProgramaResource extends JsonResource
             'extension' => $this->Extension,
             'correo' => $this->Correo,
             'area' => $this->Area_Curricular,
-            'activo' => (bool) $this->Activo_Programa,
+            'activo' => (bool) $this->Esta_Activo,
             'facultad' => $this->whenLoaded('facultad', function () {
                 return [
                     'id' => $this->facultad->ID_Facultad,
+                    'codigo_facultad' => $this->facultad->Codigo_Facultad,
                     'nombre' => $this->facultad->Nombre_Facultad,
                 ];
             }),

@@ -27,7 +27,13 @@ class SedeController extends CatalogoController
     protected function getRelatedData(): array
     {
         return [
-            'sedes' => Sede::select('ID_Sede', 'Nombre_Sede')->get()->toArray(),
+            'sedes' => Sede::select('Codigo_Sede', 'Nombre_Sede')->get()->toArray(),
         ];
+    }
+
+    protected function getActiveField(string $model): ?string
+    {
+        // Las sedes no tienen campo activo en la BD actual
+        return null;
     }
 }

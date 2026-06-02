@@ -14,7 +14,7 @@ class UpdateNormativaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID_Programa' => 'sometimes|integer|exists:programa,ID_Programa',
+            'Codigo_Programa' => 'sometimes|integer|exists:programas,Codigo_Programa',
             'Tipo_Normativa' => 'sometimes|string|in:Acuerdo,Resolución,Decreto,Circular',
             'Numero_Normativa' => 'sometimes|string|max:50',
             'Anio_Normativa' => 'sometimes|integer|min:1900|max:' . date('Y'),

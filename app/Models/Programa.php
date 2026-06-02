@@ -14,7 +14,7 @@ class Programa extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'ID_Facultad',
+        'Codigo_Facultad',
         'Codigo_Programa',
         'Nombre_Programa',
         'Titulo_Otorgado',
@@ -28,17 +28,17 @@ class Programa extends Model
         'Extension',
         'Correo',
         'Area_Curricular',
-        'Activo_Programa',
+        'Esta_Activo',
     ];
 
     public function facultad(): BelongsTo
     {
-        return $this->belongsTo(Facultad::class, 'ID_Facultad', 'ID_Facultad');
+        return $this->belongsTo(Facultad::class, 'Codigo_Facultad', 'Codigo_Facultad');
     }
 
     public function normativas(): HasMany
     {
-        return $this->hasMany(Normativa::class, 'ID_Programa', 'ID_Programa');
+        return $this->hasMany(Normativa::class, 'Codigo_Programa', 'Codigo_Programa');
     }
 
     public function mallaVigente()

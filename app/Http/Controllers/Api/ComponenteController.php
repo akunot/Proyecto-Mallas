@@ -21,7 +21,7 @@ class ComponenteController extends CatalogoController
 
     protected function getActiveField(string $model): ?string
     {
-        // Los componentes no tienen campo activo
+        // Los componentes no tienen campo activo en la BD actual
         return null;
     }
 }

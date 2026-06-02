@@ -36,19 +36,6 @@ class AsignaturaController extends CatalogoController
             $query->where($searchField, 'like', '%' . $request->search . '%');
         }
 
-        // Filtrado por tipo de asignatura (ahora contextual)
-        if ($request->has('tipo') && $request->tipo) {
-            if ($request->tipo === 'regular') {
-                $query->whereHas('agrupaciones', function($q) {
-                    $q->where('Tipo_Asignatura', 'regular');
-                });
-            } elseif ($request->tipo === 'electiva') {
-                $query->whereHas('agrupaciones', function($q) {
-                    $q->where('Tipo_Asignatura', 'electiva');
-                });
-            }
-        }
-
         // Ordenamiento
         $sortField = $request->sort_by ?? $this->fillable[1] ?? 'id';
         $sortOrder = $request->sort_order ?? 'asc';
@@ -75,7 +62,7 @@ class AsignaturaController extends CatalogoController
 
     protected function getActiveField(string $model): ?string
     {
-        // Las asignaturas no tienen campo activo
+        // Las asignaturas no tienen campo activo en la BD actual
         return null;
     }
 }

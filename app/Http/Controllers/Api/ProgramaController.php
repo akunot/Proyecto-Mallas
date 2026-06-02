@@ -15,7 +15,7 @@ class ProgramaController extends CatalogoController
     {
         $this->model = new Programa();
         $this->fillable = [
-            'ID_Facultad',
+            'Codigo_Facultad',
             'Codigo_Programa',
             'Nombre_Programa',
             'Titulo_Otorgado',
@@ -29,19 +29,19 @@ class ProgramaController extends CatalogoController
             'Extension',
             'Correo',
             'Area_Curricular',
-            'Activo_Programa',
+            'Esta_Activo',
         ];
     }
 
     protected function getActiveField(string $model): ?string
     {
-        return 'Activo_Programa';
+        return 'Esta_Activo';
     }
 
     protected function getRelatedData(): array
     {
         return [
-            'facultades' => Facultad::select('ID_Facultad', 'Nombre_Facultad')->get()->toArray(),
+            'facultades' => Facultad::select('Codigo_Facultad', 'Nombre_Facultad')->get()->toArray(),
         ];
     }
 }

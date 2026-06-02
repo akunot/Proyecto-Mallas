@@ -14,7 +14,7 @@ class Normativa extends Model
     protected $keyType = 'int';
 
     protected $fillable = [
-        'ID_Programa',
+        'Codigo_Programa',
         'Tipo_Normativa',
         'Numero_Normativa',
         'Anio_Normativa',
@@ -26,7 +26,7 @@ class Normativa extends Model
 
     public function programa(): BelongsTo
     {
-        return $this->belongsTo(Programa::class, 'ID_Programa', 'ID_Programa');
+        return $this->belongsTo(Programa::class, 'Codigo_Programa', 'Codigo_Programa');
     }
 
     public function mallasCurriculares(): HasMany

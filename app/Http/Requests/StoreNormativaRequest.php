@@ -14,7 +14,7 @@ class StoreNormativaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID_Programa' => 'required|integer|exists:programa,ID_Programa',
+            'Codigo_Programa' => 'required|integer|exists:programas,Codigo_Programa',
             'Tipo_Normativa' => 'required|string|in:Acuerdo,Resolución,Decreto,Circular',
             'Numero_Normativa' => 'required|string|max:50',
             'Anio_Normativa' => 'required|integer|min:1900|max:' . date('Y'),
@@ -28,8 +28,8 @@ class StoreNormativaRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'ID_Programa.required' => 'El programa es obligatorio.',
-            'ID_Programa.exists' => 'El programa seleccionado no existe.',
+            'Codigo_Programa.required' => 'El programa es obligatorio.',
+            'Codigo_Programa.exists' => 'El programa seleccionado no existe.',
             'Tipo_Normativa.required' => 'El tipo de normativa es obligatorio.',
             'Tipo_Normativa.in' => 'El tipo debe ser: Acuerdo, Resolución, Decreto o Circular.',
             'Numero_Normativa.required' => 'El número de normativa es obligatorio.',

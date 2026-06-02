@@ -11,15 +11,18 @@ class FacultadResource extends JsonResource
     {
         return [
             'id' => $this->ID_Facultad,
-            'id_sede' => $this->ID_Sede,
+            'codigo_facultad' => $this->Codigo_Facultad,
+            'codigo_sede' => $this->Codigo_Sede,
             'nombre' => $this->Nombre_Facultad,
             'conmutador' => $this->Conmutador_Facultad,
             'extension' => $this->Extension_Facultad,
             'campus' => $this->Campus_Facultad,
             'url' => $this->Url_Facultad,
+            'activo' => (bool) $this->Esta_Activo,
             'sede' => $this->whenLoaded('sede', function () {
                 return [
                     'id' => $this->sede->ID_Sede,
+                    'codigo_sede' => $this->sede->Codigo_Sede,
                     'nombre' => $this->sede->Nombre_Sede,
                 ];
             }),

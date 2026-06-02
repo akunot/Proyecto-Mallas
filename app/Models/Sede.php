@@ -25,6 +25,6 @@ class Sede extends Model
 
     public function facultades(): HasMany
     {
-        return $this->hasMany(Facultad::class, 'ID_Sede', 'ID_Sede');
+        return $this->hasMany(Facultad::class, 'Codigo_Sede', 'Codigo_Sede');
     }
 }

@@ -121,18 +121,21 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::post('/componentes', [ComponenteController::class, 'store']);
         Route::get('/componentes/{id}', [ComponenteController::class, 'show']);
         Route::put('/componentes/{id}', [ComponenteController::class, 'update']);
+        Route::patch('/componentes/{id}/toggle', [ComponenteController::class, 'toggle']);
 
         // Agrupaciones
         Route::get('/agrupaciones', [AgrupacionController::class, 'index']);
         Route::post('/agrupaciones', [AgrupacionController::class, 'store']);
         Route::get('/agrupaciones/{id}', [AgrupacionController::class, 'show']);
         Route::put('/agrupaciones/{id}', [AgrupacionController::class, 'update']);
+        Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
 
         // Asignaturas
         Route::get('/asignaturas', [AsignaturaController::class, 'index']);
         Route::post('/asignaturas', [AsignaturaController::class, 'store']);
         Route::get('/asignaturas/{id}', [AsignaturaController::class, 'show']);
         Route::put('/asignaturas/{id}', [AsignaturaController::class, 'update']);
+        Route::patch('/asignaturas/{id}/toggle', [AsignaturaController::class, 'toggle']);
 
         // Usuarios (solo admins)
         Route::get('/usuarios', [UsuarioController::class, 'index']);

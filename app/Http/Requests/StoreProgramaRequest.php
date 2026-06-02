@@ -14,8 +14,8 @@ class StoreProgramaRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID_Facultad' => 'required|integer|exists:facultad,ID_Facultad',
-            'Codigo_Programa' => 'required|string|max:20|unique:programas,Codigo_Programa',
+            'Codigo_Facultad' => 'required|integer|exists:facultades,Codigo_Facultad',
+            'Codigo_Programa' => 'required|integer|unique:programas,Codigo_Programa',
             'Nombre_Programa' => 'required|string|max:200',
             'Titulo_Otorgado' => 'nullable|string|max:200',
             'Nivel_Formacion' => 'nullable|string|max:50',
@@ -28,15 +28,15 @@ class StoreProgramaRequest extends FormRequest
             'Extension' => 'nullable|string|max:10',
             'Correo' => 'nullable|email|max:200',
             'Area_Curricular' => 'nullable|string|max:100',
-            'Activo_Programa' => 'sometimes|boolean',
+            'Esta_Activo' => 'sometimes|boolean',
         ];
     }
 
     public function messages(): array
     {
         return [
-            'ID_Facultad.required' => 'La facultad es obligatoria.',
-            'ID_Facultad.exists' => 'La facultad seleccionada no existe.',
+            'Codigo_Facultad.required' => 'La facultad es obligatoria.',
+            'Codigo_Facultad.exists' => 'La facultad seleccionada no existe.',
             'Codigo_Programa.required' => 'El código del programa es obligatorio.',
             'Codigo_Programa.unique' => 'El código del programa ya existe.',
             'Nombre_Programa.required' => 'El nombre del programa es obligatorio.',

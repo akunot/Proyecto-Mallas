@@ -11,7 +11,7 @@ class NormativaResource extends JsonResource
     {
         return [
             'id' => $this->ID_Normativa,
-            'id_programa' => $this->ID_Programa,
+            'codigo_programa' => $this->Codigo_Programa,
             'tipo' => $this->Tipo_Normativa,
             'numero' => $this->Numero_Normativa,
             'anio' => $this->Anio_Normativa,

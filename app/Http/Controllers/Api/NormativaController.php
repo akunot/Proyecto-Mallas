@@ -15,7 +15,7 @@ class NormativaController extends CatalogoController
     {
         $this->model = new Normativa();
         $this->fillable = [
-            'ID_Programa',
+            'Codigo_Programa',
             'Tipo_Normativa',
             'Numero_Normativa',
             'Anio_Normativa',
@@ -34,7 +34,7 @@ class NormativaController extends CatalogoController
     protected function getRelatedData(): array
     {
         return [
-            'programas' => Programa::select('ID_Programa', 'Nombre_Programa')->get()->toArray(),
+            'programas' => Programa::select('Codigo_Programa', 'Nombre_Programa')->get()->toArray(),
         ];
     }
 }

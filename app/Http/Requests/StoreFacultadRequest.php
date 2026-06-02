@@ -14,10 +14,11 @@ class StoreFacultadRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'ID_Sede' => 'required|integer|exists:sede,ID_Sede',
+            'Codigo_Sede' => 'required|integer|exists:sedes,Codigo_Sede',
+            'Codigo_Facultad' => 'required|integer|unique:facultades,Codigo_Facultad',
             'Nombre_Facultad' => 'required|string|max:150',
             'Conmutador_Facultad' => 'nullable|string|max:30',
-            'Extension_Facultad' => 'nullable|string|max:10',
+            'Extension_Facultad' => 'nullable|string|max:80',
             'Campus_Facultad' => 'nullable|string|max:100',
             'Url_Facultad' => 'nullable|string|max:300',
         ];
@@ -26,8 +27,10 @@ class StoreFacultadRequest extends FormRequest
     public function messages(): array
     {
         return [
-            'ID_Sede.required' => 'La sede es obligatoria.',
-            'ID_Sede.exists' => 'La sede seleccionada no existe.',
+            'Codigo_Sede.required' => 'La sede es obligatoria.',
+            'Codigo_Sede.exists' => 'La sede seleccionada no existe.',
+            'Codigo_Facultad.required' => 'El código de la facultad es obligatorio.',
+            'Codigo_Facultad.unique' => 'El código de la facultad ya existe.',
             'Nombre_Facultad.required' => 'El nombre de la facultad es obligatorio.',
             'Nombre_Facultad.max' => 'El nombre no puede exceder 150 caracteres.',
         ];

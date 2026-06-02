@@ -17,7 +17,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4021,
                 'Nombre_Programa' => 'Ingeniería Civil', 
-                'Codigo_Snies' => '4121',
+                'Codigo_SNIES' => '4121',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=254&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -31,7 +31,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4025,
                 'Nombre_Programa' => 'Arquitectura y Urbanismo', 
-                'Codigo_Snies' => '4126',
+                'Codigo_SNIES' => '4126',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=250&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -45,7 +45,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4022,
                 'Nombre_Programa' => 'Ingeniería Eléctrica', 
-                'Codigo_Snies' => '4122',
+                'Codigo_SNIES' => '4122',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=252&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -59,7 +59,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4028,
                 'Nombre_Programa' => 'Ingeniería Electrónica', 
-                'Codigo_Snies' => '4123',
+                'Codigo_SNIES' => '4123',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=253&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -73,7 +73,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4024,
                 'Nombre_Programa' => 'Ingeniería Industrial', 
-                'Codigo_Snies' => '4124',
+                'Codigo_SNIES' => '4124',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=251&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -87,7 +87,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4023,
                 'Nombre_Programa' => 'Ingeniería Química', 
-                'Codigo_Snies' => '4125',
+                'Codigo_SNIES' => '4125',
                 'Url_Programa' => 'https://fia.unal.edu.co/index.php?option=com_content&view=article&id=254&Itemid=117',
                 'Codigo_Facultad' => 4036,
                 'Duracion_Semestres' => 10,
@@ -101,7 +101,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4026,
                 'Nombre_Programa' => 'Administración de Empresas Diurno', 
-                'Codigo_Snies' => '4120',
+                'Codigo_SNIES' => '4120',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4046,
                 'Duracion_Semestres' => 10,
@@ -115,7 +115,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4027,
                 'Nombre_Programa' => 'Administración de Empresas Nocturno', 
-                'Codigo_Snies' => '16911',
+                'Codigo_SNIES' => '16911',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4046,
                 'Duracion_Semestres' => 10,
@@ -129,7 +129,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4035,
                 'Nombre_Programa' => 'Administración de Sistemas Informáticos', 
-                'Codigo_Snies' => '16912',
+                'Codigo_SNIES' => '16912',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4046,
                 'Duracion_Semestres' => 10,
@@ -143,7 +143,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4033,
                 'Nombre_Programa' => 'Gestión Cultural y Comunicativa',
-                'Codigo_Snies' => '16914',
+                'Codigo_SNIES' => '16914',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4191,
                 'Duracion_Semestres' => 9,
@@ -157,7 +157,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4030,
                 'Nombre_Programa' => 'Ingeniería Física',
-                'Codigo_Snies' => '16915',
+                'Codigo_SNIES' => '16915',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4037,
                 'Duracion_Semestres' => 10,
@@ -171,7 +171,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4032,
                 'Nombre_Programa' => 'Matemáticas',
-                'Codigo_Snies' => '16916',
+                'Codigo_SNIES' => '16916',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4037,
                 'Duracion_Semestres' => 10,
@@ -185,7 +185,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4034,
                 'Nombre_Programa' => 'Ciencias de la Computación',
-                'Codigo_Snies' => '110177',
+                'Codigo_SNIES' => '110177',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4037,
                 'Duracion_Semestres' => 9,
@@ -199,7 +199,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4036,
                 'Nombre_Programa' => 'Estadística',
-                'Codigo_Snies' => '116559',
+                'Codigo_SNIES' => '116559',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4037,
                 'Duracion_Semestres' => 9,
@@ -213,7 +213,7 @@ class ProgramaSeeder extends Seeder
             [
                 'Codigo_Programa' => 4037,
                 'Nombre_Programa' => 'Ingeniería Biológica',
-                'Codigo_Snies' => '116558',
+                'Codigo_SNIES' => '116558',
                 'Url_Programa' => '',
                 'Codigo_Facultad' => 4037,
                 'Duracion_Semestres' => 10,
@@ -233,7 +233,7 @@ class ProgramaSeeder extends Seeder
                 'Nombre_Programa' => $programa['Nombre_Programa'],
                 'Creditos_Totales' => $programa['Creditos_Totales'],
                 'Duracion_Semestres' => $programa['Duracion_Semestres'],
-                'Codigo_Snies' => $programa['Codigo_Snies'],
+                'Codigo_SNIES' => $programa['Codigo_SNIES'],
                 'Url_Programa' => $programa['Url_Programa'],
                 'Campus_Programa' => $programa['Campus_Programa'],
                 'Conmutador' => $programa['Conmutador'],
@@ -244,3 +244,4 @@ class ProgramaSeeder extends Seeder
         }
     }
 }
+

@@ -236,13 +236,13 @@ class CatalogoController extends Controller
     private function getActiveField(string $model): ?string
     {
         $map = [
-            'Sede'       => 'Activo_Sede',
-            'Facultad'   => 'Activo_Facultad',
-            'Programa'   => 'Activo_Programa',
-            'Normativa'  => 'Activo_Normativa',
-            'Componente' => 'Activo_Componente',
-            'Asignatura' => 'Activo_Asignatura',
-            'Usuario'    => 'Esta_Activo',
+            'Sede'       => null,
+            'Facultad'   => 'Esta_Activo',
+            'Programa'   => 'Esta_Activo',
+            'Normativa'  => 'Esta_Activo',
+            'Componente' => null,
+            'Asignatura' => null,
+            'Usuario'    => 'Activo_Usuario',
         ];
         return $map[$model] ?? null;
     }
