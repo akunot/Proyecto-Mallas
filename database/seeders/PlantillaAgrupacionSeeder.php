@@ -14,6 +14,11 @@ class PlantillaAgrupacionSeeder extends Seeder
     {
         $this->command->info("Iniciando carga de plantillas de AGRUPACION...");
 
+        // Limpiar plantillas existentes para evitar conflictos de IDs y nombres duplicados
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        PlantillaAgrupacion::truncate();
+        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+
         $componenteMap = [
             1 => 'Fundamentacion',
             2 => 'Disciplinar o Profesional', 
@@ -24,41 +29,41 @@ class PlantillaAgrupacionSeeder extends Seeder
 
         $programasData = [
             4021 => [
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'MATEMATICAS, PROBABILIDAD Y ESTADISTICA', 'CREDITOS EXIGIDOS' => 26],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'FISICA', 'CREDITOS EXIGIDOS' => 4],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'FISICA', 'CREDITOS EXIGIDOS' => 4],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'HERRAMIENTAS INFORMTICAS Y MTODOS NUMRICOS', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CIENCIAS ECONMICAS Y ADMINISTRATIVAS', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CIENCIAS SOCIALES', 'CREDITOS EXIGIDOS' => 3],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'EXPRESION GRAFICA', 'CREDITOS EXIGIDOS' => 3],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'QUIMICA', 'CREDITOS EXIGIDOS' => 3],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'ESTRUCTURAS Y CONSTRUCCION', 'CREDITOS EXIGIDOS' => 15],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'VIAS Y TRASPORTE', 'CREDITOS EXIGIDOS' => 7],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'GEOTECNIA', 'CREDITOS EXIGIDOS' => 13],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HIDRAULICA Y AMBIENTAL', 'CREDITOS EXIGIDOS' => 15],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'CONSTRUCCION DE OBRAS CIVILES', 'CREDITOS EXIGIDOS' => 3],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'BASICA DISCIPLINAR', 'CREDITOS EXIGIDOS' => 29],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'TRABAJO DE GRADO', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCION', 'AGRUPACION' => 'LIBRE ELECCION', 'CREDITOS EXIGIDOS' => 36],
-                ['ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'NIVELATORIO', 'CREDITOS EXIGIDOS' => 8],
-                ['ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'INGLES', 'CREDITOS EXIGIDOS' => 12],
+                ['ID_AGRUPACION' => 1, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'MATEMÁTICAS, PROBABILIDAD Y ESTADÍSTICA', 'CREDITOS EXIGIDOS' => 26],
+                ['ID_AGRUPACION' => 2, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'FÍSICA', 'CREDITOS EXIGIDOS' => 4],
+                ['ID_AGRUPACION' => 3, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'FÍSICA', 'CREDITOS EXIGIDOS' => 4],
+                ['ID_AGRUPACION' => 4, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'HERRAMIENTAS INFORMÁTICAS Y MÉTODOS NUMÉRICOS', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 5, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CIENCIAS ECONÓMICAS Y ADMINISTRATIVAS', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 6, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CIENCIAS SOCIALES', 'CREDITOS EXIGIDOS' => 3],
+                ['ID_AGRUPACION' => 7, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'EXPRESIÓN GRÁFICA', 'CREDITOS EXIGIDOS' => 3],
+                ['ID_AGRUPACION' => 8, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'QUÍMICA', 'CREDITOS EXIGIDOS' => 3],
+                ['ID_AGRUPACION' => 9, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'ESTRUCTURAS Y CONSTRUCCIÓN', 'CREDITOS EXIGIDOS' => 15],
+                ['ID_AGRUPACION' => 10, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'VÍAS Y TRASPORTE', 'CREDITOS EXIGIDOS' => 7],
+                ['ID_AGRUPACION' => 11, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'GEOTECNIA', 'CREDITOS EXIGIDOS' => 13],
+                ['ID_AGRUPACION' => 12, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HIDRÁULICA Y AMBIENTAL', 'CREDITOS EXIGIDOS' => 15],
+                ['ID_AGRUPACION' => 13, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'CONSTRUCCIÓN DE OBRAS CIVILES', 'CREDITOS EXIGIDOS' => 3],
+                ['ID_AGRUPACION' => 14, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'BÁSICA DISCIPLINAR', 'CREDITOS EXIGIDOS' => 29],
+                ['ID_AGRUPACION' => 15, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'TRABAJO DE GRADO', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 31, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'LIBRE ELECCIÓN', 'CREDITOS EXIGIDOS' => 36],
+                ['ID_AGRUPACION' => 32, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'NIVELATORIO', 'CREDITOS EXIGIDOS' => 8],
+                ['ID_AGRUPACION' => 33, 'ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'INGLES', 'CREDITOS EXIGIDOS' => 12],
             ],
             4035 => [
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HERRAMIENTAS INFORMATICAS', 'CREDITOS EXIGIDOS' => 3],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CUANTITATIVAS', 'CREDITOS EXIGIDOS' => 21],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'CUANTITATIVAS OPTATIVAS', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'ADMINISTRACION', 'CREDITOS EXIGIDOS' => 16],
-                ['ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HUMANASTICA', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'PROGRAMACION', 'CREDITOS EXIGIDOS' => 12],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'SISTEMAS COMPUTACIONALES', 'CREDITOS EXIGIDOS' => 9],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'SISTEMAS DE INFORMACION E INGENIERIA DEL SOFTWARE', 'CREDITOS EXIGIDOS' => 15],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'GESTION INFORMATICA', 'CREDITOS EXIGIDOS' => 24],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'PROFESIONALES OPTATIVAS', 'CREDITOS EXIGIDOS' => 9],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'PRACTICA PROFESIONAL', 'CREDITOS EXIGIDOS' => 7],
-                ['ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'TRABAJO DE GRADO', 'CREDITOS EXIGIDOS' => 6],
-                ['ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCION', 'AGRUPACION' => 'LIBRE ELECCION', 'CREDITOS EXIGIDOS' => 33],
-                ['ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'NIVELATORIO', 'CREDITOS EXIGIDOS' => 8],
-                ['ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'INGLES', 'CREDITOS EXIGIDOS' => 12],
+                ['ID_AGRUPACION' => 16, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HERRAMIENTAS INFORMÁTICAS', 'CREDITOS EXIGIDOS' => 3],
+                ['ID_AGRUPACION' => 17, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'CUANTITATIVAS', 'CREDITOS EXIGIDOS' => 21],
+                ['ID_AGRUPACION' => 18, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'CUANTITATIVAS OPTATIVAS', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 19, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'ADMINISTRACIÓN', 'CREDITOS EXIGIDOS' => 16],
+                ['ID_AGRUPACION' => 20, 'ID_COMPONENTE' => 1, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'HUMANÍSTICA', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 21, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'PROGRAMACIÓN', 'CREDITOS EXIGIDOS' => 12],
+                ['ID_AGRUPACION' => 22, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'SISTEMAS COMPUTACIONALES', 'CREDITOS EXIGIDOS' => 9],
+                ['ID_AGRUPACION' => 23, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'SISTEMAS DE INFORMACIÓN E INGENIERÍA DEL SOFTWARE', 'CREDITOS EXIGIDOS' => 15],
+                ['ID_AGRUPACION' => 24, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'GESTIÓN INFORMÁTICA', 'CREDITOS EXIGIDOS' => 24],
+                ['ID_AGRUPACION' => 25, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'PROFESIONALES OPTATIVAS', 'CREDITOS EXIGIDOS' => 9],
+                ['ID_AGRUPACION' => 26, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'PRÁCTICA PROFESIONAL', 'CREDITOS EXIGIDOS' => 7],
+                ['ID_AGRUPACION' => 27, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'TRABAJO DE GRADO', 'CREDITOS EXIGIDOS' => 6],
+                ['ID_AGRUPACION' => 28, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'LIBRE ELECCIÓN', 'CREDITOS EXIGIDOS' => 33],
+                ['ID_AGRUPACION' => 29, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'NIVELATORIO', 'CREDITOS EXIGIDOS' => 8],
+                ['ID_AGRUPACION' => 30, 'ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'INGLES', 'CREDITOS EXIGIDOS' => 12],
             ]
         ];
 
@@ -94,14 +99,17 @@ class PlantillaAgrupacionSeeder extends Seeder
                 $tipoAgrupacionRaw = trim($plantillaData['TIPO_AGRUPACION']);
                 $esObligatoria = match($tipoAgrupacionRaw) {
                     'OBLIGATORIA' => 1,
-                    'OPTATIVA', 'LIBRE ELECCION', 'NIVELATORIO', 'INGLES' => 0,
+                    'OPTATIVA', 'LIBRE ELECCION', 'LIBRE ELECCIÓN', 'NIVELATORIO', 'INGLES' => 0,
                     default => 0,
                 };
                 
-                $plantilla = PlantillaAgrupacion::updateOrCreate([
+                // Modificar el nombre temporalmente si existe el duplicado para el mismo programa
+                // o usar una lógica que permita insertar por ID específico.
+                // Como truncamos la tabla al inicio del seeder, no habrá registros previos.
+                $plantilla = PlantillaAgrupacion::create([
+                    'ID_Plantilla_Agrupacion' => $plantillaData['ID_AGRUPACION'],
                     'ID_Programa' => $programa->ID_Programa,
                     'Nombre_Agrupacion' => trim($plantillaData['AGRUPACION']),
-                ], [
                     'ID_Componente' => $componente->ID_Componente,
                     'Tipo_Agrupacion' => $tipoAgrupacionRaw,
                     'Creditos_Requeridos' => $plantillaData['CREDITOS EXIGIDOS'],
@@ -111,12 +119,8 @@ class PlantillaAgrupacionSeeder extends Seeder
                 if ($plantilla->wasRecentlyCreated) {
                     $creadas++;
                     $creadasTotales++;
-                    $this->command->info("? Creada: " . trim($plantillaData['AGRUPACION']));
-                } else {
-                    $actualizadas++;
-                    $actualizadasTotales++;
-                    $this->command->line("? Actualizada: " . trim($plantillaData['AGRUPACION']));
-                }
+                    $this->command->info("✓ ID {$plantillaData['ID_AGRUPACION']}: " . trim($plantillaData['AGRUPACION']));
+                } 
             }
         }
 

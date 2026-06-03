@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Models;
 
@@ -15,8 +15,10 @@ class AgrupacionAsignatura extends Model
     protected $fillable = [
         "ID_Agrupacion",
         "ID_Asignatura",
+        "ID_Malla",
         "Tipo_Asignatura",
         "Semestre_Sugerido",
+        "Orden",
     ];
 
     public function agrupacion(): BelongsTo

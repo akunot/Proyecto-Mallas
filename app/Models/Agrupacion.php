@@ -40,4 +40,11 @@ class Agrupacion extends Model
     {
         return $this->hasMany(AgrupacionAsignatura::class, 'ID_Agrupacion', 'ID_Agrupacion');
     }
+
+    public function asignaturas(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(Asignatura::class, 'agrupacion_asignatura', 'ID_Agrupacion', 'ID_Asignatura')
+            ->withPivot(['Semestre_Sugerido', 'Tipo_Asignatura', 'ID_Malla', 'Orden'])
+            ->withTimestamps();
+    }
 }

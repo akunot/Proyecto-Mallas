@@ -1,4 +1,4 @@
-﻿<?php
+<?php
 
 namespace App\Models;
 
@@ -37,4 +37,3 @@ class Requisito extends Model
         return $this->belongsTo(Asignatura::class, "ID_Asignatura_Requerida", "ID_Asignatura");
     }
 }
-

@@ -184,7 +184,7 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'facultades' => \App\Models\Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Activo_Facultad', 1)->get(),
+            'facultades' => \App\Models\Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get(),
         ]);
     })->name('programas');
     Route::get('/programas/create', function () {
@@ -387,6 +387,47 @@ Route::middleware(['auth'])->group(function () {
     
     // Mallas y cargas (Fase 3+)
     Route::inertia('/cargas', 'Cargas/Cargas')->name('cargas');
+
+    Route::get('/mallas', function (Illuminate\Http\Request $request) {
+        $mallas = \App\Models\MallaCurricular::with('programa')
+            ->orderBy('ID_Malla', 'desc')
+            ->paginate(15);
+        
+        return Inertia::render('Mallas/Index', [
+            'mallas' => [
+                'data' => $mallas->items(),
+                'meta' => [
+                    'current_page' => $mallas->currentPage(),
+                    'last_page' => $mallas->lastPage(),
+                    'total' => $mallas->total(),
+                ]
+            ]
+        ]);
+    })->name('mallas.index');
+
+    Route::get('/mallas/{id}', function ($id) {
+        $malla = \App\Models\MallaCurricular::with([
+            'programa', 
+            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
+            'agrupaciones.componente'
+        ])->findOrFail($id);
+        
+        return Inertia::render('Mallas/Show', [
+            'malla' => $malla
+        ]);
+    })->name('mallas.show');
+
+    Route::get('/mallas/{id}/grafica', function ($id) {
+        $malla = \App\Models\MallaCurricular::with([
+            'programa', 
+            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
+            'agrupaciones.componente'
+        ])->findOrFail($id);
+        
+        return Inertia::render('Mallas/Visualizer', [
+            'malla' => $malla
+        ]);
+    })->name('mallas.visualizer');
     
     // Auditoría y Aprobación (módulos nuevos)
     Route::get('/auditoria', function () {

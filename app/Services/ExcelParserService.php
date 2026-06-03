@@ -25,7 +25,7 @@ use PhpOffice\PhpSpreadsheet\Spreadsheet;
 class ExcelParserService
 {
     private CargaMalla $carga;
-    private MallaCurricular $malla;
+    private ?MallaCurricular $malla = null;
     private array $errors = [];
     private array $warnings = [];
     private array $asignaturasProcessed = [];
@@ -71,8 +71,10 @@ class ExcelParserService
                     'total_rows' => $this->totalRows,
                 ];
             }
-            if (!$this->malla) {
-                throw new \RuntimeException('La carga no tiene una malla asociada para procesar.');
+            
+            // Si no hay malla ID en la carga, la crearemos en prepareMalla
+            if ($this->carga->ID_Malla) {
+                $this->malla = MallaCurricular::find($this->carga->ID_Malla);
             }
         } elseif ($tipoCarga === 'asignaturas') {
             if (!$this->carga->ID_Archivo_Asignaturas) {
@@ -124,9 +126,6 @@ class ExcelParserService
 
          try {
              if ($tipoCarga === 'malla') {
-                 // Pre-cargar catálogos en cache para evitar N+1 queries
-                 $this->preloadCatalogs();
-
                  $mallaSpreadsheet = $this->loadSpreadsheetFromField('archivoMalla');
                  if (!$this->prepareMalla($mallaSpreadsheet)) {
                      return [
@@ -137,6 +136,10 @@ class ExcelParserService
                          'total_rows' => $this->totalRows,
                      ];
                  }
+                 
+                 // Pre-cargar catálogos DESPUÉS de asegurar que $this->malla existe
+                 $this->preloadCatalogs();
+
                  $this->parseAgglomerationSheets($mallaSpreadsheet);
                  $result = $this->parseMalla($mallaSpreadsheet);
              } elseif ($tipoCarga === 'asignaturas') {
@@ -438,6 +441,12 @@ class ExcelParserService
                 return $name;
             }
         }
+        
+        // Si no se encuentra mallas y buscamos MALLA, probar con la primera hoja
+        if (strtoupper($needle) === 'MALLA' || strtoupper($needle) === 'AGRUPACION') {
+            return $spreadsheet->getSheetNames()[0] ?? null;
+        }
+        
         return null;
     }
 
@@ -494,10 +503,8 @@ class ExcelParserService
         $this->malla = MallaCurricular::create([
             'ID_Normativa' => $normativa->ID_Normativa,
             'ID_Programa' => $programa->ID_Programa,
-            'ID_Facultad' => $facultad->ID_Facultad,
-            'ID_Sede' => $sede->ID_Sede,
             'Version_Numero' => $this->getNextVersionNumber($programa->ID_Programa),
-            'Fecha_Inicio_Vigencia' => now(),
+            'Fecha_Vigencia' => now(), // Corregido de Fecha_Inicio_Vigencia a Fecha_Vigencia
             'Estado' => 'borrador',
             'Es_Vigente' => 0,
         ]);
@@ -663,7 +670,16 @@ class ExcelParserService
 
         $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
 
+        // Prevenir duplicados en el mismo batch antes de insert
+        $relKey = $agrupKey . "|" . $asignaturaReqId;
+        static $processedRels = [];
+        if (isset($processedRels[$relKey])) {
+             return;
+        }
+        $processedRels[$relKey] = true;
+
         $batchRelaciones[] = [
+            "ID_Malla" => $this->malla->ID_Malla,
             "ID_Agrupacion" => $agrupKey,
             "ID_Asignatura" => $asignaturaReqId,
             "Tipo_Asignatura" => $tipoAsignatura,
@@ -674,15 +690,22 @@ class ExcelParserService
         
         $this->asignaturasProcessed[$codigoAsignatura] = true;
 
-        if (!empty($reqTipo) && (!empty($reqCodigo) || $reqTipo == "CREDITOS")) {
-            $this->processRequisitoBatch(
-                $asignaturaReqId,
-                $this->malla->normativa->ID_Programa,
-                $reqTipo,
-                $reqCodigo,
-                $rowNumber,
-                $batchRequisitos
-            );
+        // Procesar requisitos (soporta hasta 3 pares de columnas si existieran)
+        $reqColumns = [[5, 6], [8, 9], [10, 11]]; // Pares de (Tipo, Código)
+        foreach ($reqColumns as $cols) {
+            $rTipo = $this->cleanCell($data[$cols[0]] ?? null);
+            $rCodigo = $this->cleanCodeCell($data[$cols[1]] ?? null);
+            
+            if (!empty($rTipo) && (!empty($rCodigo) || str_contains(strtoupper($rTipo), 'CREDITOS'))) {
+                $this->processRequisitoBatch(
+                    $asignaturaReqId,
+                    $this->malla->ID_Programa,
+                    $rTipo,
+                    $rCodigo,
+                    $rowNumber,
+                    $batchRequisitos
+                );
+            }
         }
     }
 
@@ -1090,26 +1113,51 @@ class ExcelParserService
     /**
      * Procesa requisitos para una relación agrupación-asignatura en batch.
      */
-        private function processRequisitoBatch(int $asignaturaBaseId, int $idPrograma, ?string $reqTipo, ?string $reqCodigo, int $rowNumber, array &$batchRequisitos): void
+    private function processRequisitoBatch(int $asignaturaBaseId, int $idPrograma, ?string $reqTipo, ?string $reqCodigo, int $rowNumber, array &$batchRequisitos): void
     {
-        if (empty($reqTipo)) {
+        if (empty($reqTipo) && empty($reqCodigo)) {
             return;
         }
 
+        $reqCodigoLimpiado = $this->cleanCell($reqCodigo); // Usamos cleanCell para no perder texto largo
+        $tipoMapeado = $this->mapTipoRequisito($reqTipo);
+        
         $asignaturaReqId = null;
-        $reqCodigoLimpiado = $this->cleanCodeCell($reqCodigo);
+        $valorCreditos = null;
+        $descripcion = null;
 
-        if (!empty($reqCodigoLimpiado) && !is_numeric($reqCodigoLimpiado)) {
-            $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($reqCodigoLimpiado));
-            if (!$asignaturaReqId) {
-                $this->recordError(
-                    $rowNumber,
-                    "Requisito",
-                    "Asignatura requisito no encontrada: " . $reqCodigoLimpiado,
-                    $reqCodigoLimpiado,
-                    "advertencia"
-                );
-                return;
+        if (!empty($reqCodigoLimpiado)) {
+            // 1. Detectar si es una condición de créditos por texto
+            if ($this->isConditionRequirement($reqCodigoLimpiado)) {
+                $descripcion = $reqCodigoLimpiado;
+                $tipoMapeado = 'creditos';
+                
+                // Intentar extraer el primer número que aparezca como créditos razonables
+                if (preg_match('/(\d+)\s*(?:créditos|creditos)/i', $reqCodigoLimpiado, $matches)) {
+                    $valorCreditos = (int)$matches[1];
+                }
+            } else {
+                // 2. Intentar buscar como asignatura (flujo normal)
+                $codigoLimpio = $this->cleanCodeCell($reqCodigoLimpiado);
+                $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
+                
+                if (!$asignaturaReqId) {
+                    // 3. Si no es asignatura y es numérico, es requisito de créditos simple
+                    if (is_numeric($codigoLimpio)) {
+                        $valorCreditos = (int)$codigoLimpio;
+                        $tipoMapeado = 'creditos';
+                    } else {
+                        // Es un texto que no reconocemos como condición ni como código
+                        $this->recordError(
+                            $rowNumber,
+                            "Requisito",
+                            "Asignatura requisito no encontrada: " . $reqCodigoLimpiado,
+                            $reqCodigoLimpiado,
+                            "advertencia"
+                        );
+                        return;
+                    }
+                }
             }
         }
 
@@ -1117,11 +1165,23 @@ class ExcelParserService
             "ID_Asignatura" => $asignaturaBaseId,
             "ID_Programa" => $idPrograma,
             "ID_Asignatura_Requerida" => $asignaturaReqId,
-            "Tipo_Requisito" => $this->mapTipoRequisito($reqTipo),
-            "Valor_Creditos" => is_numeric($reqCodigoLimpiado) ? (int)$reqCodigoLimpiado : null,
+            "Tipo_Requisito" => $tipoMapeado,
+            "Valor_Creditos" => $valorCreditos,
+            "Descripcion_Requisito" => $descripcion,
             "created_at" => now(),
             "updated_at" => now(),
         ];
+    }
+
+    private function isConditionRequirement(string $text): bool
+    {
+        $textUC = mb_strtoupper($text);
+        return str_contains($textUC, 'HABER APROBADO') || 
+               str_contains($textUC, 'CRÉDITOS') || 
+               str_contains($textUC, 'CREDITOS') ||
+               str_contains($textUC, 'PLAN DE ESTUDIOS') ||
+               str_contains($textUC, 'COMPONENTES') ||
+               str_contains($textUC, '%');
     }
 
     private function processRequisito(AgrupacionAsignatura $relacion, ?string $reqTipo, ?string $reqCodigo, int $rowNumber): void
@@ -1130,28 +1190,50 @@ class ExcelParserService
             return;
         }
 
-        $reqCodigo = $this->cleanCodeCell($reqCodigo);
-        if (empty($reqCodigo)) {
+        $reqCodigoLimpiado = $this->cleanCell($reqCodigo);
+        if (empty($reqCodigoLimpiado)) {
             return;
         }
 
-        // Buscar asignatura requisito por código base
-        $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($reqCodigo));
-        if (!$asignaturaReqId) {
-            $this->recordError(
-                $rowNumber,
-                'Requisito',
-                'Asignatura requisito no encontrada: ' . $reqCodigo,
-                $reqCodigo,
-                'advertencia'
-            );
-            return;
+        $tipoMapeado = $this->mapTipoRequisito($reqTipo);
+        $asignaturaReqId = null;
+        $valorCreditos = null;
+        $descripcion = null;
+
+        if ($this->isConditionRequirement($reqCodigoLimpiado)) {
+            $descripcion = $reqCodigoLimpiado;
+            $tipoMapeado = 'creditos';
+            if (preg_match('/(\d+)\s*(?:créditos|creditos)/i', $reqCodigoLimpiado, $matches)) {
+                $valorCreditos = (int)$matches[1];
+            }
+        } else {
+            $codigoLimpio = $this->cleanCodeCell($reqCodigoLimpiado);
+            $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
+            
+            if (!$asignaturaReqId) {
+                if (is_numeric($codigoLimpio)) {
+                    $valorCreditos = (int)$codigoLimpio;
+                    $tipoMapeado = 'creditos';
+                } else {
+                    $this->recordError(
+                        $rowNumber,
+                        'Requisito',
+                        'Asignatura requisito no encontrada: ' . $reqCodigoLimpiado,
+                        $reqCodigoLimpiado,
+                        'advertencia'
+                    );
+                    return;
+                }
+            }
         }
 
         Requisito::create([
-            'ID_Agrupacion_Asignatura' => $relacion->ID_Agrupacion_Asignatura,
-            'ID_Asignatura_Requisito' => $asignaturaReqId,
-            'Tipo_Requisito' => $this->mapTipoRequisito($reqTipo),
+            'ID_Asignatura' => $relacion->ID_Asignatura,
+            'ID_Programa' => $this->malla ? $this->malla->ID_Programa : null,
+            'ID_Asignatura_Requerida' => $asignaturaReqId,
+            'Tipo_Requisito' => $tipoMapeado,
+            'Valor_Creditos' => $valorCreditos,
+            'Descripcion_Requisito' => $descripcion,
         ]);
     }
 
@@ -1162,8 +1244,17 @@ class ExcelParserService
     {
         $tipoLimpio = strtoupper($this->cleanCell($tipo));
 
-        if ($tipoLimpio === 'OBLIGATORIO' || $tipoLimpio === 'REQUERIDO') {
-            return 'obligatorio';
+        // Mapeo detallado para términos comunes en UNAL
+        if (str_contains($tipoLimpio, 'PREREQUISITO') || str_contains($tipoLimpio, 'PRE-REQUISITO') || $tipoLimpio === 'OBLIGATORIO') {
+            return 'prerrequisito';
+        }
+        
+        if (str_contains($tipoLimpio, 'CORREQUISITO') || str_contains($tipoLimpio, 'CO-REQUISITO')) {
+            return 'correquisito';
+        }
+
+        if (str_contains($tipoLimpio, 'CREDITOS') || str_contains($tipoLimpio, 'CRÉDITOS')) {
+            return 'creditos';
         }
 
         return 'opcional';

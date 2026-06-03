@@ -28,7 +28,10 @@ return new class extends Migration
 
             // Indexes
             $table->index(['ID_Programa', 'ID_Componente']);
-            $table->unique(['ID_Programa', 'Nombre_Agrupacion']);
+            // El índice único impide tener dos agrupaciones con el mismo nombre para el mismo programa.
+            // En Ingeniería Civil existen dos agrupaciones llamadas "FÍSICA" (ID 2 y 3).
+            // Cambiamos el índice único por uno normal para permitir esta estructura.
+            $table->index(['ID_Programa', 'Nombre_Agrupacion']);
         });
     }
 
