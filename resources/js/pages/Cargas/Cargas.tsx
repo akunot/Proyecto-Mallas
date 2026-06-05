@@ -34,7 +34,7 @@ interface Carga {
 }
 
 
-type TipoCarga = 'asignaturas' | 'electivas' | 'malla' | '';
+type TipoCarga = 'asignaturas' | 'electivas' | 'malla' | 'optativa' | '';
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -54,6 +54,7 @@ const TIPO_LABELS: Record<string, { label: string; bg: string; text: string }> =
     asignaturas: { label: 'Asignaturas', bg: 'bg-indigo-100', text: 'text-indigo-800' },
     electivas:   { label: 'Electivas',   bg: 'bg-teal-100',   text: 'text-teal-800' },
     malla:       { label: 'Malla',       bg: 'bg-amber-100',  text: 'text-amber-800' },
+    optativa:    { label: 'Optativas',   bg: 'bg-purple-100', text: 'text-purple-800' },
 };
 
 const ESTADOS_TERMINALES = ['borrador', 'con_errores', 'aprobado', 'rechazado'];
@@ -73,7 +74,7 @@ const ESTADOS_CATALOGO: Record<string, { bg: string; text: string; label: string
 type EstadoStyle = { bg: string; text: string; label: string; spinner?: boolean };
 
 const getEstadoBadge = (estado: string, tipo: string) => {
-    const esCatalogo = tipo === 'asignaturas' || tipo === 'electivas';
+    const esCatalogo = tipo === 'asignaturas' || tipo === 'electivas' || tipo === 'optativa';
     const map: Record<string, EstadoStyle> = esCatalogo ? ESTADOS_CATALOGO : ESTADOS;
     const s: EstadoStyle = map[estado] ?? { bg: 'bg-gray-100', text: 'text-gray-700', label: estado };
     return (
@@ -371,6 +372,7 @@ export default function Cargas() {
                         <option value="asignaturas">Asignaturas</option>
                         <option value="electivas">Electivas</option>
                         <option value="malla">Malla</option>
+                        <option value="optativa">Optativas</option>
                     </select>
 
                     <select
@@ -564,8 +566,8 @@ export default function Cargas() {
                                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
                                     Tipo de archivo
                                 </label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {(['asignaturas', 'electivas', 'malla'] as const).map((tipo) => {
+                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                                    {(['asignaturas', 'electivas', 'malla', 'optativa'] as const).map((tipo) => {
                                         const t = TIPO_LABELS[tipo];
                                         const selected = selectedTipo === tipo;
                                         return (
@@ -584,6 +586,11 @@ export default function Cargas() {
                                         );
                                     })}
                                 </div>
+                                {selectedTipo === 'optativa' && (
+                                    <p className="mt-2 text-xs text-purple-700 bg-purple-50 rounded-lg px-3 py-2">
+                                        El programa se detecta automáticamente desde el archivo.
+                                    </p>
+                                )}
                             </div>
 
 
