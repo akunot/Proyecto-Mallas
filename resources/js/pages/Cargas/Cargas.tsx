@@ -16,7 +16,7 @@ interface ErrorCarga {
 interface Carga {
     ID_Carga: number;
     Estado_Carga: string;
-    tipo_carga: 'asignaturas' | 'electivas' | 'malla' | string;
+    tipo_carga: 'asignaturas' | 'electivas' | 'malla' | 'optativa' | string;
     Comentario_Carga: string;
     Creacion_Carga: string;
     Finalizacion_Carga: string | null;
