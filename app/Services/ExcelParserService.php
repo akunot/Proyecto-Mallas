@@ -332,15 +332,15 @@ class ExcelParserService
             return;
         }
 
-        $batch = [];
+        $batch             = [];
         $codigosProcesados = [];
 
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
             $codigoOriginal = $this->cleanCodeCell($data[0] ?? null);
-            $nombre = $this->cleanCell($data[1] ?? '');
-            $creditos = !empty($data[2]) ? (int)$data[2] : 0;
+            $nombre         = $this->cleanCell($data[1] ?? '');
+            $creditos       = !empty($data[2]) ? (int)$data[2] : 0;
 
             if (empty($codigoOriginal) || empty($nombre)) {
                 if (!empty($nombre)) {
@@ -379,20 +379,27 @@ class ExcelParserService
             }
 
             $batch[] = [
-                'Codigo_Asignatura' => $codigoOriginal,
-                'Codigo_Base' => $codigoBase,
-                'Nombre_Asignatura' => $nombre,
+                'Codigo_Asignatura'   => $codigoOriginal,
+                'Codigo_Base'         => $codigoBase,
+                'Nombre_Asignatura'   => $nombre,
                 'Creditos_Asignatura' => $creditos,
-                'Horas_Presencial' => null,
-                'Horas_Estudiante' => null,
-                'created_at' => now(),
-                'updated_at' => now(),
+                'Horas_Presencial'    => null,
+                'Horas_Estudiante'    => null,
+                'created_at'          => now(),
+                'updated_at'          => now(),
             ];
 
             $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
         }
 
         $this->bulkInsertAsignaturas($batch);
+        $this->preloadAsignaturasCache();
+
+        // Vincular todas las electivas al programa de la carga
+        $programaId = $this->carga->ID_Programa ?? null;
+        if ($programaId && !empty($codigosProcesados)) {
+            $this->vincularElectivasAPrograma($programaId, array_keys($codigosProcesados));
+        }
     }
 
     /**

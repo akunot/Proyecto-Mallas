@@ -13,9 +13,8 @@ use PhpOffice\PhpSpreadsheet\IOFactory;
 
 class ExcelUploadService
 {
-    public function createCarga(?int $normativaId, ?int $mallaBaseId, int $userId, string $tipoCarga): array
+    public function createCarga(?int $normativaId, ?int $mallaBaseId, int $userId, string $tipoCarga, ?int $programaId = null): array
     {
-        $programaId = null;
         if ($normativaId) {
             $normativa = Normativa::findOrFail($normativaId);
             $programaId = $normativa->ID_Programa;

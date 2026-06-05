@@ -27,7 +27,8 @@ class CargaController extends Controller
             $request->input('normativa_id'),
             $request->input('malla_base_id'),
             $request->user()->ID_Usuario,
-            $request->input('tipo_carga')
+            $request->input('tipo_carga'),
+            $request->input('programa_id') ? (int)$request->input('programa_id') : null
         );
 
         if (!$result['success']) {
