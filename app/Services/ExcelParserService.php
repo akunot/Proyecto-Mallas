@@ -13,6 +13,7 @@ use App\Models\MallaCurricular;
 use App\Models\Normativa;
 use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
+use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\Sede;
 use App\Models\SlotAgrupacion;
@@ -116,6 +117,18 @@ class ExcelParserService
                     'total_rows' => $this->totalRows,
                 ];
             }
+        } elseif ($tipoCarga === 'optativa') {
+            if (!$this->carga->ID_Archivo_Electivas) {
+                $this->recordError(0, 'Carga', 'Falta el archivo de optativas.', null, 'error');
+                $this->carga->update(['Estado_Carga' => 'con_errores']);
+                return [
+                    'success'        => false,
+                    'errors_count'   => count($this->errors),
+                    'warnings_count' => count($this->warnings),
+                    'processed_rows' => $this->processedRows,
+                    'total_rows'     => $this->totalRows,
+                ];
+            }
         }
 
         ErrorCarga::where('ID_Carga', $this->carga->ID_Carga)->delete();
@@ -153,6 +166,11 @@ class ExcelParserService
                  $this->preloadAsignaturasCache();
                  $electivasSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
                  $this->parseElectivasFile($electivasSpreadsheet);
+                 $result = true;
+             } elseif ($tipoCarga === 'optativa') {
+                 $this->preloadAsignaturasCache();
+                 $optativaSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
+                 $this->parseOptativaFile($optativaSpreadsheet);
                  $result = true;
              }
 
@@ -375,6 +393,129 @@ class ExcelParserService
         }
 
         $this->bulkInsertAsignaturas($batch);
+    }
+
+    /**
+     * Procesa FORMATO DE CARGA - OPTATIVA.xlsx.
+     *
+     * Estructura por fila (a partir de fila 2):
+     *   Col 0: ID_Programa  Col 1: ID_Componente  Col 2: ID_Agrupacion
+     *   Col 3: Codigo       Col 4: Nombre         Col 5: Creditos      Col 6: Obligatoria
+     *
+     * Filas con Col 3 null representan separadores y se omiten.
+     * El mismo archivo puede contener múltiples programas.
+     */
+    private function parseOptativaFile(Spreadsheet $spreadsheet): void
+    {
+        $sheet = $spreadsheet->getSheet(0);
+        if (!$sheet) {
+            $this->recordError(0, 'Optativa', 'Hoja de optativas no encontrada.', null, 'error');
+            return;
+        }
+
+        $rows = $sheet->toArray();
+        if (count($rows) < 2) {
+            return;
+        }
+
+        $batch              = [];
+        $codigosPorPrograma = [];
+        $codigosProcesados  = [];
+
+        for ($i = 1; $i < count($rows); $i++) {
+            $data = $rows[$i];
+
+            $programaId     = !empty($data[0]) ? (int)$data[0] : null;
+            $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
+            $nombre         = $this->cleanCell($data[4] ?? '');
+            $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
+
+            if (empty($codigoOriginal) || empty($nombre)) {
+                continue;
+            }
+
+            if (!$programaId) {
+                $this->recordError($i + 1, 'Optativa', 'Fila sin ID de programa.', $codigoOriginal, 'advertencia');
+                continue;
+            }
+
+            $codigoBase = $this->normalizeCodigo($codigoOriginal);
+            $key        = $programaId . '|' . $codigoBase;
+
+            if (isset($codigosProcesados[$key])) {
+                $this->recordError(
+                    $i + 1,
+                    'Optativa',
+                    "Código '{$codigoBase}' duplicado para el programa {$programaId} (fila anterior: {$codigosProcesados[$key]}).",
+                    $codigoOriginal,
+                    'advertencia'
+                );
+                continue;
+            }
+            $codigosProcesados[$key] = $i + 1;
+
+            if (!isset($codigosPorPrograma[$programaId])) {
+                $codigosPorPrograma[$programaId] = [];
+            }
+            $codigosPorPrograma[$programaId][] = $codigoBase;
+
+            if (isset($this->asignaturasCache[$codigoBase])) {
+                continue;
+            }
+
+            $batch[] = [
+                'Codigo_Asignatura'   => $codigoOriginal,
+                'Codigo_Base'         => $codigoBase,
+                'Nombre_Asignatura'   => $nombre,
+                'Creditos_Asignatura' => $creditos,
+                'Horas_Presencial'    => null,
+                'Horas_Estudiante'    => null,
+                'created_at'          => now(),
+                'updated_at'          => now(),
+            ];
+
+            $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
+        }
+
+        $this->bulkInsertAsignaturas($batch);
+
+        foreach ($codigosPorPrograma as $programaId => $codigos) {
+            $this->vincularElectivasAPrograma($programaId, $codigos);
+        }
+    }
+
+    /**
+     * Upsert en programa_electivas para los códigos dados y un programa.
+     */
+    private function vincularElectivasAPrograma(int $programaId, array $codigosBase): void
+    {
+        if (empty($codigosBase)) {
+            return;
+        }
+
+        $ids = \App\Models\Asignatura::whereIn('Codigo_Base', $codigosBase)
+            ->pluck('ID_Asignatura')
+            ->all();
+
+        if (empty($ids)) {
+            return;
+        }
+
+        $now  = now();
+        $lote = array_map(fn($id) => [
+            'ID_Programa'   => $programaId,
+            'ID_Asignatura' => $id,
+            'created_at'    => $now,
+            'updated_at'    => $now,
+        ], $ids);
+
+        foreach (array_chunk($lote, self::BATCH_SIZE) as $chunk) {
+            DB::table('programa_electivas')->upsert(
+                $chunk,
+                ['ID_Programa', 'ID_Asignatura'],
+                ['updated_at']
+            );
+        }
     }
 
     private function parseAgglomerationSheets(Spreadsheet $spreadsheet): void
