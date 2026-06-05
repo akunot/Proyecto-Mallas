@@ -97,7 +97,7 @@ class ExcelUploadService
             $isReadyToProcess = $carga->ID_Archivo_Malla !== null;
         } elseif ($carga->tipo_carga === 'asignaturas') {
             $isReadyToProcess = $field === 'ID_Archivo_Asignaturas';
-        } elseif ($carga->tipo_carga === 'electivas') {
+        } elseif ($carga->tipo_carga === 'electivas' || $carga->tipo_carga === 'optativa') {
             $isReadyToProcess = $field === 'ID_Archivo_Electivas';
         }
 
@@ -120,9 +120,9 @@ class ExcelUploadService
     {
         return match ($tipoArchivo) {
             'asignaturas' => 'ID_Archivo_Asignaturas',
-            'electivas' => 'ID_Archivo_Electivas',
-            'malla' => 'ID_Archivo_Malla',
-            default => 'ID_Archivo_Malla',
+            'electivas'   => 'ID_Archivo_Electivas',
+            'optativa'    => 'ID_Archivo_Electivas',
+            default       => 'ID_Archivo_Malla',
         };
     }
 
