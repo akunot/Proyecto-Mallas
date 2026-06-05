@@ -108,6 +108,7 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::get('/programas/{id}', [ProgramaController::class, 'show']);
         Route::put('/programas/{id}', [ProgramaController::class, 'update']);
         Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
+        Route::get('/programas/{id}/electivas', [ProgramaController::class, 'electivas']);
 
         // Normativas
         Route::get('/normativas', [NormativaController::class, 'index']);

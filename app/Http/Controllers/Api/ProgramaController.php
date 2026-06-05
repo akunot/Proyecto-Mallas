@@ -44,4 +44,22 @@ class ProgramaController extends CatalogoController
             'facultades' => Facultad::select('Codigo_Facultad', 'Nombre_Facultad')->get()->toArray(),
         ];
     }
+
+    public function electivas(int $id): \Illuminate\Http\JsonResponse
+    {
+        $programa  = Programa::findOrFail($id);
+        $electivas = $programa->electivas()
+            ->select('asignaturas.ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura')
+            ->orderBy('Nombre_Asignatura')
+            ->paginate(200);
+
+        return response()->json([
+            'data' => $electivas->items(),
+            'meta' => [
+                'total'        => $electivas->total(),
+                'current_page' => $electivas->currentPage(),
+                'last_page'    => $electivas->lastPage(),
+            ],
+        ]);
+    }
 }
