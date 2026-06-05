@@ -393,12 +393,12 @@ class ExcelParserService
         }
 
         $this->bulkInsertAsignaturas($batch);
-        $this->preloadAsignaturasCache();
 
-        // Vincular todas las electivas al programa de la carga
-        $programaId = $this->carga->ID_Programa ?? null;
-        if ($programaId && !empty($codigosProcesados)) {
-            $this->vincularElectivasAPrograma($programaId, array_keys($codigosProcesados));
+        // Marcar todas las asignaturas procesadas como electivas de libre elección
+        if (!empty($codigosProcesados)) {
+            DB::table('asignaturas')
+                ->whereIn('Codigo_Base', array_keys($codigosProcesados))
+                ->update(['es_electiva_libre' => true, 'updated_at' => now()]);
         }
     }
 

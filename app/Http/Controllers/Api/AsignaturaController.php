@@ -60,6 +60,23 @@ class AsignaturaController extends CatalogoController
         ]);
     }
 
+    public function catalogo(): \Illuminate\Http\JsonResponse
+    {
+        $electivas = Asignatura::where('es_electiva_libre', true)
+            ->select('ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura')
+            ->orderBy('Nombre_Asignatura')
+            ->paginate(500);
+
+        return response()->json([
+            'data' => $electivas->items(),
+            'meta' => [
+                'total'        => $electivas->total(),
+                'current_page' => $electivas->currentPage(),
+                'last_page'    => $electivas->lastPage(),
+            ],
+        ]);
+    }
+
     protected function getActiveField(string $model): ?string
     {
         // Las asignaturas no tienen campo activo en la BD actual

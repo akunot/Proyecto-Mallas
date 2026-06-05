@@ -132,6 +132,7 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
 
         // Asignaturas
+        Route::get('/electivas', [AsignaturaController::class, 'catalogo']);
         Route::get('/asignaturas', [AsignaturaController::class, 'index']);
         Route::post('/asignaturas', [AsignaturaController::class, 'store']);
         Route::get('/asignaturas/{id}', [AsignaturaController::class, 'show']);

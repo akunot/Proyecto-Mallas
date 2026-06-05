@@ -20,6 +20,7 @@ class Asignatura extends Model
         "Horas_Presencial",
         "Horas_Estudiante",
         "Descripcion_Asignatura",
+        "es_electiva_libre",
     ];
 
     public function agrupaciones(): HasMany

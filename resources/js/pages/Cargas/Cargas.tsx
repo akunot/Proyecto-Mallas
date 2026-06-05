@@ -113,8 +113,6 @@ export default function Cargas() {
     const [uploading, setUploading]             = useState(false);
     const [selectedTipo, setSelectedTipo]       = useState<TipoCarga>('');
     const [selectedFile, setSelectedFile]       = useState<File | null>(null);
-    const [selectedPrograma, setSelectedPrograma] = useState<number | null>(null);
-    const [programas, setProgramas]             = useState<{ ID_Programa: number; Nombre_Programa: string }[]>([]);
 
     // Modal de errores
     const [errorModal, setErrorModal]           = useState<{ cargaId: number; tipo: string } | null>(null);
@@ -139,17 +137,6 @@ export default function Cargas() {
         fetchCargas();
     }, []);
 
-    useEffect(() => {
-        if (selectedTipo === 'electivas' && programas.length === 0) {
-            fetch(`${apiUrl}/api/v1/programas?per_page=200`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
-                credentials: 'same-origin',
-            })
-                .then(r => r.json())
-                .then(d => setProgramas(d.data?.data ?? d.data ?? []))
-                .catch(() => {});
-        }
-    }, [selectedTipo]);
 
     // ── Polling ────────────────────────────────────────────────────────────────
 
@@ -241,7 +228,6 @@ export default function Cargas() {
                 credentials: 'same-origin',
                 body: JSON.stringify({
                     tipo_carga: selectedTipo,
-                    ...(selectedTipo === 'electivas' && selectedPrograma ? { programa_id: selectedPrograma } : {}),
                 }),
             });
 
@@ -327,7 +313,6 @@ export default function Cargas() {
         setShowModal(false);
         setSelectedTipo('');
         setSelectedFile(null);
-        setSelectedPrograma(null);
     };
 
     // ── Filtros aplicados ──────────────────────────────────────────────────────
@@ -609,27 +594,6 @@ export default function Cargas() {
                                 )}
                             </div>
 
-                            {/* Selector de programa — solo para electivas */}
-                            {selectedTipo === 'electivas' && (
-                                <div>
-                                    <label className="mb-1.5 block text-sm font-medium text-gray-700">
-                                        Programa <span className="text-red-500">*</span>
-                                    </label>
-                                    <select
-                                        value={selectedPrograma ?? ''}
-                                        onChange={(e) => setSelectedPrograma(e.target.value ? Number(e.target.value) : null)}
-                                        className="w-full rounded-lg border border-gray-300 px-3 py-2 text-sm text-gray-700 focus:border-green-500 focus:outline-none focus:ring-2 focus:ring-green-500/20"
-                                    >
-                                        <option value="">— Selecciona un programa —</option>
-                                        {programas.map((p) => (
-                                            <option key={p.ID_Programa} value={p.ID_Programa}>
-                                                {p.Nombre_Programa}
-                                            </option>
-                                        ))}
-                                    </select>
-                                </div>
-                            )}
-
                             {/* Archivo */}
                             <div>
                                 <label className="mb-1.5 block text-sm font-medium text-gray-700">
@@ -655,7 +619,7 @@ export default function Cargas() {
                                 </button>
                                 <button
                                     type="submit"
-                                    disabled={uploading || !selectedFile || !selectedTipo || (selectedTipo === 'electivas' && !selectedPrograma)}
+                                    disabled={uploading || !selectedFile || !selectedTipo}
                                     className="rounded-lg bg-green-700 px-4 py-2 text-sm font-medium text-white hover:bg-green-800 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                                 >
                                     {uploading ? (
