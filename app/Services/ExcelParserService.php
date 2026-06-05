@@ -425,7 +425,7 @@ class ExcelParserService
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            $programaId     = !empty($data[0]) ? (int)$data[0] : null;
+            $programaId     = !empty($data[0]) ? (int)$this->cleanCodeCell($data[0]) : null;
             $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
             $nombre         = $this->cleanCell($data[4] ?? '');
             $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
@@ -478,7 +478,13 @@ class ExcelParserService
         }
 
         $this->bulkInsertAsignaturas($batch);
+        $this->preloadAsignaturasCache();
 
+        if (!empty($this->errors)) {
+            return;
+        }
+
+        // Vincular cada programa a sus asignaturas
         foreach ($codigosPorPrograma as $programaId => $codigos) {
             $this->vincularElectivasAPrograma($programaId, $codigos);
         }
