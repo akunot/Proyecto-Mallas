@@ -46,4 +46,14 @@ class Programa extends Model
         return $this->hasOne(MallaCurricular::class, 'ID_Programa', 'ID_Programa')
             ->where('Es_Vigente', 1);
     }
+
+    public function electivas(): \Illuminate\Database\Eloquent\Relations\BelongsToMany
+    {
+        return $this->belongsToMany(
+            Asignatura::class,
+            'programa_electivas',
+            'ID_Programa',
+            'ID_Asignatura'
+        );
+    }
 }

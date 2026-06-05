@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use App\Models\SlotAgrupacion;
 
 class Agrupacion extends Model
 {
@@ -46,5 +47,10 @@ class Agrupacion extends Model
         return $this->belongsToMany(Asignatura::class, 'agrupacion_asignatura', 'ID_Agrupacion', 'ID_Asignatura')
             ->withPivot(['Semestre_Sugerido', 'Tipo_Asignatura', 'ID_Malla', 'Orden'])
             ->withTimestamps();
+    }
+
+    public function slots(): HasMany
+    {
+        return $this->hasMany(SlotAgrupacion::class, 'ID_Agrupacion', 'ID_Agrupacion');
     }
 }
