@@ -397,7 +397,7 @@ class ExcelParserService
         // Marcar todas las asignaturas procesadas como electivas de libre elección
         if (!empty($codigosProcesados)) {
             DB::table('asignaturas')
-                ->whereIn('Codigo_Base', array_keys($codigosProcesados))
+                ->whereIn('Codigo_Base', array_map('strval', array_keys($codigosProcesados)))
                 ->update(['es_electiva_libre' => true, 'updated_at' => now()]);
         }
     }
