@@ -82,7 +82,10 @@ export default function MallaGrafica({ malla }: Props) {
         setErrorElectivas(false);
         setElectivas([]);
         try {
-            const res = await fetch(`/api/v1/electivas`);
+            const res = await fetch(`/api/v1/electivas`, {
+                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                credentials: 'same-origin',
+            });
             if (res.ok) {
                 const data = await res.json();
                 setElectivas(data.data ?? []);
