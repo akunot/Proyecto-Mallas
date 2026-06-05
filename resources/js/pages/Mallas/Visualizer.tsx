@@ -29,6 +29,20 @@ interface Asignatura {
     };
 }
 
+interface Slot {
+    ID_Slot: number;
+    Nombre_Slot: string;
+    Tipo_Slot: 'optativa' | 'libre' | 'nivelatorio';
+    Semestre: number | null;
+}
+
+interface Electiva {
+    ID_Asignatura: number;
+    Codigo_Asignatura: string;
+    Nombre_Asignatura: string;
+    Creditos_Asignatura: number;
+}
+
 interface Agrupacion {
     ID_Agrupacion: number;
     Nombre_Agrupacion: string;
@@ -37,6 +51,7 @@ interface Agrupacion {
         Nombre_Componente: string;
     };
     asignaturas: Asignatura[];
+    slots: Slot[];
 }
 
 interface Props {
@@ -44,13 +59,42 @@ interface Props {
         ID_Malla: number;
         programa: {
             Nombre_Programa: string;
+            ID_Programa: number;
         };
         agrupaciones: Agrupacion[];
     };
 }
 
+type GridItem =
+    | (Asignatura & { isSlot: false; ID_Componente: number })
+    | (Slot      & { isSlot: true;  ID_Componente: number });
+
 export default function MallaGrafica({ malla }: Props) {
     const [selectedAsig, setSelectedAsig] = useState<number | null>(null);
+
+    const [showElectivasModal, setShowElectivasModal] = useState(false);
+    const [electivas, setElectivas]                   = useState<Electiva[]>([]);
+    const [loadingElectivas, setLoadingElectivas]     = useState(false);
+    const [errorElectivas, setErrorElectivas]         = useState(false);
+
+    const fetchElectivas = async () => {
+        setLoadingElectivas(true);
+        setErrorElectivas(false);
+        setElectivas([]);
+        try {
+            const res = await fetch(`/api/v1/programas/${malla.programa.ID_Programa}/electivas`);
+            if (res.ok) {
+                const data = await res.json();
+                setElectivas(data.data ?? []);
+            } else {
+                setErrorElectivas(true);
+            }
+        } catch {
+            setErrorElectivas(true);
+        } finally {
+            setLoadingElectivas(false);
+        }
+    };
 
     // Encontrar la asignatura seleccionada para obtener sus requisitos rápidamente
     const selectedAsigData = useMemo(() => {
@@ -62,24 +106,35 @@ export default function MallaGrafica({ malla }: Props) {
         return null;
     }, [selectedAsig, malla]);
 
-    // Organizar asignaturas por semestre
+    // Organizar asignaturas y slots por semestre
     const semestres = useMemo(() => {
-        const grid: Record<number, Asignatura[]> = {};
+        const grid: Record<number, GridItem[]> = {};
+
         malla.agrupaciones.forEach(agrup => {
             agrup.asignaturas.forEach(asig => {
-                const asigWithComp = { ...asig, ID_Componente: agrup.ID_Componente };
+                const item: GridItem = { ...asig, ID_Componente: agrup.ID_Componente, isSlot: false };
                 const sem = asig.pivot.Semestre_Sugerido || 0;
                 if (!grid[sem]) grid[sem] = [];
-                // Evitar duplicados si una materia está en varias agrupaciones (raro pero posible)
-                if (!grid[sem].find(a => a.ID_Asignatura === asig.ID_Asignatura)) {
-                    grid[sem].push(asigWithComp);
+                if (!grid[sem].find(a => !a.isSlot && (a as Asignatura).ID_Asignatura === asig.ID_Asignatura)) {
+                    grid[sem].push(item);
                 }
             });
+
+            (agrup.slots || []).forEach(slot => {
+                const sem = slot.Semestre || 0;
+                if (!grid[sem]) grid[sem] = [];
+                grid[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente });
+            });
         });
-        // Ordenar cada semestre por el campo Orden
+
         Object.keys(grid).forEach(sem => {
-            grid[Number(sem)].sort((a, b) => (a.pivot.Orden || 0) - (b.pivot.Orden || 0));
+            grid[Number(sem)].sort((a, b) => {
+                const oa = a.isSlot ? 999 : ((a as Asignatura).pivot.Orden || 0);
+                const ob = b.isSlot ? 999 : ((b as Asignatura).pivot.Orden || 0);
+                return oa - ob;
+            });
         });
+
         return grid;
     }, [malla]);
 
@@ -109,7 +164,7 @@ export default function MallaGrafica({ malla }: Props) {
         if (type === 'any' && selectedAsig == asigId) return true;
 
         const reqs = selectedAsigData.requisitos || [];
-        
+
         // Verificar si la materia actual (asigId) es un requisito de la seleccionada
         const matchesReq = reqs.some(r => {
             if (r.ID_Asignatura_Requerida != asigId) return false;
@@ -121,22 +176,13 @@ export default function MallaGrafica({ malla }: Props) {
 
         if (matchesReq) return true;
 
-        // Opcional: ¿La materia seleccionada es un requisito de la actual? (Resaltado inverso)
-        // Esto ayuda a ver qué materias se desbloquean
-        /* 
-        const currentAsig = malla.agrupaciones.flatMap(a => a.asignaturas).find(a => a.ID_Asignatura == asigId);
-        if (currentAsig?.requisitos?.some(r => r.ID_Asignatura_Requerida == selectedAsig)) {
-            return true; // Podríamos usar un color diferente, pero por ahora resaltemos igual
-        }
-        */
-
         return false;
     };
 
     return (
         <Layout>
             <Head title={`Visualización - ${malla.programa.Nombre_Programa}`} />
-            
+
             <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto">
                 <div className="flex justify-between items-center mb-6">
                     <div>
@@ -166,38 +212,64 @@ export default function MallaGrafica({ malla }: Props) {
                                     {sem === 0 ? 'OTRO' : sem === 1 ? 'I' : sem === 2 ? 'II' : sem === 3 ? 'III' : sem === 4 ? 'IV' : sem === 5 ? 'V' : sem === 6 ? 'VI' : sem === 7 ? 'VII' : sem === 8 ? 'VIII' : sem === 9 ? 'IX' : 'X'}
                                 </div>
                                 <div className="space-y-3">
-                                    {semestres[sem]?.map(asig => {
-                                        const active = selectedAsig == asig.ID_Asignatura;
-                                        const isPre = isRelated(asig.ID_Asignatura, 'pre');
-                                        const isCo = isRelated(asig.ID_Asignatura, 'co');
+                                    {semestres[sem]?.map((item) => {
+                                        if (item.isSlot) {
+                                            const slot = item as Slot & { isSlot: true; ID_Componente: number };
+                                            const isLibre = slot.Tipo_Slot === 'libre';
+                                            return (
+                                                <div
+                                                    key={`slot-${slot.ID_Slot}`}
+                                                    onClick={isLibre ? () => { setShowElectivasModal(true); fetchElectivas(); } : undefined}
+                                                    className={[
+                                                        'border-dashed border-2 p-2 h-[120px] flex flex-col items-center justify-center',
+                                                        'text-[11px] font-semibold text-center leading-tight transition-all duration-200',
+                                                        isLibre
+                                                            ? 'border-blue-400 bg-blue-50 text-blue-700 cursor-pointer hover:bg-blue-100 hover:shadow-md'
+                                                            : slot.Tipo_Slot === 'optativa'
+                                                                ? 'border-orange-400 bg-orange-50 text-orange-700 cursor-default'
+                                                                : 'border-yellow-400 bg-yellow-50 text-yellow-700 cursor-default',
+                                                    ].join(' ')}
+                                                >
+                                                    <span className="uppercase tracking-wide">
+                                                        {slot.Tipo_Slot === 'libre' ? 'Libre Elección' : slot.Tipo_Slot === 'optativa' ? 'Optativa' : 'Nivelatorio'}
+                                                    </span>
+                                                    {isLibre && (
+                                                        <span className="mt-1 text-[9px] text-blue-500">clic para ver catálogo</span>
+                                                    )}
+                                                </div>
+                                            );
+                                        }
+
+                                        const asig   = item as Asignatura & { isSlot: false; ID_Componente: number };
+                                        const active  = selectedAsig === asig.ID_Asignatura;
+                                        const isPre   = isRelated(asig.ID_Asignatura, 'pre');
+                                        const isCo    = isRelated(asig.ID_Asignatura, 'co');
                                         const related = isPre || isCo;
-                                        
+
                                         return (
-                                            <div 
+                                            <div
                                                 key={asig.ID_Asignatura}
-                                                onClick={() => setSelectedAsig(asig.ID_Asignatura == selectedAsig ? null : asig.ID_Asignatura)}
-                                                className={`
-                                                    ${getComponentColor(asig.ID_Componente || 0)}
-                                                    border-l-4 p-2 shadow-sm cursor-pointer transition-all duration-200
-                                                    hover:shadow-md h-[120px] flex flex-col justify-between relative
-                                                    ${active ? 'ring-4 ring-blue-600 scale-105 z-20 shadow-xl' : ''}
-                                                    ${selectedAsig && !active && !related ? 'opacity-30' : 'opacity-100'}
-                                                    ${isPre ? 'ring-4 ring-red-500 z-10' : ''}
-                                                    ${isCo ? 'ring-4 ring-yellow-500 z-10' : ''}
-                                                `}
+                                                onClick={() => setSelectedAsig(asig.ID_Asignatura === selectedAsig ? null : asig.ID_Asignatura)}
+                                                className={[
+                                                    getComponentColor(asig.ID_Componente || 0),
+                                                    'border-l-4 p-2 shadow-sm cursor-pointer transition-all duration-200',
+                                                    'hover:shadow-md h-[120px] flex flex-col justify-between relative',
+                                                    active  ? 'ring-4 ring-blue-600 scale-105 z-20 shadow-xl' : '',
+                                                    selectedAsig && !active && !related ? 'opacity-30' : 'opacity-100',
+                                                    isPre ? 'ring-4 ring-red-500 z-10' : '',
+                                                    isCo  ? 'ring-4 ring-yellow-500 z-10' : '',
+                                                ].join(' ')}
                                             >
                                                 <div className="flex justify-between text-[10px] font-bold text-gray-600">
                                                     <span>{asig.Creditos_Asignatura}</span>
                                                     <span>{asig.Horas_Presencial || 0}</span>
                                                     <span>{asig.Horas_Estudiante || 0}</span>
                                                 </div>
-                                                
                                                 <div className="text-center text-[11px] font-semibold leading-tight flex-grow flex items-center justify-center py-1">
                                                     {asig.Nombre_Asignatura}
                                                 </div>
-
                                                 <div className="flex justify-between items-center mt-1 border-t border-gray-200 pt-1">
-                                                    <span>{asig.Codigo_Asignatura}</span>
+                                                    <span className="text-[10px] text-gray-500">{asig.Codigo_Asignatura}</span>
                                                     <div className="flex gap-1">
                                                         {asig.requisitos?.some(r => r.Tipo_Requisito?.toLowerCase().includes('pre')) && (
                                                             <div className="w-3 h-3 bg-red-400 rounded-full flex items-center justify-center" title="Tiene prerrequisitos">
@@ -263,6 +335,75 @@ export default function MallaGrafica({ malla }: Props) {
                     </div>
                 )}
             </div>
+
+            {showElectivasModal && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
+                    <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
+                        <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
+                            <div>
+                                <h2 className="text-base font-semibold text-gray-900">Catálogo de Libre Elección</h2>
+                                <p className="text-xs text-gray-500 mt-0.5">{malla.programa.Nombre_Programa}</p>
+                            </div>
+                            <button
+                                onClick={() => setShowElectivasModal(false)}
+                                className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
+                            >
+                                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+
+                        <div className="overflow-y-auto px-6 py-4 flex-1">
+                            {loadingElectivas ? (
+                                <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
+                                    <span className="text-sm">Cargando catálogo…</span>
+                                </div>
+                            ) : errorElectivas ? (
+                                <p className="py-10 text-center text-sm text-red-500">
+                                    No se pudieron cargar las electivas. Intenta de nuevo.
+                                </p>
+                            ) : electivas.length === 0 ? (
+                                <p className="py-10 text-center text-sm text-gray-500">
+                                    No hay electivas registradas para este programa.
+                                </p>
+                            ) : (
+                                <table className="min-w-full text-sm">
+                                    <thead>
+                                        <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100">
+                                            <th className="pb-3 pr-4">Código</th>
+                                            <th className="pb-3 pr-4">Nombre</th>
+                                            <th className="pb-3 text-center">Créditos</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-50">
+                                        {electivas.map((e) => (
+                                            <tr key={e.ID_Asignatura} className="hover:bg-gray-50">
+                                                <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
+                                                <td className="py-2 pr-4 text-gray-800">{e.Nombre_Asignatura}</td>
+                                                <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
+                                            </tr>
+                                        ))}
+                                    </tbody>
+                                </table>
+                            )}
+                        </div>
+
+                        <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
+                            {!loadingElectivas && !errorElectivas && electivas.length > 0 && (
+                                <span className="text-xs text-gray-400">{electivas.length} materias disponibles</span>
+                            )}
+                            <button
+                                onClick={() => setShowElectivasModal(false)}
+                                className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
+                            >
+                                Cerrar
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </Layout>
     );
 }
