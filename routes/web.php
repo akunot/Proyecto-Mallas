@@ -419,9 +419,10 @@ Route::middleware(['auth'])->group(function () {
 
     Route::get('/mallas/{id}/grafica', function ($id) {
         $malla = \App\Models\MallaCurricular::with([
-            'programa', 
+            'programa',
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-            'agrupaciones.componente'
+            'agrupaciones.componente',
+            'agrupaciones.slots',
         ])->findOrFail($id);
         
         return Inertia::render('Mallas/Visualizer', [
