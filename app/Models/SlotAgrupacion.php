@@ -17,10 +17,12 @@ class SlotAgrupacion extends Model
         'Nombre_Slot',
         'Tipo_Slot',
         'Semestre',
+        'Orden',
     ];
 
     protected $casts = [
         'Semestre' => 'integer',
+        'Orden'    => 'integer',
     ];
 
     public $timestamps = true;

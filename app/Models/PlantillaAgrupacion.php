@@ -15,6 +15,7 @@ class PlantillaAgrupacion extends Model
     protected $fillable = [
         'ID_Programa',
         'ID_Componente',
+        'Indice_Agrupacion_Excel',
         'Nombre_Agrupacion',
         'Tipo_Agrupacion',
         'Creditos_Requeridos',
@@ -26,6 +27,7 @@ class PlantillaAgrupacion extends Model
         'Es_Obligatoria' => 'boolean',
         'Creditos_Requeridos' => 'integer',
         'Creditos_Maximos' => 'integer',
+        'Indice_Agrupacion_Excel' => 'integer',
     ];
 
     public $timestamps = true;

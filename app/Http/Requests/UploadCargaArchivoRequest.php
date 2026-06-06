@@ -16,7 +16,7 @@ class UploadCargaArchivoRequest extends FormRequest
     {
         return [
             'archivo' => ['required', 'file', 'mimes:xlsx,xls', 'max:10240'],
-            'tipo_archivo' => ['required', 'string', Rule::in(['asignaturas', 'electivas', 'malla'])],
+            'tipo_archivo' => ['required', 'string', Rule::in(['asignaturas', 'electivas', 'malla', 'optativa'])],
         ];
     }
 
@@ -28,7 +28,7 @@ class UploadCargaArchivoRequest extends FormRequest
             'archivo.mimes' => 'El archivo debe ser un archivo Excel (.xlsx o .xls).',
             'archivo.max' => 'El archivo no puede exceder 10MB.',
             'tipo_archivo.required' => 'El tipo de archivo es requerido.',
-            'tipo_archivo.in' => 'El tipo de archivo debe ser asignaturas, electivas o malla.',
+            'tipo_archivo.in' => 'El tipo de archivo debe ser asignaturas, electivas, malla u optativa.',
         ];
     }
 }

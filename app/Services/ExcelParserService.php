@@ -406,10 +406,13 @@ class ExcelParserService
      * Procesa FORMATO DE CARGA - OPTATIVA.xlsx.
      *
      * Estructura por fila (a partir de fila 2):
-     *   Col 0: ID_Programa  Col 1: ID_Componente  Col 2: ID_Agrupacion
-     *   Col 3: Codigo       Col 4: Nombre         Col 5: Creditos      Col 6: Obligatoria
+     *   Col 0: Codigo_Programa  Col 1: ID_Componente  Col 2: ID_Agrupacion
+     *   Col 3: Codigo           Col 4: Nombre         Col 5: Creditos  Col 6: Obligatoria
+     *   Col 7: Codigo_Requisito (o '-')  Col 8: Nombre_Requisito (referencia o texto condición)
+     *   Col 9: Tipo_Requisito
      *
-     * Filas con Col 3 null representan separadores y se omiten.
+     * Una asignatura con múltiples requisitos ocupa una fila por requisito.
+     * Filas con Col 3 null son separadores y se omiten.
      * El mismo archivo puede contener múltiples programas.
      */
     private function parseOptativaFile(Spreadsheet $spreadsheet): void
@@ -427,12 +430,15 @@ class ExcelParserService
 
         $batch              = [];
         $codigosPorPrograma = [];
-        $codigosProcesados  = [];
+        $codigosProcesados  = []; // prog|codigoBase => fila primera ocurrencia
+        $programasCache     = []; // Codigo_Programa => ID_Programa|null
+        // Cada entrada: [codigoBase, programaId, tipoReq, reqCodigo|null, esTexto, descripcion|null, fila]
+        $requisitosData     = [];
 
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            $programaId     = !empty($data[0]) ? (int)$this->cleanCodeCell($data[0]) : null;
+            $codigoPrograma = !empty($data[0]) ? trim((string)$this->cleanCodeCell($data[0])) : null;
             $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
             $nombre         = $this->cleanCell($data[4] ?? '');
             $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
@@ -441,47 +447,68 @@ class ExcelParserService
                 continue;
             }
 
+            if (!$codigoPrograma) {
+                $this->recordError($i + 1, 'Optativa', 'Fila sin código de programa.', $codigoOriginal, 'advertencia');
+                continue;
+            }
+
+            if (!array_key_exists($codigoPrograma, $programasCache)) {
+                $prog = Programa::where('Codigo_Programa', $codigoPrograma)->first(['ID_Programa']);
+                $programasCache[$codigoPrograma] = $prog?->ID_Programa;
+            }
+            $programaId = $programasCache[$codigoPrograma];
+
             if (!$programaId) {
-                $this->recordError($i + 1, 'Optativa', 'Fila sin ID de programa.', $codigoOriginal, 'advertencia');
+                $this->recordError($i + 1, 'Optativa', "Programa con código '{$codigoPrograma}' no encontrado en la base de datos.", $codigoOriginal, 'error');
                 continue;
             }
 
             $codigoBase = $this->normalizeCodigo($codigoOriginal);
             $key        = $programaId . '|' . $codigoBase;
 
-            if (isset($codigosProcesados[$key])) {
-                $this->recordError(
-                    $i + 1,
-                    'Optativa',
-                    "Código '{$codigoBase}' duplicado para el programa {$programaId} (fila anterior: {$codigosProcesados[$key]}).",
-                    $codigoOriginal,
-                    'advertencia'
-                );
-                continue;
+            // Primera ocurrencia: registrar asignatura y vincular al programa
+            if (!isset($codigosProcesados[$key])) {
+                $codigosProcesados[$key] = $i + 1;
+
+                if (!isset($codigosPorPrograma[$programaId])) {
+                    $codigosPorPrograma[$programaId] = [];
+                }
+                $codigosPorPrograma[$programaId][] = $codigoBase;
+
+                if (!isset($this->asignaturasCache[$codigoBase])) {
+                    $batch[] = [
+                        'Codigo_Asignatura'   => $codigoOriginal,
+                        'Codigo_Base'         => $codigoBase,
+                        'Nombre_Asignatura'   => $nombre,
+                        'Creditos_Asignatura' => $creditos,
+                        'Horas_Presencial'    => null,
+                        'Horas_Estudiante'    => null,
+                        'created_at'          => now(),
+                        'updated_at'          => now(),
+                    ];
+                    $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
+                }
             }
-            $codigosProcesados[$key] = $i + 1;
 
-            if (!isset($codigosPorPrograma[$programaId])) {
-                $codigosPorPrograma[$programaId] = [];
+            // Todas las ocurrencias: recolectar prerequisito de esta fila
+            // Col 7 = código req (puede ser '-' o vacío), Col 8 = nombre/texto, Col 9 = tipo
+            $rCodigo = $this->cleanCodeCell($data[7] ?? null);
+            $rNombre = $this->cleanCell($data[8] ?? null);
+            $rTipo   = $this->cleanCell($data[9] ?? null);
+
+            $tipoValido = !empty($rTipo) && $rTipo !== '-';
+
+            if (!$tipoValido) {
+                continue; // fila sin requisito
             }
-            $codigosPorPrograma[$programaId][] = $codigoBase;
 
-            if (isset($this->asignaturasCache[$codigoBase])) {
-                continue;
+            if (!empty($rCodigo) && $rCodigo !== '-') {
+                // Requisito referenciado por código de asignatura
+                $requisitosData[] = [$codigoBase, $programaId, $rTipo, $rCodigo, false, null, $i + 1];
+            } elseif (!empty($rNombre) && $rNombre !== '-') {
+                // Requisito de texto (condición de créditos o nombre sin código)
+                $requisitosData[] = [$codigoBase, $programaId, $rTipo, null, true, $rNombre, $i + 1];
             }
-
-            $batch[] = [
-                'Codigo_Asignatura'   => $codigoOriginal,
-                'Codigo_Base'         => $codigoBase,
-                'Nombre_Asignatura'   => $nombre,
-                'Creditos_Asignatura' => $creditos,
-                'Horas_Presencial'    => null,
-                'Horas_Estudiante'    => null,
-                'created_at'          => now(),
-                'updated_at'          => now(),
-            ];
-
-            $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
         }
 
         $this->bulkInsertAsignaturas($batch);
@@ -494,6 +521,85 @@ class ExcelParserService
         // Vincular cada programa a sus asignaturas
         foreach ($codigosPorPrograma as $programaId => $codigos) {
             $this->vincularElectivasAPrograma($programaId, $codigos);
+        }
+
+        // Insertar requisitos
+        if (!empty($requisitosData)) {
+            $batchRequisitos = [];
+            $seenInBatch     = [];
+
+            // Cargar requisitos ya existentes para estos programas (dedup en re-subida)
+            $programaIdsAfectados = array_unique(array_column($requisitosData, 1));
+            $requisitosExistentes = DB::table('requisitos')
+                ->whereIn('ID_Programa', $programaIdsAfectados)
+                ->select('ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida', 'Descripcion_Requisito')
+                ->get()
+                ->mapWithKeys(fn($r) => [
+                    "{$r->ID_Asignatura}|{$r->ID_Programa}|" .
+                    ($r->ID_Asignatura_Requerida ?? 'null') . '|' .
+                    ($r->Descripcion_Requisito ?? '') => true,
+                ])
+                ->all();
+
+            foreach ($requisitosData as [$codigoBase, $programaId, $tipoReq, $reqCodigo, $esTexto, $descripcion, $rowNumber]) {
+                $asignaturaId = $this->asignaturasCache[$codigoBase] ?? null;
+                if (!is_int($asignaturaId)) {
+                    continue;
+                }
+
+                if ($esTexto) {
+                    // Requisito de texto: condición de créditos u otro
+                    $tipoMapeado = $this->isConditionRequirement($descripcion)
+                        ? 'creditos'
+                        : $this->mapTipoRequisito($tipoReq);
+
+                    $dupKey = "{$asignaturaId}|{$programaId}|null|{$descripcion}";
+                    if (isset($requisitosExistentes[$dupKey]) || isset($seenInBatch[$dupKey])) {
+                        continue;
+                    }
+                    $seenInBatch[$dupKey] = true;
+
+                    $batchRequisitos[] = [
+                        'ID_Asignatura'           => $asignaturaId,
+                        'ID_Programa'             => $programaId,
+                        'ID_Asignatura_Requerida' => null,
+                        'Tipo_Requisito'          => $tipoMapeado,
+                        'Valor_Creditos'          => null,
+                        'Descripcion_Requisito'   => $descripcion,
+                        'created_at'              => now(),
+                        'updated_at'              => now(),
+                    ];
+                } else {
+                    // Requisito por código de asignatura
+                    $reqBase         = $this->normalizeCodigo($reqCodigo);
+                    $reqAsignaturaId = $this->asignaturasCache[$reqBase] ?? null;
+                    if (!is_int($reqAsignaturaId)) {
+                        $this->recordError($rowNumber, 'Optativa', "Requisito '{$reqCodigo}' no encontrado en catálogo.", $codigoBase, 'advertencia');
+                        continue;
+                    }
+
+                    $dupKey = "{$asignaturaId}|{$programaId}|{$reqAsignaturaId}|";
+                    if (isset($requisitosExistentes[$dupKey]) || isset($seenInBatch[$dupKey])) {
+                        continue;
+                    }
+                    $seenInBatch[$dupKey] = true;
+
+                    $batchRequisitos[] = [
+                        'ID_Asignatura'           => $asignaturaId,
+                        'ID_Programa'             => $programaId,
+                        'ID_Asignatura_Requerida' => $reqAsignaturaId,
+                        'Tipo_Requisito'          => $this->mapTipoRequisito($tipoReq),
+                        'Valor_Creditos'          => null,
+                        'Descripcion_Requisito'   => null,
+                        'created_at'              => now(),
+                        'updated_at'              => now(),
+                    ];
+                }
+            }
+
+            if (!empty($batchRequisitos)) {
+                $this->bulkInsertModel($batchRequisitos, 'requisitos');
+            }
         }
     }
 
@@ -596,8 +702,8 @@ class ExcelParserService
             }
         }
         
-        // Si no se encuentra mallas y buscamos MALLA, probar con la primera hoja
-        if (strtoupper($needle) === 'MALLA' || strtoupper($needle) === 'AGRUPACION') {
+        // Fallback to first sheet only for MALLA (file may just be named "Hoja 1")
+        if (strtoupper($needle) === 'MALLA') {
             return $spreadsheet->getSheetNames()[0] ?? null;
         }
         
@@ -758,6 +864,20 @@ class ExcelParserService
             $this->bulkInsertModel($batchRequisitos, 'requisitos');
         }
 
+        // 8. Segunda pasada: procesar placeholders (LIBRE1-11, OPTATIVA1-8, NIVELATORIO1-2).
+        // No se pueden acumular en batch porque crean slots, no relaciones.
+        // Se ejecutan después de los inserts para que las agrupaciones ya existan.
+        for ($i = 1; $i < count($rows); $i++) {
+            $data = $rows[$i];
+            if ($this->isRowEmpty($data)) {
+                continue;
+            }
+            $codigoAsignatura = $this->cleanCodeCell($data[3] ?? null);
+            if (!empty($codigoAsignatura) && $this->esPlaceholder($codigoAsignatura)) {
+                $this->procesarPlaceholder($data, $i + 1);
+            }
+        }
+
         return count($this->errors) === 0;
     }
 
@@ -785,6 +905,11 @@ class ExcelParserService
 
         if (empty($codigoAsignatura)) {
             $this->recordError($rowNumber, "Codigo Asignatura", "Fila sin codigo de asignatura", "", "error");
+            return;
+        }
+
+        // Placeholders (OPTATIVA*, LIBRE*, NIVELATORIO*) are processed in the second pass
+        if ($this->esPlaceholder($codigoAsignatura)) {
             return;
         }
 
@@ -1463,9 +1588,21 @@ class ExcelParserService
             return null;
         }
 
-        // Si es numérico, asumir que es ID
+        // Si es numérico, verificar que exista antes de usarlo como ID
         if (is_numeric($agrupacionValue)) {
-            return (int) $agrupacionValue;
+            $id = (int) $agrupacionValue;
+            if (Agrupacion::where('ID_Agrupacion', $id)->exists()) {
+                return $id;
+            }
+            // El ID numérico no existe en BD; el Excel usa número de columna, no ID real.
+            // Buscar la agrupación por componente y malla como fallback.
+            $agrupacion = Agrupacion::where('ID_Malla', $this->malla->ID_Malla)
+                ->where('ID_Componente', $componenteId)
+                ->first();
+            if ($agrupacion) {
+                return $agrupacion->ID_Agrupacion;
+            }
+            return null;
         }
 
         // Buscar por nombre dentro del componente y malla actual
@@ -1645,7 +1782,8 @@ class ExcelParserService
             'NIVELATORIO1', 'NIVELATORIO2'
         ];
         
-        return in_array(trim($codigoAsignatura), $placeholders);
+        $normalized = preg_replace('/\s+/', '', strtoupper(trim($codigoAsignatura)));
+        return in_array($normalized, $placeholders);
     }
 
     /**
@@ -1653,52 +1791,58 @@ class ExcelParserService
      */
     private function procesarPlaceholder(array $data, int $rowNumber): void
     {
-        // Extraer datos
-        $componenteValue = $this->cleanCell($data[1] ?? null);
-        $agrupacionValue = $this->cleanCell($data[2] ?? null);
-        $codigoPlaceholder = trim($this->cleanCell($data[3] ?? null));
-        $obligatoria = $this->cleanCell($data[4] ?? null);
-        $semestre = $this->cleanCell($data[7] ?? null);
+        $componenteId          = (int) $this->cleanCell($data[1] ?? null);
+        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? null);
+        $codigoPlaceholder     = trim((string) $this->cleanCell($data[3] ?? null));
+        $semestre              = $this->cleanCell($data[7] ?? null);
 
-        // Resolver IDs
-        $componenteId = $this->resolveComponenteId($componenteValue);
-        if (!$componenteId) {
-            $this->recordError($rowNumber, 'Malla', "Componente no encontrado: {$componenteValue}", $codigoPlaceholder, 'error');
+        if (!$componenteId || !$plantillaAgrupacionId || empty($codigoPlaceholder)) {
+            $this->recordError($rowNumber, 'Malla', 'Fila de placeholder incompleta.', $codigoPlaceholder, 'error');
             return;
         }
 
-        $agrupacionId = $this->resolveAgrupacionId($agrupacionValue, $componenteId);
-        if (!$agrupacionId) {
-            $this->recordError($rowNumber, 'Malla', "Agrupación no encontrada: {$agrupacionValue}", $codigoPlaceholder, 'error');
+        // Same PlantillaAgrupacion lookup used in accumulateMallaRow
+        static $plantillasCache = null;
+        if ($plantillasCache === null) {
+            $plantillasCache = PlantillaAgrupacion::all()->keyBy('ID_Plantilla_Agrupacion');
+        }
+
+        if (!isset($plantillasCache[$plantillaAgrupacionId])) {
+            $this->recordError($rowNumber, 'Agrupacion', "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no válida.", $codigoPlaceholder, 'error');
             return;
         }
 
-        // Determinar tipo de slot
-        $tipoSlot = $this->determinarTipoSlot($codigoPlaceholder);
+        $plantilla = $plantillasCache[$plantillaAgrupacionId];
+        $agrupKey  = $componenteId . '|' . $plantilla->Nombre_Agrupacion;
+
+        if (isset($this->agrupacionesCache[$agrupKey]) && is_int($this->agrupacionesCache[$agrupKey])) {
+            $agrupacionId = $this->agrupacionesCache[$agrupKey];
+        } else {
+            $agrup = Agrupacion::where('ID_Malla', $this->malla->ID_Malla)
+                ->where('ID_Componente', $componenteId)
+                ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
+                ->first();
+            if (!$agrup) {
+                $this->recordError($rowNumber, 'Malla', "Agrupación '{$plantilla->Nombre_Agrupacion}' no encontrada para el slot.", $codigoPlaceholder, 'error');
+                return;
+            }
+            $agrupacionId = $agrup->ID_Agrupacion;
+            $this->agrupacionesCache[$agrupKey] = $agrupacionId;
+        }
+
+        $tipoSlot   = $this->determinarTipoSlot($codigoPlaceholder);
         $semestreNum = is_numeric($semestre) ? (int) $semestre : null;
 
         try {
-            // Crear slot
-            $slot = SlotAgrupacion::create([
+            SlotAgrupacion::create([
                 'ID_Agrupacion' => $agrupacionId,
-                'Nombre_Slot' => $codigoPlaceholder,
-                'Tipo_Slot' => $tipoSlot,
-                'Semestre' => $semestreNum,
+                'Nombre_Slot'   => $codigoPlaceholder,
+                'Tipo_Slot'     => $tipoSlot,
+                'Semestre'      => $semestreNum,
             ]);
-
             $this->processedRows++;
-            
-            // Registrar información de procesamiento
-            $this->recordError($rowNumber, 'Malla', 
-                "Slot creado: {$codigoPlaceholder} (Tipo: {$tipoSlot})", 
-                $codigoPlaceholder, 'info'
-            );
-
         } catch (\Exception $e) {
-            $this->recordError($rowNumber, 'Malla', 
-                "Error creando slot '{$codigoPlaceholder}': " . $e->getMessage(), 
-                $codigoPlaceholder, 'error'
-            );
+            $this->recordError($rowNumber, 'Malla', "Error creando slot '{$codigoPlaceholder}': " . $e->getMessage(), $codigoPlaceholder, 'error');
         }
     }
 

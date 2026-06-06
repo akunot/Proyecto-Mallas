@@ -12,6 +12,7 @@ use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\CargaController;
 use App\Http\Controllers\Api\AuditoriaController;
 use App\Http\Controllers\Api\MallaAprobacionController;
+use App\Http\Controllers\Api\MallaController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -146,6 +147,9 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
         Route::patch('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle']);
         
+        // Mallas - reordenación de bloques en el visualizador
+        Route::patch('/mallas/{mallaId}/reordenar', [MallaController::class, 'reordenar']);
+
         // Mallas y cargas (Fase 3+)
         Route::get('/cargas', [CargaController::class, 'index']);
         Route::post('/cargas', [CargaController::class, 'store']);

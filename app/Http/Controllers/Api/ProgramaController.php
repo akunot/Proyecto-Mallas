@@ -50,6 +50,7 @@ class ProgramaController extends CatalogoController
         $programa  = Programa::findOrFail($id);
         $electivas = $programa->electivas()
             ->select('asignaturas.ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura')
+            ->with(['requisitos.asignaturaRequerida'])
             ->orderBy('Nombre_Asignatura')
             ->paginate(200);
 
