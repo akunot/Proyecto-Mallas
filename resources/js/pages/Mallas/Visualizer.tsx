@@ -45,6 +45,7 @@ interface Slot {
     Tipo_Slot: 'optativa' | 'libre' | 'nivelatorio';
     Semestre: number | null;
     Orden?: number;
+    Nombre_Agrupacion?: string;
 }
 
 interface ElectivaRequisito {
@@ -61,6 +62,12 @@ interface Electiva {
     Nombre_Asignatura: string;
     Creditos_Asignatura: number;
     requisitos?: ElectivaRequisito[];
+}
+
+interface OptativaGroup {
+    ID_Agrupacion: number;
+    Nombre_Agrupacion: string;
+    asignaturas: Electiva[];
 }
 
 interface Agrupacion {
@@ -104,7 +111,8 @@ export default function MallaGrafica({ malla }: Props) {
     const [searchElectivas, setSearchElectivas]       = useState('');
 
     const [showOptativasModal, setShowOptativasModal] = useState(false);
-    const [optativas, setOptativas]                   = useState<Electiva[]>([]);
+    const [selectedOptativaSlot, setSelectedOptativaSlot] = useState<Slot | null>(null);
+    const [optativas, setOptativas]                   = useState<OptativaGroup[]>([]);
     const [loadingOptativas, setLoadingOptativas]     = useState(false);
     const [errorOptativas, setErrorOptativas]         = useState(false);
     const [searchOptativas, setSearchOptativas]       = useState('');
@@ -138,14 +146,18 @@ export default function MallaGrafica({ malla }: Props) {
         }
     };
 
-    const fetchOptativas = async () => {
+    const fetchOptativas = async (slot?: Slot) => {
+        if (slot) {
+            setSelectedOptativaSlot(slot);
+        }
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
         setSearchOptativas('');
         setExpandedOptativa(null);
         try {
-            const res = await fetch(`/api/v1/programas/${malla.programa.ID_Programa}/electivas`, {
+            const url = `/api/v1/mallas/${malla.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
+            const res = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
@@ -188,7 +200,7 @@ export default function MallaGrafica({ malla }: Props) {
             (agrup.slots || []).forEach(slot => {
                 const sem = slot.Semestre || 0;
                 if (!g[sem]) g[sem] = [];
-                g[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente });
+                g[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente, Nombre_Agrupacion: agrup.Nombre_Agrupacion });
             });
         });
         Object.keys(g).forEach(sem => {
@@ -205,10 +217,8 @@ export default function MallaGrafica({ malla }: Props) {
 
     const numSemestres = Math.max(...Object.keys(semestres).map(Number), 10);
     const listaSemestres = useMemo(() => {
-        const list = Array.from({ length: numSemestres }, (_, i) => i + 1);
-        if (semestres[0] && semestres[0].length > 0) return [0, ...list];
-        return list;
-    }, [numSemestres, semestres]);
+        return Array.from({ length: numSemestres }, (_, i) => i + 1);
+    }, [numSemestres]);
 
     // Drag-and-drop handlers
     const handleDragStart = (e: React.DragEvent, key: string) => {
@@ -424,8 +434,8 @@ export default function MallaGrafica({ malla }: Props) {
                                                         onDragEnd={handleDragEnd}
                                                         onDragOver={e => handleItemDragOver(e, sem, key)}
                                                         onClick={
-                                                            isLibre    ? () => { setShowElectivasModal(true);  fetchElectivas();  } :
-                                                            isOptativa ? () => { setShowOptativasModal(true); fetchOptativas(); } :
+                                                            isLibre    ? () => { setSelectedOptativaSlot(null); setShowElectivasModal(true);  fetchElectivas();  } :
+                                                            isOptativa ? () => { setShowOptativasModal(true); fetchOptativas(slot); } :
                                                             undefined
                                                         }
                                                         className={[
@@ -442,6 +452,9 @@ export default function MallaGrafica({ malla }: Props) {
                                                         <span className="uppercase tracking-wide">
                                                             {isLibre ? 'Libre Elección' : isOptativa ? 'Optativa' : 'Nivelatorio'}
                                                         </span>
+                                                        {slot.Nombre_Agrupacion && (
+                                                            <span className="mt-1 text-[10px] text-gray-500">{slot.Nombre_Agrupacion}</span>
+                                                        )}
                                                         {isLibre && (
                                                             <span className="mt-1 text-[9px] text-blue-500">clic para ver catálogo</span>
                                                         )}
@@ -678,12 +691,19 @@ export default function MallaGrafica({ malla }: Props) {
 
             {showOptativasModal && (() => {
                 const q = searchOptativas.trim().toLowerCase();
-                const filtered = q
-                    ? optativas.filter(e =>
-                        e.Nombre_Asignatura.toLowerCase().includes(q) ||
-                        String(e.Codigo_Asignatura).toLowerCase().includes(q)
-                      )
-                    : optativas;
+                const filteredGroups = optativas
+                    .map(group => ({
+                        ...group,
+                        asignaturas: q
+                            ? group.asignaturas.filter(e =>
+                                e.Nombre_Asignatura.toLowerCase().includes(q) ||
+                                String(e.Codigo_Asignatura).toLowerCase().includes(q)
+                              )
+                            : group.asignaturas,
+                    }))
+                    .filter(group => group.asignaturas.length > 0);
+                const totalOptativas = optativas.reduce((sum, group) => sum + group.asignaturas.length, 0);
+                const visibleOptativas = filteredGroups.reduce((sum, group) => sum + group.asignaturas.length, 0);
                 return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
@@ -691,10 +711,20 @@ export default function MallaGrafica({ malla }: Props) {
                         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
                             <div>
                                 <h2 className="text-base font-semibold text-gray-900">Catálogo de Optativas</h2>
-                                <p className="text-xs text-gray-500 mt-0.5">{malla.programa.Nombre_Programa}</p>
+                                {selectedOptativaSlot?.Nombre_Agrupacion ? (
+                                    <p className="text-xs text-gray-500 mt-0.5">Agrupación: {selectedOptativaSlot.Nombre_Agrupacion}</p>
+                                ) : (
+                                    <p className="text-xs text-gray-500 mt-0.5">{malla.programa.Nombre_Programa}</p>
+                                )}
+                                {selectedOptativaSlot?.Nombre_Slot && (
+                                    <p className="text-xs text-gray-500">Slot: {selectedOptativaSlot.Nombre_Slot}</p>
+                                )}
                             </div>
                             <button
-                                onClick={() => setShowOptativasModal(false)}
+                                onClick={() => {
+                                    setShowOptativasModal(false);
+                                    setSelectedOptativaSlot(null);
+                                }}
                                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                             >
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -742,11 +772,11 @@ export default function MallaGrafica({ malla }: Props) {
                                 <p className="py-10 text-center text-sm text-red-500">
                                     No se pudieron cargar las optativas. Intenta de nuevo.
                                 </p>
-                            ) : optativas.length === 0 ? (
+                            ) : totalOptativas === 0 ? (
                                 <p className="py-10 text-center text-sm text-gray-500">
                                     No hay optativas registradas para este programa.
                                 </p>
-                            ) : filtered.length === 0 ? (
+                            ) : visibleOptativas === 0 ? (
                                 <p className="py-10 text-center text-sm text-gray-500">
                                     Sin resultados para <span className="font-medium">"{searchOptativas}"</span>.
                                 </p>
@@ -761,61 +791,69 @@ export default function MallaGrafica({ malla }: Props) {
                                         </tr>
                                     </thead>
                                     <tbody>
-                                        {filtered.map((e) => {
-                                            const reqs = e.requisitos ?? [];
-                                            const isOpen = expandedOptativa === e.ID_Asignatura;
-                                            return (
-                                                <>
-                                                    <tr
-                                                        key={e.ID_Asignatura}
-                                                        onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)}
-                                                        className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none"
-                                                    >
-                                                        <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
-                                                        <td className="py-2 pr-4 text-gray-800 font-medium">{e.Nombre_Asignatura}</td>
-                                                        <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
-                                                        <td className="py-2 text-center">
-                                                            {reqs.length > 0 ? (
-                                                                <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-semibold">
-                                                                    {reqs.length}
-                                                                    <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                    </svg>
-                                                                </span>
-                                                            ) : (
-                                                                <span className="text-gray-300 text-xs">—</span>
+                                        {filteredGroups.map((group) => (
+                                            <React.Fragment key={`group-${group.ID_Agrupacion}`}>
+                                                <tr className="bg-gray-50 border-b border-gray-200">
+                                                    <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
+                                                        {group.Nombre_Agrupacion}
+                                                    </td>
+                                                </tr>
+                                                {group.asignaturas.map((e) => {
+                                                    const reqs = e.requisitos ?? [];
+                                                    const isOpen = expandedOptativa === e.ID_Asignatura;
+                                                    return (
+                                                        <React.Fragment key={e.ID_Asignatura}>
+                                                            <tr
+                                                                onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)}
+                                                                className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none"
+                                                            >
+                                                                <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
+                                                                <td className="py-2 pr-4 text-gray-800 font-medium">{e.Nombre_Asignatura}</td>
+                                                                <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
+                                                                <td className="py-2 text-center">
+                                                                    {reqs.length > 0 ? (
+                                                                        <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-semibold">
+                                                                            {reqs.length}
+                                                                            <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                                                            </svg>
+                                                                        </span>
+                                                                    ) : (
+                                                                        <span className="text-gray-300 text-xs">—</span>
+                                                                    )}
+                                                                </td>
+                                                            </tr>
+                                                            {isOpen && reqs.length > 0 && (
+                                                                <tr className="bg-orange-50 border-b border-orange-100">
+                                                                    <td colSpan={4} className="px-4 pb-3 pt-1">
+                                                                        <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 mb-1">Requisitos</p>
+                                                                        <ul className="space-y-1">
+                                                                            {reqs.map((r, idx) => (
+                                                                                <li key={idx} className="flex items-start gap-2 text-xs text-gray-700">
+                                                                                    <span className={`mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${
+                                                                                        r.Tipo_Requisito?.toLowerCase().includes('pre') || r.Tipo_Requisito?.toLowerCase() === 'opcional' ? 'bg-red-100 text-red-700' :
+                                                                                        r.Tipo_Requisito?.toLowerCase().includes('co')  ? 'bg-yellow-100 text-yellow-700' :
+                                                                                        'bg-gray-100 text-gray-600'
+                                                                                    }`}>
+                                                                                        {formatTipoRequisito(r.Tipo_Requisito)}
+                                                                                    </span>
+                                                                                    <span>
+                                                                                        {r.asignatura_requerida
+                                                                                            ? `${r.asignatura_requerida.Nombre_Asignatura} (${r.asignatura_requerida.Codigo_Asignatura})`
+                                                                                            : r.Descripcion_Requisito || (r.Valor_Creditos ? `${r.Valor_Creditos} créditos` : '—')
+                                                                                        }
+                                                                                    </span>
+                                                                                </li>
+                                                                            ))}
+                                                                        </ul>
+                                                                    </td>
+                                                                </tr>
                                                             )}
-                                                        </td>
-                                                    </tr>
-                                                    {isOpen && reqs.length > 0 && (
-                                                        <tr key={`req-${e.ID_Asignatura}`} className="bg-orange-50 border-b border-orange-100">
-                                                            <td colSpan={4} className="px-4 pb-3 pt-1">
-                                                                <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 mb-1">Requisitos</p>
-                                                                <ul className="space-y-1">
-                                                                    {reqs.map((r, idx) => (
-                                                                        <li key={idx} className="flex items-start gap-2 text-xs text-gray-700">
-                                                                            <span className={`mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${
-                                                                                r.Tipo_Requisito?.toLowerCase().includes('pre') || r.Tipo_Requisito?.toLowerCase() === 'opcional' ? 'bg-red-100 text-red-700' :
-                                                                                r.Tipo_Requisito?.toLowerCase().includes('co')  ? 'bg-yellow-100 text-yellow-700' :
-                                                                                'bg-gray-100 text-gray-600'
-                                                                            }`}>
-                                                                                {formatTipoRequisito(r.Tipo_Requisito)}
-                                                                            </span>
-                                                                            <span>
-                                                                                {r.asignatura_requerida
-                                                                                    ? `${r.asignatura_requerida.Nombre_Asignatura} (${r.asignatura_requerida.Codigo_Asignatura})`
-                                                                                    : r.Descripcion_Requisito || (r.Valor_Creditos ? `${r.Valor_Creditos} créditos` : '—')
-                                                                                }
-                                                                            </span>
-                                                                        </li>
-                                                                    ))}
-                                                                </ul>
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </>
-                                            );
-                                        })}
+                                                        </React.Fragment>
+                                                    );
+                                                })}
+                                            </React.Fragment>
+                                        ))}
                                     </tbody>
                                 </table>
                             )}
@@ -823,13 +861,16 @@ export default function MallaGrafica({ malla }: Props) {
 
                         {/* Footer */}
                         <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
-                            {!loadingOptativas && !errorOptativas && optativas.length > 0 && (
+                            {!loadingOptativas && !errorOptativas && totalOptativas > 0 && (
                                 <span className="text-xs text-gray-400">
-                                    {q ? `${filtered.length} de ${optativas.length}` : optativas.length} materias
+                                    {q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias
                                 </span>
                             )}
                             <button
-                                onClick={() => setShowOptativasModal(false)}
+                                onClick={() => {
+                                    setShowOptativasModal(false);
+                                    setSelectedOptativaSlot(null);
+                                }}
                                 className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
                             >
                                 Cerrar

@@ -406,7 +406,7 @@ class ExcelParserService
      * Procesa FORMATO DE CARGA - OPTATIVA.xlsx.
      *
      * Estructura por fila (a partir de fila 2):
-     *   Col 0: Codigo_Programa  Col 1: ID_Componente  Col 2: ID_Agrupacion
+     *   Col 0: Codigo_Programa  Col 1: ID_Componente  Col 2: ID_Plantilla_Agrupacion
      *   Col 3: Codigo           Col 4: Nombre         Col 5: Creditos  Col 6: Obligatoria
      *   Col 7: Codigo_Requisito (o '-')  Col 8: Nombre_Requisito (referencia o texto condición)
      *   Col 9: Tipo_Requisito
@@ -428,17 +428,20 @@ class ExcelParserService
             return;
         }
 
-        $batch              = [];
-        $codigosPorPrograma = [];
-        $codigosProcesados  = []; // prog|codigoBase => fila primera ocurrencia
-        $programasCache     = []; // Codigo_Programa => ID_Programa|null
+        $batch                = [];
+        $codigosPorPrograma   = [];
+        $codigosProcesados    = []; // prog|codigoBase => fila primera ocurrencia
+        $programasCache       = []; // Codigo_Programa => ID_Programa|null
+        $optativaGroupMeta    = []; // [programaId][codigoBase] => ['ID_Componente'=>..., 'ID_Plantilla_Agrupacion'=>...]
         // Cada entrada: [codigoBase, programaId, tipoReq, reqCodigo|null, esTexto, descripcion|null, fila]
-        $requisitosData     = [];
+        $requisitosData       = [];
 
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
             $codigoPrograma = !empty($data[0]) ? trim((string)$this->cleanCodeCell($data[0])) : null;
+            $componenteId   = !empty($data[1]) ? (int)$data[1] : null;
+            $plantillaId    = !empty($data[2]) ? (int)$data[2] : null;
             $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
             $nombre         = $this->cleanCell($data[4] ?? '');
             $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
@@ -474,6 +477,10 @@ class ExcelParserService
                     $codigosPorPrograma[$programaId] = [];
                 }
                 $codigosPorPrograma[$programaId][] = $codigoBase;
+                $optativaGroupMeta[$programaId][$codigoBase] = [
+                    'ID_Componente' => $componenteId,
+                    'ID_Plantilla_Agrupacion' => $plantillaId,
+                ];
 
                 if (!isset($this->asignaturasCache[$codigoBase])) {
                     $batch[] = [
@@ -518,9 +525,10 @@ class ExcelParserService
             return;
         }
 
-        // Vincular cada programa a sus asignaturas
+        // Vincular cada programa a sus asignaturas y, si es posible, crear vínculos hacia la malla vigente.
         foreach ($codigosPorPrograma as $programaId => $codigos) {
             $this->vincularElectivasAPrograma($programaId, $codigos);
+            $this->persistOptativaAgrupacionLinkages($programaId, $codigos, $optativaGroupMeta[$programaId] ?? []);
         }
 
         // Insertar requisitos
@@ -635,6 +643,114 @@ class ExcelParserService
                 ['updated_at']
             );
         }
+    }
+
+    private function persistOptativaAgrupacionLinkages(int $programaId, array $codigosBase, array $metaByCodigo): void
+    {
+        $malla = $this->resolveMallaForOptativaPrograma($programaId);
+        if (!$malla || empty($codigosBase)) {
+            return;
+        }
+
+        $plantillasCache = PlantillaAgrupacion::where('ID_Programa', $programaId)
+            ->get()
+            ->keyBy('ID_Plantilla_Agrupacion');
+
+        $rows = [];
+        $now = now();
+
+        foreach ($codigosBase as $codigoBase) {
+            $asignaturaId = $this->asignaturasCache[$codigoBase] ?? null;
+            if (!is_int($asignaturaId)) {
+                continue;
+            }
+
+            $agrupacionId = null;
+            $meta = $metaByCodigo[$codigoBase] ?? [];
+
+            if (!empty($meta['ID_Plantilla_Agrupacion']) && isset($plantillasCache[$meta['ID_Plantilla_Agrupacion']])) {
+                $agrupacionId = $this->findOrCreateAgrupacionFromPlantilla(
+                    $malla,
+                    $meta['ID_Componente'] ?? null,
+                    $plantillasCache[$meta['ID_Plantilla_Agrupacion']]
+                );
+            }
+
+            if (!$agrupacionId) {
+                $agrupacionId = $this->findOrCreateDefaultOptativaAgrupacion($malla);
+            }
+
+            if (!$agrupacionId) {
+                continue;
+            }
+
+            $rows[] = [
+                'ID_Malla' => $malla->ID_Malla,
+                'ID_Agrupacion' => $agrupacionId,
+                'ID_Asignatura' => $asignaturaId,
+                'Tipo_Asignatura' => 'optativa',
+                'created_at' => $now,
+                'updated_at' => $now,
+            ];
+        }
+
+        if (!empty($rows)) {
+            DB::table('agrupacion_asignatura')
+                ->upsert($rows, ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'], ['Tipo_Asignatura', 'updated_at']);
+        }
+    }
+
+    private function resolveMallaForOptativaPrograma(int $programaId): ?MallaCurricular
+    {
+        if ($this->carga->ID_Malla) {
+            return $this->carga->malla;
+        }
+
+        return MallaCurricular::where('ID_Programa', $programaId)
+            ->where('Es_Vigente', 1)
+            ->first();
+    }
+
+    private function findOrCreateAgrupacionFromPlantilla(MallaCurricular $malla, ?int $componenteId, PlantillaAgrupacion $plantilla): ?int
+    {
+        if (!$componenteId) {
+            return null;
+        }
+
+        $agrupacion = Agrupacion::firstOrCreate(
+            [
+                'ID_Malla' => $malla->ID_Malla,
+                'ID_Componente' => $componenteId,
+                'Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion,
+            ],
+            [
+                'Creditos_Requeridos' => $plantilla->Creditos_Requeridos,
+                'Creditos_Maximos' => $plantilla->Creditos_Maximos,
+                'Es_Obligatoria' => $plantilla->Es_Obligatoria,
+            ]
+        );
+
+        return $agrupacion->ID_Agrupacion;
+    }
+
+    private function findOrCreateDefaultOptativaAgrupacion(MallaCurricular $malla): ?int
+    {
+        $componente = Componente::firstOrCreate(['Nombre_Componente' => 'Libre Elección']);
+
+        $agrupacion = Agrupacion::firstOrCreate(
+            [
+                'ID_Malla' => $malla->ID_Malla,
+                'ID_Componente' => $componente->ID_Componente,
+                'Nombre_Agrupacion' => 'Optativas',
+            ],
+            [
+                'Creditos_Requeridos' => null,
+                'Creditos_Maximos' => null,
+                'Es_Obligatoria' => 0,
+            ]
+        );
+
+        return $agrupacion->ID_Agrupacion;
     }
 
     private function parseAgglomerationSheets(Spreadsheet $spreadsheet): void
@@ -1822,10 +1938,12 @@ class ExcelParserService
                 ->where('ID_Componente', $componenteId)
                 ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
                 ->first();
+
             if (!$agrup) {
-                $this->recordError($rowNumber, 'Malla', "Agrupación '{$plantilla->Nombre_Agrupacion}' no encontrada para el slot.", $codigoPlaceholder, 'error');
-                return;
+                // Si la agrupación no existe aún, crearla desde la plantilla para que el slot pueda generarse.
+                $agrup = $plantilla->generarAgrupacion($this->malla->ID_Malla);
             }
+
             $agrupacionId = $agrup->ID_Agrupacion;
             $this->agrupacionesCache[$agrupKey] = $agrupacionId;
         }

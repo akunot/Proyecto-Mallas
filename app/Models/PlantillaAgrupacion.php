@@ -13,6 +13,7 @@ class PlantillaAgrupacion extends Model
     protected $primaryKey = 'ID_Plantilla_Agrupacion';
 
     protected $fillable = [
+        'ID_Plantilla_Agrupacion',
         'ID_Programa',
         'ID_Componente',
         'Indice_Agrupacion_Excel',

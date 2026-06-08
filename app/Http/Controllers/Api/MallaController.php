@@ -2,8 +2,12 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Agrupacion;
 use App\Models\AgrupacionAsignatura;
+use App\Models\Componente;
 use App\Models\MallaCurricular;
+use App\Models\ProgramaElectiva;
+use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -36,6 +40,7 @@ class MallaController extends Controller
                         'Orden'             => $cambio['Orden'],
                     ]);
             }
+
             foreach ($validated['cambios_slots'] ?? [] as $cambio) {
                 SlotAgrupacion::where('ID_Slot', $cambio['ID_Slot'])
                     ->update([
@@ -46,5 +51,168 @@ class MallaController extends Controller
         });
 
         return response()->json(['ok' => true]);
+    }
+
+    public function optativas(Request $request, int $mallaId): JsonResponse
+    {
+        $malla = MallaCurricular::findOrFail($mallaId);
+        $slotId = $request->query('slot_id');
+
+        $slot = null;
+        if ($slotId !== null) {
+            $slot = SlotAgrupacion::with('agrupacion')->find($slotId);
+            if (!$slot) {
+                return response()->json([
+                    'message' => 'Slot de optativa no encontrado.',
+                    'data' => [],
+                ], 404);
+            }
+        }
+
+        $fallbackGroupName = $slot?->agrupacion?->Nombre_Agrupacion ?? 'Optativas';
+        $fallbackGroupId = $slot?->agrupacion?->ID_Agrupacion ?? $slot?->ID_Agrupacion;
+
+        $optativaAsignaturaIds = ProgramaElectiva::where('ID_Programa', $malla->ID_Programa)
+            ->pluck('ID_Asignatura')
+            ->all();
+
+        if (!empty($optativaAsignaturaIds)) {
+            $this->ensureOptativasLinkedToMalla($malla, $slot, $optativaAsignaturaIds);
+        }
+
+        $query = ProgramaElectiva::query()
+            ->where('programa_electivas.ID_Programa', $malla->ID_Programa)
+            ->join('asignaturas', 'programa_electivas.ID_Asignatura', '=', 'asignaturas.ID_Asignatura')
+            ->leftJoin('agrupacion_asignatura', function ($join) use ($malla) {
+                $join->on('asignaturas.ID_Asignatura', '=', 'agrupacion_asignatura.ID_Asignatura')
+                     ->where('agrupacion_asignatura.ID_Malla', $malla->ID_Malla);
+            })
+            ->leftJoin('agrupaciones', function ($join) use ($malla) {
+                $join->on('agrupacion_asignatura.ID_Agrupacion', '=', 'agrupaciones.ID_Agrupacion')
+                     ->where('agrupaciones.ID_Malla', $malla->ID_Malla);
+            })
+            ->where(function ($query) use ($malla) {
+                $query->whereNull('agrupaciones.ID_Agrupacion')
+                    ->orWhere('agrupaciones.ID_Malla', $malla->ID_Malla);
+            })
+            ->where(function ($query) {
+                $query->whereNull('agrupacion_asignatura.Tipo_Asignatura')
+                    ->orWhereIn('agrupacion_asignatura.Tipo_Asignatura', ['electiva', 'optativa']);
+            })
+            ->select(
+                'asignaturas.ID_Asignatura',
+                'asignaturas.Codigo_Asignatura',
+                'asignaturas.Nombre_Asignatura',
+                'asignaturas.Creditos_Asignatura',
+                'agrupaciones.ID_Agrupacion',
+                'agrupaciones.Nombre_Agrupacion'
+            );
+
+        // Si hay un slot seleccionado, usamos su agrupación solo para nombre/etiqueta.
+        // Las optativas vienen del catálogo de programa_electivas y no necesariamente están
+        // persistidas en agrupacion_asignatura para ese slot.
+        $optativas = $query
+            ->orderBy('agrupaciones.Nombre_Agrupacion')
+            ->orderBy('asignaturas.Nombre_Asignatura')
+            ->get();
+
+        $requisitosByAsignatura = Requisito::with('asignaturaRequerida')
+            ->where('ID_Programa', $malla->ID_Programa)
+            ->whereIn('ID_Asignatura', $optativas->pluck('ID_Asignatura')->unique()->all())
+            ->get()
+            ->groupBy('ID_Asignatura');
+
+        $optativas = $optativas
+            ->map(function ($item) use ($fallbackGroupId, $fallbackGroupName, $requisitosByAsignatura) {
+                $groupId = $item->ID_Agrupacion ?? $fallbackGroupId;
+                $groupName = $item->Nombre_Agrupacion ?? $fallbackGroupName;
+
+                return [
+                    'ID_Asignatura' => $item->ID_Asignatura,
+                    'Codigo_Asignatura' => $item->Codigo_Asignatura,
+                    'Nombre_Asignatura' => $item->Nombre_Asignatura,
+                    'Creditos_Asignatura' => $item->Creditos_Asignatura,
+                    'ID_Agrupacion' => $groupId,
+                    'Nombre_Agrupacion' => $groupName,
+                    'requisitos' => $requisitosByAsignatura[$item->ID_Asignatura] ?? [],
+                ];
+            })
+            ->groupBy('Nombre_Agrupacion')
+            ->map(function ($items, $groupName) {
+                $first = $items->first();
+
+                return [
+                    'ID_Agrupacion' => $first['ID_Agrupacion'],
+                    'Nombre_Agrupacion' => $groupName,
+                    'asignaturas' => $items->values()->all(),
+                ];
+            })
+            ->values();
+
+        return response()->json([
+            'data' => $optativas,
+            'meta' => [
+                'total' => $optativas->reduce(fn ($sum, $group) => $sum + count($group['asignaturas']), 0),
+                'groups' => $optativas->count(),
+            ],
+        ]);
+    }
+
+    private function ensureOptativasLinkedToMalla(MallaCurricular $malla, ?SlotAgrupacion $slot, array $asignaturaIds): void
+    {
+        if (empty($asignaturaIds)) {
+            return;
+        }
+
+        $agrupacionId = null;
+        if ($slot?->agrupacion) {
+            $agrupacionId = $slot->agrupacion->ID_Agrupacion;
+        } else {
+            $componente = Componente::firstOrCreate(['Nombre_Componente' => 'Libre Elección']);
+            $agrupacion = Agrupacion::firstOrCreate(
+                [
+                    'ID_Malla' => $malla->ID_Malla,
+                    'ID_Componente' => $componente->ID_Componente,
+                    'Nombre_Agrupacion' => 'Optativas',
+                ],
+                [
+                    'Creditos_Requeridos' => null,
+                    'Creditos_Maximos' => null,
+                    'Es_Obligatoria' => 0,
+                ]
+            );
+            $agrupacionId = $agrupacion->ID_Agrupacion;
+        }
+
+        if (!$agrupacionId) {
+            return;
+        }
+
+        $existingAsignaturas = AgrupacionAsignatura::where('ID_Malla', $malla->ID_Malla)
+            ->where('ID_Agrupacion', $agrupacionId)
+            ->whereIn('ID_Asignatura', $asignaturaIds)
+            ->pluck('ID_Asignatura')
+            ->all();
+
+        $missingAsignaturas = array_diff($asignaturaIds, $existingAsignaturas);
+        if (empty($missingAsignaturas)) {
+            return;
+        }
+
+        $now = now();
+        $rows = array_map(fn ($id) => [
+            'ID_Malla' => $malla->ID_Malla,
+            'ID_Agrupacion' => $agrupacionId,
+            'ID_Asignatura' => $id,
+            'Tipo_Asignatura' => 'optativa',
+            'created_at' => $now,
+            'updated_at' => $now,
+        ], $missingAsignaturas);
+
+        DB::table('agrupacion_asignatura')->upsert(
+            $rows,
+            ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'],
+            ['Tipo_Asignatura', 'updated_at']
+        );
     }
 }
