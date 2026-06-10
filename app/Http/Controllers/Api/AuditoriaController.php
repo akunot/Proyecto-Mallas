@@ -46,7 +46,7 @@ class AuditoriaController extends Controller
 
         return response()->json([
             'data' => $logs->items(),
-            'pagination' => [
+            'meta' => [
                 'current_page' => $logs->currentPage(),
                 'per_page' => $logs->perPage(),
                 'total' => $logs->total(),
@@ -190,7 +190,7 @@ class AuditoriaController extends Controller
     /**
      * Exporta logs a CSV.
      */
-    public function exportarLogs(Request $request): JsonResponse
+    public function exportarLogs(Request $request): \Illuminate\Http\Response
     {
         $query = LogActividad::with(['usuario']);
 

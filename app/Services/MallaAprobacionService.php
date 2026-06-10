@@ -16,14 +16,11 @@ class MallaAprobacionService
      */
     public function enviarRevision(CargaMalla $carga, Usuario $usuario): CargaMalla
     {
-        // Validar que el usuario sea quien cargó la malla
-        if ($carga->ID_Usuario !== $usuario->ID_Usuario) {
-            throw new \Exception('Solo el usuario que cargó la malla puede enviarla a revisión');
-        }
-
-        // Validar que la malla esté en estado borrador
-        if ($carga->Estado_Carga !== 'borrador') {
-            throw new \Exception('La malla debe estar en estado borrador para enviar a revisión');
+        // Validar que la malla esté en un estado que permita enviar a revisión
+        // Puede ser 'borrador' (procesada sin errores) o 'con_errores' (procesada con errores pero la malla ya fue creada)
+        $estadosPermitidos = ['borrador', 'con_errores'];
+        if (!in_array($carga->Estado_Carga, $estadosPermitidos)) {
+            throw new \Exception('La carga debe estar en estado borrador para enviar a revisión');
         }
 
         // Validar que exista una malla asociada
@@ -246,8 +243,8 @@ class MallaAprobacionService
      */
     public function puedeEnviarRevision(Usuario $usuario, CargaMalla $carga): bool
     {
-        return $carga->Estado_Carga === 'borrador' && 
-               $carga->ID_Usuario === $usuario->ID_Usuario &&
+        $estadosPermitidos = ['borrador', 'con_errores'];
+        return in_array($carga->Estado_Carga, $estadosPermitidos) && 
                $carga->ID_Malla !== null;
     }
 

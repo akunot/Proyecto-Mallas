@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Api;
 use App\Http\Controllers\Controller;
 use App\Mail\OtpCodeMail;
 use App\Models\Usuario;
+use App\Services\LogActividadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
@@ -139,6 +140,18 @@ class AuthController extends Controller
         // Hacer login para establecer sesión de cookie (para auth middleware)
         auth()->login($usuario);
 
+        // Registrar log de inicio de sesión
+        LogActividadService::registrar(
+            $usuario,
+            'LOGIN',
+            'usuario',
+            $usuario->ID_Usuario,
+            [
+                'nombre' => $usuario->Nombre_Usuario,
+                'email' => $usuario->Email_Usuario,
+            ]
+        );
+
         // Crear respuesta JSON
         $response = response()->json([
             'message' => 'Autenticación exitosa.',
@@ -160,6 +173,22 @@ class AuthController extends Controller
      */
     public function logout(Request $request): JsonResponse
     {
+        $usuario = auth()->user();
+        
+        // Registrar log de cierre de sesión
+        if ($usuario) {
+            LogActividadService::registrar(
+                $usuario,
+                'LOGOUT',
+                'usuario',
+                $usuario->ID_Usuario,
+                [
+                    'nombre' => $usuario->Nombre_Usuario,
+                    'email' => $usuario->Email_Usuario,
+                ]
+            );
+        }
+
         // Cerrar sesión y invalidar tokens de sesión
         auth()->logout();
         $request->session()->invalidate();

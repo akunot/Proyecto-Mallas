@@ -48,11 +48,44 @@ Route::middleware(['auth'])->group(function () {
         $sedesCount = Sede::count();
         $facultadesCount = Facultad::count();
         $programasCount = Programa::count();
+        $asignaturasCount = \App\Models\Asignatura::count();
+        $mallasCount = \App\Models\MallaCurricular::count();
+        $usuariosCount = \App\Models\Usuario::count();
+        $normativasCount = \App\Models\Normativa::count();
+        $componentesCount = \App\Models\Componente::count();
+        $agrupacionesCount = \App\Models\PlantillaAgrupacion::count();
+        
+        // Cargas pendientes de aprobación
+        $cargasPendientes = \App\Models\CargaMalla::where('Estado_Carga', 'pendiente_aprobacion')->count();
+
+        // Cargas recientes
+        $cargasRecientes = \App\Models\CargaMalla::with(['malla', 'usuario', 'programa'])
+            ->orderBy('Creacion_Carga', 'desc')
+            ->limit(5)
+            ->get()
+            ->map(function ($carga) {
+                return [
+                    'id' => $carga->ID_Carga,
+                    'estado' => $carga->Estado_Carga,
+                    'malla' => $carga->malla ? $carga->malla->Nombre_Malla : 'N/A',
+                    'programa' => $carga->programa ? $carga->programa->Nombre_Programa : 'N/A',
+                    'usuario' => $carga->usuario ? $carga->usuario->Nombre_Usuario : 'N/A',
+                    'fecha' => $carga->Creacion_Carga->format('d/m/Y H:i'),
+                ];
+            });
         
         return Inertia::render('Dashboard', [
             'sedesCount' => $sedesCount,
             'facultadesCount' => $facultadesCount,
             'programasCount' => $programasCount,
+            'asignaturasCount' => $asignaturasCount,
+            'mallasCount' => $mallasCount,
+            'usuariosCount' => $usuariosCount,
+            'normativasCount' => $normativasCount,
+            'componentesCount' => $componentesCount,
+            'agrupacionesCount' => $agrupacionesCount,
+            'cargasPendientes' => $cargasPendientes,
+            'cargasRecientes' => $cargasRecientes,
         ]);
     })->name('dashboard');
     

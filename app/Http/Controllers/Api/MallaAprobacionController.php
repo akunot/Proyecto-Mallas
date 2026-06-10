@@ -221,10 +221,6 @@ class MallaAprobacionController extends Controller
             return 'La malla no está en estado borrador';
         }
 
-        if ($carga->ID_Usuario !== $usuario->ID_Usuario) {
-            return 'Solo el usuario que cargó la malla puede enviarla a revisión';
-        }
-
         if (!$carga->ID_Malla) {
             return 'No existe una malla asociada a esta carga';
         }

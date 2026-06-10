@@ -9,6 +9,7 @@ use App\Jobs\ProcesarExcelJob;
 use App\Models\CargaMalla;
 use App\Models\ErrorCarga;
 use App\Services\ExcelUploadService;
+use App\Services\LogActividadService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -43,6 +44,21 @@ class CargaController extends Controller
             );
         }
 
+        // Registrar log de creación de carga
+        $cargaData = $result['data'] ?? null;
+        if ($cargaData) {
+            $cargaId = is_array($cargaData) ? ($cargaData['carga_id'] ?? null) : ($cargaData->ID_Carga ?? null);
+            if ($cargaId) {
+                LogActividadService::registrar(
+                    $request->user(),
+                    'CREATE_CARGA',
+                    'carga_malla',
+                    $cargaId,
+                    ['normativa_id' => $request->input('normativa_id')]
+                );
+            }
+        }
+
         return response()->json(
             $this->sanitizeForJson([
                 'data' => $result['data'],
@@ -75,6 +91,15 @@ class CargaController extends Controller
             );
         }
 
+        // Registrar log de subida de archivo
+        LogActividadService::registrar(
+            $request->user(),
+            'UPLOAD_FILE',
+            'carga_malla',
+            $id,
+            ['tipo_archivo' => $request->input('tipo_archivo')]
+        );
+
         return response()->json(
             $this->sanitizeForJson([
                 'data' => $result['data'],
@@ -97,6 +122,15 @@ class CargaController extends Controller
         }
 
         $carga->update(['Estado_Carga' => 'iniciado']);
+
+        // Registrar log de inicio de procesamiento
+        LogActividadService::registrar(
+            request()->user(),
+            'PROCESS_START',
+            'carga_malla',
+            $id,
+            ['estado_anterior' => 'listo_para_procesar']
+        );
 
         if (app()->isLocal()) {
             $job = new ProcesarExcelJob($id);
@@ -249,19 +283,23 @@ class CargaController extends Controller
     {
         $carga = CargaMalla::findOrFail($id);
 
-        if ($carga->ID_Usuario !== $request->user()->ID_Usuario) {
-            return response()->json([
-                'message' => 'No tienes permiso para enviar esta carga a revisión.',
-            ], 403, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
-        }
-
-        if ($carga->Estado_Carga !== 'borrador') {
+        $estadosPermitidos = ['borrador', 'con_errores'];
+        if (!in_array($carga->Estado_Carga, $estadosPermitidos)) {
             return response()->json([
                 'message' => 'Solo las cargas en estado borrador pueden enviarse a revisión.',
             ], 400, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
         $carga->update(['Estado_Carga' => 'pendiente_aprobacion']);
+
+        // Registrar log de envío a revisión
+        LogActividadService::registrar(
+            $request->user(),
+            'ENVIAR_REVISION',
+            'carga_malla',
+            $id,
+            ['malla_id' => $carga->ID_Malla]
+        );
 
         return response()->json([
             'data' => $this->sanitizeForJson($carga),
@@ -292,11 +330,14 @@ class CargaController extends Controller
 
         $accion = $request->input('accion');
 
+        $revisor = $request->user()->ID_Usuario;
+        $comentario = $request->input('comentario');
+
         if ($accion === 'aprobar') {
             $carga->update([
                 'Estado_Carga' => 'aprobado',
-                'Comentario_Revisor' => $request->input('comentario'),
-                'ID_Usuario_Revisor' => $request->user()->ID_Usuario,
+                'Comentario_Revisor' => $comentario,
+                'ID_Usuario_Revisor' => $revisor,
                 'Fecha_Revision' => now(),
             ]);
 
@@ -304,17 +345,35 @@ class CargaController extends Controller
                 'Estado' => 'activa',
                 'Es_Vigente' => 1,
             ]);
+
+            // Registrar log de aprobación
+            LogActividadService::registrar(
+                $request->user(),
+                'APROBAR_MALLA',
+                'carga_malla',
+                $id,
+                ['malla_id' => $carga->ID_Malla, 'comentario' => $comentario]
+            );
         } else {
             $carga->update([
                 'Estado_Carga' => 'rechazado',
-                'Comentario_Revisor' => $request->input('comentario'),
-                'ID_Usuario_Revisor' => $request->user()->ID_Usuario,
+                'Comentario_Revisor' => $comentario,
+                'ID_Usuario_Revisor' => $revisor,
                 'Fecha_Revision' => now(),
             ]);
 
             $carga->malla->update([
                 'Estado' => 'rechazada',
             ]);
+
+            // Registrar log de rechazo
+            LogActividadService::registrar(
+                $request->user(),
+                'RECHAZAR_MALLA',
+                'carga_malla',
+                $id,
+                ['malla_id' => $carga->ID_Malla, 'comentario' => $comentario]
+            );
         }
 
         return response()->json([

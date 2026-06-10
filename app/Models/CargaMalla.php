@@ -32,6 +32,7 @@ class CargaMalla extends Model
 
     protected $casts = [
         'Fecha_Revision' => 'datetime',
+        'Creacion_Carga' => 'datetime',
     ];
 
     public function archivo(): BelongsTo

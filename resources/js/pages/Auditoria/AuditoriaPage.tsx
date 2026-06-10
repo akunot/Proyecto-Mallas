@@ -32,6 +32,7 @@ interface ApiResponse {
         current_page: number;
         per_page: number;
         total: number;
+        last_page: number;
     };
 }
 
@@ -52,16 +53,26 @@ export default function AuditoriaPage({ logs: initialLogs, estadisticas, accione
         desde: '',
         hasta: '',
         search: '',
+        page: '1',
     });
 
     const [pagination, setPagination] = useState({
         current_page: 1,
         per_page: 20,
-        total: 0,
+        total: initialLogs.length,
+        last_page: 1,
     });
 
+    // Solo buscar por API cuando hay filtros activos (no en carga inicial)
     useEffect(() => {
-        fetchLogs();
+        const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
+            if (key === 'page' && value === '1') return false;
+            return value !== '';
+        });
+
+        if (hasActiveFilters) {
+            fetchLogs();
+        }
     }, [filters]);
 
     const fetchLogs = async () => {
@@ -76,8 +87,9 @@ export default function AuditoriaPage({ logs: initialLogs, estadisticas, accione
             setLogs(response.data);
             setPagination({
                 current_page: response.meta?.current_page || 1,
-                per_page: response.meta?.per_page || 10,
+                per_page: response.meta?.per_page || 20,
                 total: response.meta?.total || 0,
+                last_page: response.meta?.last_page || 1,
             });
         } catch (error) {
             console.error('Error fetching logs:', error);
@@ -97,16 +109,28 @@ export default function AuditoriaPage({ logs: initialLogs, estadisticas, accione
                 if (value) params.append(key, value);
             });
 
-            const response = await apiClient.get(`/auditoria/exportar-logs?${params.toString()}`, {
-                responseType: 'blob',
-            }) as any;
+            // Usar fetch directo para descargar blob (apiClient no soporta responseType)
+            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
+            const response = await fetch(`/api/v1/auditoria/exportar-logs?${params.toString()}`, {
+                headers: {
+                    'Accept': 'text/csv',
+                    'X-CSRF-TOKEN': token || '',
+                },
+                credentials: 'same-origin',
+            });
 
-            const blob = new Blob([response.data], { type: 'text/csv' });
+            if (!response.ok) {
+                throw new Error(`Error ${response.status}: ${response.statusText}`);
+            }
+
+            const blob = await response.blob();
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement('a');
             a.href = url;
             a.download = `logs_actividad_${new Date().toISOString().split('T')[0]}.csv`;
+            document.body.appendChild(a);
             a.click();
+            document.body.removeChild(a);
             window.URL.revokeObjectURL(url);
         } catch (error) {
             console.error('Error exporting logs:', error);

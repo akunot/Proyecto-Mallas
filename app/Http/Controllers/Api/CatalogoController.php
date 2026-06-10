@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
+use App\Services\LogActividadService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
 
@@ -85,6 +86,17 @@ class CatalogoController extends Controller
 
         $record = $this->model->create($validated);
 
+        // Registrar log de creación
+        if (auth()->check()) {
+            LogActividadService::registrar(
+                auth()->user(),
+                'CREATE',
+                $this->routeName,
+                $record->getKey(),
+                ['nombre' => $record->{$this->fillable[1] ?? 'name'} ?? '']
+            );
+        }
+
         // Limpieza eficiente de UTF-8
         $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
 
@@ -104,6 +116,17 @@ class CatalogoController extends Controller
         $validated = $request->validate($this->getValidationRules('update'));
 
         $record->update($validated);
+
+        // Registrar log de actualización
+        if (auth()->check()) {
+            LogActividadService::registrar(
+                auth()->user(),
+                'UPDATE',
+                $this->routeName,
+                $record->getKey(),
+                ['nombre' => $record->{$this->fillable[1] ?? 'name'} ?? '']
+            );
+        }
 
         // Limpieza eficiente de UTF-8
         $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
@@ -139,6 +162,17 @@ class CatalogoController extends Controller
 
         $statusText = $newStatus ? 'activado' : 'desactivado';
 
+        // Registrar log de toggle
+        if (auth()->check()) {
+            LogActividadService::registrar(
+                auth()->user(),
+                $newStatus ? 'ACTIVATE' : 'DEACTIVATE',
+                $this->routeName,
+                $record->getKey(),
+                ['nombre' => $record->{$this->fillable[1] ?? 'name'} ?? '']
+            );
+        }
+
         // Limpieza eficiente de UTF-8
         $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
 
@@ -154,6 +188,18 @@ class CatalogoController extends Controller
     public function destroy(int $id)
     {
         $record = $this->model->findOrFail($id);
+
+        // Registrar log de eliminación
+        if (auth()->check()) {
+            LogActividadService::registrar(
+                auth()->user(),
+                'DELETE',
+                $this->routeName,
+                $record->getKey(),
+                ['nombre' => $record->{$this->fillable[1] ?? 'name'} ?? '']
+            );
+        }
+
         $record->delete();
 
         return response()->json([

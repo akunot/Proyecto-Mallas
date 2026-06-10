@@ -98,19 +98,12 @@ class MallaController extends Controller
             ->where(function ($query) {
                 $query->whereNull('agrupacion_asignatura.Tipo_Asignatura')
                     ->orWhereIn('agrupacion_asignatura.Tipo_Asignatura', ['electiva', 'optativa']);
-            })
-            ->select(
-                'asignaturas.ID_Asignatura',
-                'asignaturas.Codigo_Asignatura',
-                'asignaturas.Nombre_Asignatura',
-                'asignaturas.Creditos_Asignatura',
-                'agrupaciones.ID_Agrupacion',
-                'agrupaciones.Nombre_Agrupacion'
-            );
+            });
 
-        // Si hay un slot seleccionado, usamos su agrupación solo para nombre/etiqueta.
-        // Las optativas vienen del catálogo de programa_electivas y no necesariamente están
-        // persistidas en agrupacion_asignatura para ese slot.
+        if ($slot && $slot->agrupacion) {
+            $query->where('agrupacion_asignatura.ID_Agrupacion', $slot->agrupacion->ID_Agrupacion);
+        }
+
         $optativas = $query
             ->orderBy('agrupaciones.Nombre_Agrupacion')
             ->orderBy('asignaturas.Nombre_Asignatura')
