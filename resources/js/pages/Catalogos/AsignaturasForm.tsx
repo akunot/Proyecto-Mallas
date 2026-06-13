@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 
 interface Asignatura {
@@ -17,176 +16,119 @@ interface Props {
   errors?: Record<string, string>;
 }
 
-export default function AsignaturasForm({ asignatura, errors: initialErrors }: Props) {
+export default function AsignaturasForm({ asignatura }: Props) {
   const isEditing = !!asignatura;
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>(initialErrors || {});
   
-  const [formData, setFormData] = useState({
+  const { data, setData, post, put, processing, errors } = useForm({
     Codigo_Asignatura: asignatura?.Codigo_Asignatura || '',
     Nombre_Asignatura: asignatura?.Nombre_Asignatura || '',
-    Creditos_Asignatura: asignatura?.Creditos_Asignatura?.toString() || '',
-    Horas_Presencial: asignatura?.Horas_Presencial?.toString() || '',
-    Horas_Estudiante: asignatura?.Horas_Estudiante?.toString() || '',
+    Creditos_Asignatura: asignatura?.Creditos_Asignatura || '',
+    Horas_Presencial: asignatura?.Horas_Presencial || '',
+    Horas_Estudiante: asignatura?.Horas_Estudiante || '',
     Descripcion_Asignatura: asignatura?.Descripcion_Asignatura || '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrors({});
-
-    try {
-      const method = isEditing ? 'PUT' : 'POST';
-      const url = isEditing 
-        ? `/api/v1/asignaturas/${asignatura.ID_Asignatura}` 
-        : '/api/v1/asignaturas';
-
-      const payload = {
-        ...formData,
-        Creditos_Asignatura: parseInt(formData.Creditos_Asignatura),
-        Horas_Presencial: formData.Horas_Presencial ? parseInt(formData.Horas_Presencial) : null,
-        Horas_Estudiante: formData.Horas_Estudiante ? parseInt(formData.Horas_Estudiante) : null,
-      };
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'same-origin', // Incluir cookies de sesión
-        body: JSON.stringify(payload),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (result.errors) setErrors(result.errors);
-        else if (result.message) setErrors({ general: result.message });
-        setLoading(false);
-        return;
-      }
-
-      window.location.href = '/asignaturas';
-    } catch (error) {
-      setErrors({ general: 'Error de conexión.' });
-    } finally {
-      setLoading(false);
-    }
+    if (isEditing) put(`/asignaturas/${asignatura.ID_Asignatura}`);
+    else post('/asignaturas');
   };
 
   return (
     <MainLayout>
       <Head title={isEditing ? 'Editar Asignatura' : 'Nueva Asignatura'} />
       
-      <div className="page-header">
-        <div className="page-title">
-          <h1>{isEditing ? 'Editar Asignatura' : 'Nueva Asignatura'}</h1>
-          <p className="page-subtitle">{isEditing ? 'Modifica la asignatura' : 'Registra una nueva asignatura'}</p>
-        </div>
-      </div>
+      <div className="max-w-4xl mx-auto py-10 px-4">
+        <header className="mb-10">
+          <Link href="/asignaturas" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+            <span className="material-symbols-outlined !text-sm">arrow_back</span> Volver al catálogo
+          </Link>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+            {isEditing ? 'Actualizar Contenido' : 'Registro de Asignatura'}
+          </h1>
+          <p className="text-slate-500 mt-2">Ingresa los datos técnicos y la carga horaria de la asignatura.</p>
+        </header>
 
-      {errors.general && <div className="alert alert-error">{errors.general}</div>}
-
-      <div className="form-container">
-        <form onSubmit={handleSubmit} className="form">
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="Codigo_Asignatura">Código *</label>
-              <input
-                type="text"
-                id="Codigo_Asignatura"
-                name="Codigo_Asignatura"
-                value={formData.Codigo_Asignatura}
-                onChange={handleChange}
-                className={errors.Codigo_Asignatura ? 'input-error' : ''}
-                required
-              />
-              {errors.Codigo_Asignatura && <span className="error-message">{errors.Codigo_Asignatura}</span>}
+        <form onSubmit={onSubmit} className="space-y-6">
+          
+          {/* SECCIÓN 1: IDENTIFICACIÓN */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-blue-600">fingerprint</span>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-600">Identificación Básica</h3>
             </div>
-
-            <div className="form-group">
-              <label htmlFor="Nombre_Asignatura">Nombre *</label>
-              <input
-                type="text"
-                id="Nombre_Asignatura"
-                name="Nombre_Asignatura"
-                value={formData.Nombre_Asignatura}
-                onChange={handleChange}
-                className={errors.Nombre_Asignatura ? 'input-error' : ''}
-                required
-              />
-              {errors.Nombre_Asignatura && <span className="error-message">{errors.Nombre_Asignatura}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="Creditos_Asignatura">Créditos *</label>
-              <input
-                type="number"
-                id="Creditos_Asignatura"
-                name="Creditos_Asignatura"
-                value={formData.Creditos_Asignatura}
-                onChange={handleChange}
-                className={errors.Creditos_Asignatura ? 'input-error' : ''}
-                min="1"
-                required
-              />
-              {errors.Creditos_Asignatura && <span className="error-message">{errors.Creditos_Asignatura}</span>}
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="Horas_Presencial">Horas Presenciales</label>
-              <input
-                type="number"
-                id="Horas_Presencial"
-                name="Horas_Presencial"
-                value={formData.Horas_Presencial}
-                onChange={handleChange}
-                min="0"
-              />
-            </div>
-
-            <div className="form-group">
-              <label htmlFor="Horas_Estudiante">Horas de Estudio</label>
-              <input
-                type="number"
-                id="Horas_Estudiante"
-                name="Horas_Estudiante"
-                value={formData.Horas_Estudiante}
-                onChange={handleChange}
-                min="0"
-              />
-            </div>
-
-            <div className="form-group full-width">
-              <label htmlFor="Descripcion_Asignatura">Descripción</label>
-              <textarea
-                id="Descripcion_Asignatura"
-                name="Descripcion_Asignatura"
-                value={formData.Descripcion_Asignatura}
-                onChange={handleChange}
-                rows={3}
-              />
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="md:col-span-1 space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Código de Materia *</label>
+                <input
+                    type="text"
+                    value={data.Codigo_Asignatura}
+                    onChange={e => setData('Codigo_Asignatura', e.target.value)}
+                    className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all focus:ring-4 focus:ring-blue-100 ${errors.Codigo_Asignatura ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
+                    placeholder="Ej: 1000001"
+                />
+                {errors.Codigo_Asignatura && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Codigo_Asignatura}</p>}
+              </div>
+              <div className="md:col-span-2 space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Nombre de la Asignatura *</label>
+                <input
+                    type="text"
+                    value={data.Nombre_Asignatura}
+                    onChange={e => setData('Nombre_Asignatura', e.target.value)}
+                    className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all focus:ring-4 focus:ring-blue-100 ${errors.Nombre_Asignatura ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
+                    placeholder="Ej: Cálculo Diferencial"
+                />
+                {errors.Nombre_Asignatura && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Nombre_Asignatura}</p>}
+              </div>
             </div>
           </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={() => window.history.back()}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear'}
+          {/* SECCIÓN 2: CARGA ACADÉMICA */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-orange-500">timer</span>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Carga Horaria y Créditos</h3>
+            </div>
+            <div className="p-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Créditos Académicos *</label>
+                <input
+                    type="number"
+                    value={data.Creditos_Asignatura}
+                    onChange={e => setData('Creditos_Asignatura', e.target.value)}
+                    className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 ${errors.Creditos_Asignatura ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
+                />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Horas Presenciales</label>
+                <input type="number" value={data.Horas_Presencial} onChange={e => setData('Horas_Presencial', e.target.value)} className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500" />
+              </div>
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Horas Trabajo Autónomo</label>
+                <input type="number" value={data.Horas_Estudiante} onChange={e => setData('Horas_Estudiante', e.target.value)} className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500" />
+              </div>
+            </div>
+          </div>
+
+          <div className="space-y-2">
+            <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Descripción de la Asignatura</label>
+            <textarea 
+                value={data.Descripcion_Asignatura} 
+                onChange={e => setData('Descripcion_Asignatura', e.target.value)}
+                rows={4} 
+                className="w-full px-6 py-4 bg-white border border-slate-200 rounded-3xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 transition-all resize-none shadow-sm"
+                placeholder="Objetivos, contenidos mínimos o justificación..."
+            />
+          </div>
+
+          <div className="flex justify-end items-center gap-4 pt-4">
+            <Link href="/asignaturas" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</Link>
+            <button
+                type="submit"
+                disabled={processing}
+                className="px-10 py-4 bg-[#00236f] text-white rounded-2xl font-black shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all uppercase tracking-widest text-[11px]"
+            >
+              {processing ? 'GUARDANDO...' : isEditing ? 'ACTUALIZAR' : 'CREAR ASIGNATURA'}
             </button>
           </div>
         </form>

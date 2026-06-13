@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -27,177 +27,105 @@ interface Props {
 export default function Usuarios({ usuarios }: Props) {
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
-
     const sortBy = usuarios.meta.sort_by || 'ID_Usuario';
     const sortOrder = usuarios.meta.sort_order || 'asc';
 
     const columns = [
-        { key: 'ID_Usuario', label: 'ID', sortable: true },
-        { key: 'Nombre_Usuario', label: 'Nombre', sortable: true },
-        { key: 'Email_Usuario', label: 'Correo', sortable: true },
+        { 
+            key: 'Nombre_Usuario', 
+            label: 'Usuario', 
+            sortable: true,
+            render: (value: string, row: Usuario) => (
+                <div className="flex flex-col">
+                    <span className="font-bold text-slate-800">{value}</span>
+                    <span className="text-xs text-slate-500 font-mono">{row.Email_Usuario}</span>
+                </div>
+            )
+        },
         {
             key: 'Activo_Usuario',
             label: 'Estado',
             render: (value: number) => (
-                <span
-                    className={`badge ${value ? 'badge-success' : 'badge-danger'}`}
-                >
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[11px] font-black uppercase tracking-wider ring-1 ring-inset ${
+                    value ? 'bg-emerald-100 text-emerald-700 ring-emerald-600/20' : 'bg-rose-100 text-rose-700 ring-rose-600/20'
+                }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${value ? 'bg-emerald-500' : 'bg-rose-500'}`} />
                     {value ? 'Activo' : 'Inactivo'}
                 </span>
             ),
         },
         {
             key: 'Creacion_Usuario',
-            label: 'Creado',
-            render: (value: string) =>
-                value ? new Date(value).toLocaleDateString('es-CO') : '-',
+            label: 'Miembro desde',
+            render: (value: string) => (
+                <div className="flex flex-col text-xs">
+                    <span className="font-medium text-slate-600">{value ? new Date(value).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' }) : '-'}</span>
+                </div>
+            ),
         },
     ];
 
-    const handleSearch = (search: string, page: number = 1) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
-        params.set('sort_by', sortBy);
-        params.set('sort_order', sortOrder);
-
-        router.visit(`/usuarios?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleRefresh = () => {
-        router.visit('/usuarios', {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
-
-        const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
-        params.set('sort_by', column);
-        params.set('sort_order', newDirection);
-        params.set('page', '1');
-
-        router.visit(`/usuarios?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleToggle = async (id: number) => {
-        await router.patch(`/usuarios/${id}/toggle`, {}, {
-            onSuccess: () => handleRefresh(),
-        });
-    };
-
     const actions = (row: Usuario) => (
-        <div className="action-buttons">
-            <button
-                className="btn-edit"
-                onClick={() => router.visit(`/usuarios/${row.ID_Usuario}/edit`)}
-                title="Editar"
+        <div className="flex justify-end gap-2">
+            <Link
+                href={`/usuarios/${row.ID_Usuario}/edit`}
+                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                title="Editar Perfil"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-            </button>
+                <span className="material-symbols-outlined !text-xl">edit_square</span>
+            </Link>
             <button
-                className="btn-delete"
-                onClick={() => handleToggle(row.ID_Usuario)}
-                title={row.Activo_Usuario ? 'Desactivar' : 'Activar'}
+                onClick={() => router.patch(`/usuarios/${row.ID_Usuario}/toggle`)}
+                className={`p-2 rounded-lg transition-colors ${
+                    row.Activo_Usuario ? 'text-rose-600 hover:bg-rose-50' : 'text-emerald-600 hover:bg-emerald-50'
+                }`}
+                title={row.Activo_Usuario ? 'Desactivar Acceso' : 'Habilitar Acceso'}
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    {row.Activo_Usuario ? (
-                        <>
-                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
-                            <line x1="12" y1="2" x2="12" y2="12" />
-                        </>
-                    ) : (
-                        <>
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </>
-                    )}
-                </svg>
+                <span className="material-symbols-outlined !text-xl">
+                    {row.Activo_Usuario ? 'person_off' : 'person_check'}
+                </span>
             </button>
         </div>
     );
 
     return (
         <MainLayout>
-            <Head title="Usuarios - Mallas UNAL" />
+            <Head title="Gestión de Usuarios - UNAL" />
 
-            <div className="page-header">
-                <div className="page-title">
-                    <h1>Gestión de Usuarios</h1>
-                    <p className="page-subtitle">
-                        Administra los usuarios del sistema
-                    </p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        className="btn-primary"
-                        onClick={() => router.visit('/usuarios/create')}
+            <div className="max-w-[1200px] mx-auto space-y-8 pb-10">
+                {/* Header Estilo UNAL SaaS */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
+                            <span className="material-symbols-outlined !text-sm">admin_panel_settings</span>
+                            Seguridad
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Usuarios</h1>
+                        <p className="text-slate-500 mt-1">Control de accesos y perfiles administrativos del sistema.</p>
+                    </div>
+                    <Link
+                        href="/usuarios/create"
+                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
-                        Nuevo Usuario
-                    </button>
+                        <span className="material-symbols-outlined">person_add</span>
+                        Registrar Usuario
+                    </Link>
                 </div>
-            </div>
 
-            <DataTable
-                columns={columns}
-                data={usuarios.data}
-                meta={usuarios.meta}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                searchValue={currentSearch}
-                onSort={handleSort}
-                searchPlaceholder="Buscar por nombre o correo..."
-                onSearch={handleSearch}
-                onRefresh={handleRefresh}
-                actions={actions}
-                emptyMessage="No hay usuarios registrados"
-            />
+                <DataTable
+                    columns={columns}
+                    data={usuarios.data}
+                    meta={usuarios.meta}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    searchValue={currentSearch}
+                    onSort={(col, dir) => router.get('/usuarios', { search: currentSearch, sort_by: col, sort_order: dir }, { preserveState: true })}
+                    onSearch={(search, page) => router.get('/usuarios', { search, page, sort_by: sortBy, sort_order: sortOrder }, { preserveState: true })}
+                    onRefresh={() => router.visit('/usuarios')}
+                    actions={actions}
+                    emptyMessage="No se encontraron usuarios en la base de datos."
+                />
+            </div>
         </MainLayout>
     );
 }

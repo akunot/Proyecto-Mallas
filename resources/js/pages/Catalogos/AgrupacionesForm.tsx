@@ -1,6 +1,5 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
-import { useState, useEffect } from 'react';
 
 interface Agrupacion {
     ID_Plantilla_Agrupacion?: number;
@@ -25,284 +24,162 @@ interface Props {
     }>;
 }
 
-export default function AgrupacionesForm({ agrupacion, programas, componentes }: Props) {
-    const { url } = usePage();
+export default function AgrupacionesForm({ agrupacion, programas = [], componentes = [] }: Props) {
     const isEditing = !!agrupacion?.ID_Plantilla_Agrupacion;
     
-    const [formData, setFormData] = useState<Agrupacion>({
-        ID_Programa: agrupacion?.ID_Programa || 0,
-        ID_Componente: agrupacion?.ID_Componente || 0,
+    // Migración a useForm para gestión nativa de Inertia
+    const { data, setData, post, put, processing, errors } = useForm({
+        ID_Programa: agrupacion?.ID_Programa || '',
+        ID_Componente: agrupacion?.ID_Componente || '',
         Nombre_Agrupacion: agrupacion?.Nombre_Agrupacion || '',
         Tipo_Agrupacion: agrupacion?.Tipo_Agrupacion || '',
-        Creditos_Requeridos: agrupacion?.Creditos_Requeridos || null,
-        Creditos_Maximos: agrupacion?.Creditos_Maximos || null,
+        Creditos_Requeridos: agrupacion?.Creditos_Requeridos || 0,
+        Creditos_Maximos: agrupacion?.Creditos_Maximos || '',
         Es_Obligatoria: agrupacion?.Es_Obligatoria || false,
     });
 
-    const [errors, setErrors] = useState<Record<string, string>>({});
-    const [isSubmitting, setIsSubmitting] = useState(false);
-
-    useEffect(() => {
-        // Actualizar créditos requeridos cuando cambia Es_Obligatoria
-        if (formData.Es_Obligatoria && formData.Creditos_Requeridos === null) {
-            setFormData(prev => ({ ...prev, Creditos_Requeridos: 0 }));
-        }
-    }, [formData.Es_Obligatoria, formData.Creditos_Requeridos]);
-
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
-        const { name, value, type } = e.target;
-        
-        if (type === 'checkbox') {
-            const checked = (e.target as HTMLInputElement).checked;
-            setFormData(prev => ({ ...prev, [name]: checked }));
-        } else if (type === 'number') {
-            const numValue = value === '' ? null : Number(value);
-            setFormData(prev => ({ ...prev, [name]: numValue }));
-        } else {
-            setFormData(prev => ({ ...prev, [name]: value }));
-        }
-        
-        // Limpiar error del campo
-        if (errors[name]) {
-            setErrors(prev => ({ ...prev, [name]: '' }));
-        }
-    };
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setIsSubmitting(true);
-        setErrors({});
-
-        const url = isEditing 
-            ? `/api/v1/agrupaciones/${agrupacion?.ID_Plantilla_Agrupacion}`
-            : '/api/v1/agrupaciones';
-        
-        const method = isEditing ? 'PUT' : 'POST';
-
-        router[method.toLowerCase() === 'put' ? 'put' : 'post'](url, formData as Record<string, any>, {
-            onSuccess: () => {
-                router.visit('/agrupaciones');
-            },
-            onError: (errors: any) => {
-                setErrors(errors as Record<string, string>);
-            },
-            onFinish: () => {
-                setIsSubmitting(false);
-            },
-        });
-    };
-
-    const handleCancel = () => {
-        router.visit('/agrupaciones');
+        if (isEditing) put(`/agrupaciones/${agrupacion.ID_Plantilla_Agrupacion}`);
+        else post('/agrupaciones');
     };
 
     return (
-        <>
+        <MainLayout>
             <Head title={isEditing ? 'Editar Agrupación' : 'Nueva Agrupación'} />
             
-            <MainLayout>
-                <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900">
-                            {isEditing ? 'Editar Agrupación' : 'Nueva Agrupación'}
+            <div className="max-w-4xl mx-auto py-10 px-4">
+                <header className="mb-10 flex justify-between items-center">
+                    <div>
+                        <Link href="/agrupaciones" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4 uppercase tracking-widest">
+                            <span className="material-symbols-outlined !text-sm">arrow_back</span> Regresar
+                        </Link>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+                            {isEditing ? 'Actualizar Plantilla' : 'Crear Agrupación'}
                         </h1>
-                        <p className="mt-2 text-gray-600">
-                            {isEditing 
-                                ? 'Modifica los datos de la plantilla de agrupación curricular'
-                                : 'Crea una nueva plantilla de agrupación curricular'
-                            }
-                        </p>
+                        <p className="text-slate-500 mt-2">Configura la lógica de créditos y pertenencia para la malla.</p>
                     </div>
+                </header>
 
-                    {/* Form */}
-                    <div className="bg-white shadow-sm rounded-lg">
-                        <form onSubmit={handleSubmit} className="p-6 space-y-6">
+                <form onSubmit={handleSubmit} className="space-y-6">
+                    {/* Bloque 1: Definición Estructural */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-blue-600">schema</span>
+                            <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Ubicación y Nombre</h3>
+                        </div>
+                        <div className="p-8 space-y-6">
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                                {/* Programa */}
-                                <div>
-                                    <label htmlFor="ID_Programa" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Programa *
-                                    </label>
-                                    <select
-                                        id="ID_Programa"
-                                        name="ID_Programa"
-                                        value={formData.ID_Programa}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.ID_Programa ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        required
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Programa Académico *</label>
+                                    <select 
+                                        value={data.ID_Programa} 
+                                        onChange={e => setData('ID_Programa', e.target.value)}
+                                        className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.ID_Programa ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
                                     >
-                                        <option value="">Seleccionar programa</option>
-                                        {programas.map((programa) => (
-                                            <option key={programa.ID_Programa} value={programa.ID_Programa}>
-                                                {programa.Nombre_Programa}
-                                            </option>
-                                        ))}
+                                        <option value="">Seleccionar programa...</option>
+                                        {programas.map(p => <option key={p.ID_Programa} value={p.ID_Programa}>{p.Nombre_Programa}</option>)}
                                     </select>
-                                    {errors.ID_Programa && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.ID_Programa}</p>
-                                    )}
+                                    {errors.ID_Programa && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.ID_Programa}</p>}
                                 </div>
-
-                                {/* Componente */}
-                                <div>
-                                    <label htmlFor="ID_Componente" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Componente *
-                                    </label>
-                                    <select
-                                        id="ID_Componente"
-                                        name="ID_Componente"
-                                        value={formData.ID_Componente}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.ID_Componente ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        required
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Componente Curricular *</label>
+                                    <select 
+                                        value={data.ID_Componente} 
+                                        onChange={e => setData('ID_Componente', e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
                                     >
-                                        <option value="">Seleccionar componente</option>
-                                        {componentes.map((componente) => (
-                                            <option key={componente.ID_Componente} value={componente.ID_Componente}>
-                                                {componente.Nombre_Componente}
-                                            </option>
-                                        ))}
+                                        <option value="">Seleccionar componente...</option>
+                                        {componentes.map(c => <option key={c.ID_Componente} value={c.ID_Componente}>{c.Nombre_Componente}</option>)}
                                     </select>
-                                    {errors.ID_Componente && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.ID_Componente}</p>
-                                    )}
                                 </div>
-
-                                {/* Nombre Agrupación */}
-                                <div>
-                                    <label htmlFor="Nombre_Agrupacion" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Nombre Agrupación *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="Nombre_Agrupacion"
-                                        name="Nombre_Agrupacion"
-                                        value={formData.Nombre_Agrupacion}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.Nombre_Agrupacion ? 'border-red-500' : 'border-gray-300'
-                                        }`}
+                            </div>
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                                <div className="md:col-span-2 space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Nombre de la Agrupación *</label>
+                                    <input 
+                                        type="text" 
+                                        value={data.Nombre_Agrupacion} 
+                                        onChange={e => setData('Nombre_Agrupacion', e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
                                         placeholder="Ej: Fundamentación Obligatoria"
-                                        required
                                     />
-                                    {errors.Nombre_Agrupacion && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.Nombre_Agrupacion}</p>
-                                    )}
                                 </div>
-
-                                {/* Tipo Agrupación */}
-                                <div>
-                                    <label htmlFor="Tipo_Agrupacion" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Tipo Agrupación *
-                                    </label>
-                                    <input
-                                        type="text"
-                                        id="Tipo_Agrupacion"
-                                        name="Tipo_Agrupacion"
-                                        value={formData.Tipo_Agrupacion}
-                                        onChange={handleInputChange}
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.Tipo_Agrupacion ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="Ej: Obligatoria, Optativa, Electiva"
-                                        required
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Tipo de Agrupación</label>
+                                    <input 
+                                        type="text" 
+                                        value={data.Tipo_Agrupacion} 
+                                        onChange={e => setData('Tipo_Agrupacion', e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
+                                        placeholder="Ej: Obligatoria"
                                     />
-                                    {errors.Tipo_Agrupacion && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.Tipo_Agrupacion}</p>
-                                    )}
-                                </div>
-
-                                {/* Créditos Requeridos */}
-                                <div>
-                                    <label htmlFor="Creditos_Requeridos" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Créditos Requeridos {formData.Es_Obligatoria && '*'}
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="Creditos_Requeridos"
-                                        name="Creditos_Requeridos"
-                                        value={formData.Creditos_Requeridos === null ? '' : formData.Creditos_Requeridos}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.Creditos_Requeridos ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="0"
-                                        required={formData.Es_Obligatoria}
-                                    />
-                                    {errors.Creditos_Requeridos && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.Creditos_Requeridos}</p>
-                                    )}
-                                </div>
-
-                                {/* Créditos Máximos */}
-                                <div>
-                                    <label htmlFor="Creditos_Maximos" className="block text-sm font-medium text-gray-700 mb-2">
-                                        Créditos Máximos
-                                    </label>
-                                    <input
-                                        type="number"
-                                        id="Creditos_Maximos"
-                                        name="Creditos_Maximos"
-                                        value={formData.Creditos_Maximos === null ? '' : formData.Creditos_Maximos}
-                                        onChange={handleInputChange}
-                                        min="0"
-                                        className={`w-full px-3 py-2 border rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                                            errors.Creditos_Maximos ? 'border-red-500' : 'border-gray-300'
-                                        }`}
-                                        placeholder="Opcional"
-                                    />
-                                    {errors.Creditos_Maximos && (
-                                        <p className="mt-1 text-sm text-red-600">{errors.Creditos_Maximos}</p>
-                                    )}
                                 </div>
                             </div>
-
-                            {/* Es Obligatoria */}
-                            <div className="flex items-center">
-                                <input
-                                    type="checkbox"
-                                    id="Es_Obligatoria"
-                                    name="Es_Obligatoria"
-                                    checked={formData.Es_Obligatoria}
-                                    onChange={handleInputChange}
-                                    className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                                />
-                                <label htmlFor="Es_Obligatoria" className="ml-2 block text-sm text-gray-700">
-                                    Es obligatoria
-                                </label>
-                            </div>
-                            {errors.Es_Obligatoria && (
-                                <p className="mt-1 text-sm text-red-600">{errors.Es_Obligatoria}</p>
-                            )}
-
-                            {/* Botones */}
-                            <div className="flex justify-end space-x-4 pt-6 border-t border-gray-200">
-                                <button
-                                    type="button"
-                                    onClick={handleCancel}
-                                    disabled={isSubmitting}
-                                    className="px-4 py-2 text-gray-700 bg-gray-100 border border-gray-300 rounded-md hover:bg-gray-200 focus:outline-none focus:ring-2 focus:ring-gray-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    Cancelar
-                                </button>
-                                <button
-                                    type="submit"
-                                    disabled={isSubmitting}
-                                    className="px-4 py-2 text-white bg-blue-600 border border-transparent rounded-md hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 disabled:opacity-50 disabled:cursor-not-allowed"
-                                >
-                                    {isSubmitting ? 'Guardando...' : (isEditing ? 'Actualizar' : 'Crear')}
-                                </button>
-                            </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
-            </MainLayout>
-        </>
+
+                    {/* Bloque 2: Reglas de Créditos */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-orange-500">pin</span>
+                                <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Límites y Obligatoriedad</h3>
+                            </div>
+                            <label className="flex items-center gap-3 cursor-pointer group">
+                                <span className="text-[10px] font-black uppercase text-slate-400 group-hover:text-blue-600 transition-colors">¿Es de carácter obligatorio?</span>
+                                <div className="relative inline-flex items-center">
+                                    <input 
+                                        type="checkbox" 
+                                        checked={data.Es_Obligatoria} 
+                                        onChange={e => setData('Es_Obligatoria', e.target.checked)}
+                                        className="sr-only peer"
+                                    />
+                                    <div className="w-11 h-6 bg-slate-200 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                                </div>
+                            </label>
+                        </div>
+                        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-8">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Créditos Mínimos Requeridos</label>
+                                <div className="flex items-center gap-4">
+                                    <input 
+                                        type="number" 
+                                        value={data.Creditos_Requeridos} 
+                                        onChange={e => setData('Creditos_Requeridos', Number(e.target.value))}
+                                        className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl text-xl font-black text-[#00236f] focus:border-blue-500 transition-all shadow-inner"
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium leading-tight">Cantidad de créditos que el estudiante DEBE cursar en esta agrupación.</p>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Créditos Máximos Permitidos</label>
+                                <div className="flex items-center gap-4">
+                                    <input 
+                                        type="number" 
+                                        value={data.Creditos_Maximos} 
+                                        onChange={e => setData('Creditos_Maximos', e.target.value === '' ? '' : Number(e.target.value))}
+                                        className="w-full px-6 py-4 bg-slate-50 border-2 border-transparent rounded-2xl text-xl font-black text-slate-700 focus:border-blue-500 transition-all shadow-inner"
+                                        placeholder="∞"
+                                    />
+                                    <p className="text-[10px] text-slate-400 font-medium leading-tight">Límite superior de créditos válidos (Dejar vacío si no hay límite).</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end items-center gap-4 pt-4">
+                        <Link href="/agrupaciones" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</Link>
+                        <button 
+                            type="submit" 
+                            disabled={processing}
+                            className="px-10 py-4 bg-[#00236f] text-white rounded-2xl font-black shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all uppercase tracking-widest text-[11px]"
+                        >
+                            {processing ? 'GUARDANDO...' : isEditing ? 'ACTUALIZAR PLANTILLA' : 'CREAR AGRUPACIÓN'}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </MainLayout>
     );
 }

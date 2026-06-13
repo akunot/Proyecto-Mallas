@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -30,178 +30,126 @@ interface Props {
     programas: { ID_Programa: number; Nombre_Programa: string }[];
 }
 
-export default function Normativas({ normativas, programas }: Props) {
+export default function Normativas({ normativas }: Props) {
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
-
     const sortBy = normativas.meta.sort_by || 'ID_Normativa';
     const sortOrder = normativas.meta.sort_order || 'asc';
 
     const columns = [
-        { key: 'ID_Normativa', label: 'ID', sortable: true },
-        { key: 'Tipo_Normativa', label: 'Tipo', sortable: true },
-        { key: 'Numero_Normativa', label: 'Número', sortable: true },
-        { key: 'Anio_Normativa', label: 'Año', sortable: true },
-        { key: 'Instancia', label: 'Instancia' },
+        { 
+            key: 'Documento', 
+            label: 'Documento Legal', 
+            sortable: true,
+            render: (_: any, row: Normativa) => (
+                <div className="flex flex-col">
+                    <div className="flex items-center gap-2">
+                        <span className="font-bold text-slate-800">
+                            {row.Tipo_Normativa} {row.Numero_Normativa}
+                        </span>
+                        {row.Url_Normativa && (
+                            <a 
+                                href={row.Url_Normativa} 
+                                target="_blank" 
+                                className="text-blue-600 hover:text-blue-800"
+                                title="Ver documento original"
+                            >
+                                <span className="material-symbols-outlined !text-sm">open_in_new</span>
+                            </a>
+                        )}
+                    </div>
+                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest">
+                        Año {row.Anio_Normativa}
+                    </span>
+                </div>
+            )
+        },
+        { 
+            key: 'Nombre_Programa', 
+            label: 'Programa Relacionado',
+            render: (value: string) => (
+                <span className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[200px]">
+                    {value || 'General / No asignado'}
+                </span>
+            )
+        },
+        { 
+            key: 'Instancia', 
+            label: 'Instancia / Emisor',
+            render: (value: string) => (
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase border border-slate-200">
+                    {value}
+                </span>
+            )
+        },
         {
             key: 'Esta_Activo',
             label: 'Estado',
             render: (value: number) => (
-                <span
-                    className={`badge ${value ? 'badge-success' : 'badge-danger'}`}
-                >
-                    {value ? 'Activo' : 'Inactivo'}
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${
+                    value ? 'bg-emerald-100 text-emerald-700 ring-emerald-600/20' : 'bg-rose-100 text-rose-700 ring-rose-600/20'
+                }`}>
+                    <span className={`h-1.5 w-1.5 rounded-full ${value ? 'bg-emerald-500' : 'bg-rose-500'}`} />
+                    {value ? 'Vigente' : 'Derogada'}
                 </span>
             ),
         },
     ];
 
-    const handleSearch = (search: string, page: number = 1) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
-        params.set('sort_by', sortBy);
-        params.set('sort_order', sortOrder);
-
-        router.visit(`/normativas?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleRefresh = () => {
-        router.visit('/normativas', {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
-
-        const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
-        params.set('sort_by', column);
-        params.set('sort_order', newDirection);
-        params.set('page', '1');
-
-        router.visit(`/normativas?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleToggle = async (id: number) => {
-        await router.patch(`/normativas/${id}/toggle`, {}, {
-            onSuccess: () => handleRefresh(),
-        });
-    };
-
     const actions = (row: Normativa) => (
-        <div className="action-buttons">
-            <button
-                className="btn-edit"
-                onClick={() =>
-                    router.visit(`/normativas/${row.ID_Normativa}/edit`)
-                }
-                title="Editar"
+        <div className="flex justify-end gap-1">
+            <Link
+                href={`/normativas/${row.ID_Normativa}/edit`}
+                className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-            </button>
+                <span className="material-symbols-outlined !text-xl">edit_document</span>
+            </Link>
             <button
-                className="btn-delete"
-                onClick={() => handleToggle(row.ID_Normativa)}
-                title={row.Esta_Activo ? 'Desactivar' : 'Activar'}
+                onClick={() => router.patch(`/normativas/${row.ID_Normativa}/toggle`)}
+                className={`p-2 rounded-lg transition-all ${row.Esta_Activo ? 'text-rose-400 hover:text-rose-600 hover:bg-rose-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    {row.Esta_Activo ? (
-                        <>
-                            <path d="M18.36 6.64a9 9 0 1 1-12.73 0" />
-                            <line x1="12" y1="2" x2="12" y2="12" />
-                        </>
-                    ) : (
-                        <>
-                            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-                            <polyline points="22 4 12 14.01 9 11.01" />
-                        </>
-                    )}
-                </svg>
+                <span className="material-symbols-outlined !text-xl">
+                    {row.Esta_Activo ? 'cancel' : 'check_circle'}
+                </span>
             </button>
         </div>
     );
 
     return (
         <MainLayout>
-            <Head title="Normativas - Mallas UNAL" />
+            <Head title="Normativas Académicas - UNAL" />
 
-            <div className="page-header">
-                <div className="page-title">
-                    <h1>Gestión de Normativas</h1>
-                    <p className="page-subtitle">
-                        Administra las normativas de los programas
-                    </p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        className="btn-primary"
-                        onClick={() => router.visit('/normativas/create')}
+            <div className="max-w-[1400px] mx-auto space-y-8 pb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
+                            <span className="material-symbols-outlined !text-sm">gavel</span>
+                            Marco Legal
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight">Normativas</h1>
+                        <p className="text-slate-500 mt-2">Base documental de acuerdos y resoluciones de programas.</p>
+                    </div>
+                    <Link
+                        href="/normativas/create"
+                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-all"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
+                        <span className="material-symbols-outlined">add_moderator</span>
                         Nueva Normativa
-                    </button>
+                    </Link>
                 </div>
-            </div>
 
-            <DataTable
-                columns={columns}
-                data={normativas.data}
-                meta={normativas.meta}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                searchValue={currentSearch}
-                onSort={handleSort}
-                searchPlaceholder="Buscar por número o instancia..."
-                onSearch={handleSearch}
-                onRefresh={handleRefresh}
-                actions={actions}
-                emptyMessage="No hay normativas registradas"
-            />
+                <DataTable
+                    columns={columns}
+                    data={normativas.data}
+                    meta={normativas.meta}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    searchValue={currentSearch}
+                    onSort={(col, dir) => router.get('/normativas', { search: currentSearch, sort_by: col, sort_order: dir }, { preserveState: true })}
+                    onSearch={(search, page) => router.get('/normativas', { search, page, sort_by: sortBy, sort_order: sortOrder }, { preserveState: true })}
+                    actions={actions}
+                />
+            </div>
         </MainLayout>
     );
 }

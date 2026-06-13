@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -38,164 +38,125 @@ interface Props {
 export default function Agrupaciones({ agrupaciones }: Props) {
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
-
     const sortBy = agrupaciones.meta.sort_by || 'ID_Plantilla_Agrupacion';
     const sortOrder = agrupaciones.meta.sort_order || 'asc';
 
     const columns = [
-        { key: 'ID_Plantilla_Agrupacion', label: 'ID', sortable: true },
-        { key: 'Nombre_Agrupacion', label: 'Nombre', sortable: true },
-        { key: 'Tipo_Agrupacion', label: 'Tipo', sortable: true },
         {
-            key: 'programa.Nombre_Programa',
-            label: 'Programa',
-            render: (value: string, record: PlantillaAgrupacion) => 
-                record.programa?.Nombre_Programa || '-',
+            key: 'ID_Plantilla_Agrupacion',
+            label: 'ID',
+            sortable: true,
+            render: (value: number) => (
+                <span className="text-xs font-mono font-bold text-slate-400">#{String(value).padStart(3, '0')}</span>
+            )
+        },
+        { 
+            key: 'Nombre_Agrupacion', 
+            label: 'Agrupación / Programa', 
+            sortable: true,
+            render: (value: string, record: PlantillaAgrupacion) => (
+                <div className="flex flex-col max-w-[400px]">
+                    <span className="font-bold text-slate-800 leading-tight">{value}</span>
+                    <span className="text-[10px] text-slate-500 font-medium uppercase tracking-tighter truncate">
+                        {record.programa?.Nombre_Programa || 'Sin programa'}
+                    </span>
+                    <span className="text-[9px] font-black text-blue-600 uppercase tracking-widest mt-1">
+                        {record.componente?.Nombre_Componente || 'Sin componente'}
+                    </span>
+                </div>
+            )
+        },
+        { 
+            key: 'Tipo_Agrupacion', 
+            label: 'Tipo', 
+            sortable: true,
+            render: (value: string) => (
+                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-md border border-slate-200 uppercase">
+                    {value}
+                </span>
+            )
         },
         {
-            key: 'componente.Nombre_Componente',
-            label: 'Componente',
-            render: (value: string, record: PlantillaAgrupacion) => 
-                record.componente?.Nombre_Componente || '-',
-        },
-        {
-            key: 'Creditos_Requeridos',
-            label: 'Créditos Req.',
-            render: (value: number | null) => value || '-',
-        },
-        {
-            key: 'Creditos_Maximos',
-            label: 'Créditos Máx.',
-            render: (value: number | null) => value || '-',
+            key: 'Creditos',
+            label: 'Regla de Créditos',
+            render: (_: any, record: PlantillaAgrupacion) => (
+                <div className="flex items-center gap-2">
+                    <div className="flex flex-col items-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Mín</span>
+                        <span className="text-sm font-black text-slate-700">{record.Creditos_Requeridos ?? 0}</span>
+                    </div>
+                    <span className="text-slate-300">/</span>
+                    <div className="flex flex-col items-center">
+                        <span className="text-[9px] font-bold text-slate-400 uppercase">Máx</span>
+                        <span className="text-sm font-black text-slate-700">{record.Creditos_Maximos || '∞'}</span>
+                    </div>
+                </div>
+            ),
         },
         {
             key: 'Es_Obligatoria',
-            label: 'Obligatoria',
+            label: 'Estado',
             render: (value: boolean) => (
-                <span className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                    value 
-                        ? 'bg-green-100 text-green-800' 
-                        : 'bg-blue-100 text-blue-800'
+                <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${
+                    value ? 'bg-emerald-100 text-emerald-700 ring-emerald-600/20' : 'bg-blue-100 text-blue-700 ring-blue-600/20'
                 }`}>
-                    {value ? 'Sí' : 'No'}
+                    <span className={`h-1.5 w-1.5 rounded-full ${value ? 'bg-emerald-500' : 'bg-blue-500'}`} />
+                    {value ? 'Obligatoria' : 'Opcional'}
                 </span>
             ),
         },
     ];
 
-    const handleSearch = (search: string, page: number = 1) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
-        params.set('sort_by', sortBy);
-        params.set('sort_order', sortOrder);
-
-        router.visit(`/agrupaciones?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newOrder = sortBy === column && sortOrder === 'asc' ? 'desc' : 'asc';
-        
-        const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
-        params.set('sort_by', column);
-        params.set('sort_order', newOrder);
-
-        router.visit(`/agrupaciones?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleEdit = (record: PlantillaAgrupacion) => {
-        router.visit(`/agrupaciones/${record.ID_Plantilla_Agrupacion}/edit`);
-    };
-
-    const handleDelete = (record: PlantillaAgrupacion) => {
-        if (confirm(`¿Está seguro de eliminar la agrupación "${record.Nombre_Agrupacion}"?`)) {
-            router.delete(`/agrupaciones/${record.ID_Plantilla_Agrupacion}`, {
-                onSuccess: () => {
-                    // La recarga se maneja automáticamente
-                },
-                onError: (errors) => {
-                    alert('Error al eliminar la agrupación: ' + Object.values(errors).flat().join(', '));
-                },
-            });
+    const handleDelete = (id: number) => {
+        if (confirm('¿Realmente deseas eliminar esta plantilla de agrupación?')) {
+            router.delete(`/agrupaciones/${id}`, { preserveScroll: true });
         }
     };
 
     return (
-        <>
-            <Head title="Agrupaciones" />
+        <MainLayout>
+            <Head title="Agrupaciones Curriculares - UNAL" />
             
-            <MainLayout>
-                <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                    {/* Header */}
-                    <div className="mb-8">
-                        <h1 className="text-3xl font-bold text-gray-900">
-                            Agrupaciones
-                        </h1>
-                        <p className="mt-2 text-gray-600">
-                            Gestión de plantillas de agrupaciones curriculares
-                        </p>
+            <div className="max-w-[1400px] mx-auto space-y-8 pb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
+                            <span className="material-symbols-outlined !text-sm">account_tree</span>
+                            Estructura de Malla
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none text-balance">Agrupaciones</h1>
+                        <p className="text-slate-500 mt-2">Plantillas de agrupación de materias por componente y programa.</p>
                     </div>
-
-                    {/* Create Button */}
-                    <div className="mb-4 flex justify-end">
-                        <button
-                            onClick={() => router.visit('/agrupaciones/create')}
-                            className="btn-create"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="mr-2">
-                                <line x1="12" y1="5" x2="12" y2="19"></line>
-                                <line x1="5" y1="12" x2="19" y2="12"></line>
-                            </svg>
-                            Nueva Agrupación
-                        </button>
-                    </div>
-
-                    {/* DataTable */}
-                    <DataTable
-                        data={agrupaciones.data}
-                        columns={columns}
-                        meta={agrupaciones.meta}
-                        sortBy={sortBy}
-                        sortOrder={sortOrder}
-                        loading={false}
-                        searchPlaceholder="Buscar agrupación..."
-                        searchValue={currentSearch}
-                        onSearch={handleSearch}
-                        onSort={handleSort}
-                        actions={(record: PlantillaAgrupacion) => (
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleEdit(record)}
-                                    className="btn-edit"
-                                    title="Editar"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
-                                        <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
-                                    </svg>
-                                </button>
-                                <button
-                                    onClick={() => handleDelete(record)}
-                                    className="btn-delete"
-                                    title="Eliminar"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <polyline points="3,6 5,6 21,6"/>
-                                        <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/>
-                                    </svg>
-                                </button>
-                            </div>
-                        )}
-                    />
+                    <Link
+                        href="/agrupaciones/create"
+                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all"
+                    >
+                        <span className="material-symbols-outlined">playlist_add</span>
+                        Nueva Agrupación
+                    </Link>
                 </div>
-            </MainLayout>
-        </>
+
+                <DataTable
+                    data={agrupaciones.data}
+                    columns={columns}
+                    meta={agrupaciones.meta}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    searchValue={currentSearch}
+                    onSearch={(search, page) => router.get('/agrupaciones', { search, page }, { preserveState: true })}
+                    onSort={(col, dir) => router.get('/agrupaciones', { sort_by: col, sort_order: dir }, { preserveState: true })}
+                    actions={(record) => (
+                        <div className="flex justify-end gap-1">
+                            <Link href={`/agrupaciones/${record.ID_Plantilla_Agrupacion}/edit`} className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all">
+                                <span className="material-symbols-outlined !text-xl">edit_note</span>
+                            </Link>
+                            <button onClick={() => handleDelete(record.ID_Plantilla_Agrupacion)} className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all">
+                                <span className="material-symbols-outlined !text-xl">delete</span>
+                            </button>
+                        </div>
+                    )}
+                />
+            </div>
+        </MainLayout>
     );
 }

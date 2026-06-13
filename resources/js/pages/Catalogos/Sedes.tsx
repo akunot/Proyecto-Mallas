@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -9,6 +9,7 @@ interface Sede {
     Direccion_Sede: string | null;
     Conmutador_Sede: string | null;
     Campus_Sede: string | null;
+    Codigo_Sede?: string | null;
     Url_Sede: string | null;
 }
 
@@ -26,174 +27,113 @@ interface Props {
     };
 }
 
-export default function Sedes({ sedes: initialSedes }: Props) {
+export default function Sedes({ sedes }: Props) {
     const { url } = usePage();
-    const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
-
-    const sortBy = initialSedes.meta.sort_by || 'ID_Sede';
-    const sortOrder = initialSedes.meta.sort_order || 'asc';
+    const currentParams = new URLSearchParams(url.split('?')[1] || '');
+    const currentSearch = currentParams.get('search') || '';
+    const sortBy = sedes.meta.sort_by || 'ID_Sede';
+    const sortOrder = sedes.meta.sort_order || 'asc';
 
     const columns = [
-        { key: 'Codigo_Sede', label: 'Código', sortable: true },
-        { key: 'ID_Sede', label: 'ID', sortable: true },
-        { key: 'Nombre_Sede', label: 'Nombre', sortable: true },
+        { 
+            key: 'Nombre_Sede', 
+            label: 'Sede / Código', 
+            sortable: true,
+            render: (value: string, row: Sede) => (
+                <div className="flex flex-col">
+                    <span className="font-bold text-slate-800 leading-tight">{value}</span>
+                    <span className="text-[10px] font-mono text-blue-600 font-bold uppercase tracking-tighter">
+                        COD: {row.Codigo_Sede || 'N/A'} • ID: {row.ID_Sede}
+                    </span>
+                </div>
+            )
+        },
         { key: 'Ciudad_Sede', label: 'Ciudad', sortable: true },
-        { key: 'Direccion_Sede', label: 'Dirección' },
-        { key: 'Conmutador_Sede', label: 'Conmutador' },
-        {
-            key: 'Campus_Sede',
+        { 
+            key: 'Campus_Sede', 
             label: 'Campus',
-            render: (value: string | null) => value || '-',
+            render: (value: string | null) => (
+                <div className="flex items-center gap-1.5 text-slate-600">
+                    <span className="material-symbols-outlined !text-sm opacity-50">domain</span>
+                    <span className="text-sm">{value || 'No asignado'}</span>
+                </div>
+            )
+        },
+        { 
+            key: 'Url_Sede', 
+            label: 'Sitio Web',
+            render: (value: string | null) => value ? (
+                <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline flex items-center gap-1 text-xs">
+                    <span className="material-symbols-outlined !text-sm">open_in_new</span>
+                    Visitar
+                </a>
+            ) : '—'
         },
     ];
 
-    const handleSearch = (search: string, page: number = 1) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
-        params.set('sort_by', sortBy);
-        params.set('sort_order', sortOrder);
-
-        router.visit(`/sedes?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleRefresh = () => {
-        router.visit('/sedes', {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
-
-        const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
-        params.set('sort_by', column);
-        params.set('sort_order', newDirection);
-        params.set('page', '1');
-
-        router.visit(`/sedes?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!confirm('¿Está seguro de eliminar esta sede?')) return;
-
-        await fetch(`/sedes/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
-            credentials: 'same-origin',
-        }).then(() => handleRefresh());
+    const handleDelete = (id: number) => {
+        if (confirm('¿Realmente deseas eliminar esta sede? Esta acción no se puede deshacer.')) {
+            router.delete(`/sedes/${id}`, {
+                preserveScroll: true,
+                onSuccess: () => { /* Aquí podrías disparar una notificación */ }
+            });
+        }
     };
 
     const actions = (row: Sede) => (
-        <div className="action-buttons">
-            <button
-                className="btn-edit"
-                onClick={() =>
-                    router.visit(`/sedes/${row.ID_Sede}/edit`)
-                }
-                title="Editar"
+        <div className="flex justify-end gap-1">
+            <Link
+                href={`/sedes/${row.ID_Sede}/edit`}
+                className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-            </button>
+                <span className="material-symbols-outlined !text-xl">edit_note</span>
+            </Link>
             <button
-                className="btn-delete"
                 onClick={() => handleDelete(row.ID_Sede)}
-                title="Eliminar"
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
+                <span className="material-symbols-outlined !text-xl">delete</span>
             </button>
         </div>
     );
 
     return (
         <MainLayout>
-            <Head title="Sedes - Mallas UNAL" />
+            <Head title="Sedes Institucionales - UNAL" />
 
-            <div className="page-header">
-                <div className="page-title">
-                    <h1>Gestión de Sedes</h1>
-                    <p className="page-subtitle">
-                        Administra las sedes de la Universidad Nacional de
-                        Colombia
-                    </p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        className="btn-primary"
-                        onClick={() => router.visit('/sedes/create')}
+            <div className="max-w-[1400px] mx-auto space-y-8 pb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
+                            <span className="material-symbols-outlined !text-sm">location_on</span>
+                            Infraestructura
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Sedes UNAL</h1>
+                        <p className="text-slate-500 mt-2">Gestión de campus y centros de operación a nivel nacional.</p>
+                    </div>
+                    <Link
+                        href="/sedes/create"
+                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] active:scale-95 transition-all"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
+                        <span className="material-symbols-outlined">add_location_alt</span>
                         Nueva Sede
-                    </button>
+                    </Link>
                 </div>
-            </div>
 
-            <DataTable
-                columns={columns}
-                data={initialSedes.data}
-                meta={initialSedes.meta}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                searchValue={currentSearch}
-                onSort={handleSort}
-                searchPlaceholder="Buscar por nombre o ciudad..."
-                onSearch={handleSearch}
-                onRefresh={handleRefresh}
-                actions={actions}
-                emptyMessage="No hay sedes registradas"
-            />
+                <DataTable
+                    columns={columns}
+                    data={sedes.data}
+                    meta={sedes.meta}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    searchValue={currentSearch}
+                    onSort={(col, dir) => router.get('/sedes', { search: currentSearch, sort_by: col, sort_order: dir }, { preserveState: true })}
+                    onSearch={(search, page) => router.get('/sedes', { search, page, sort_by: sortBy, sort_order: sortOrder }, { preserveState: true })}
+                    onRefresh={() => router.visit('/sedes')}
+                    actions={actions}
+                    emptyMessage="No se encontraron sedes con los criterios de búsqueda."
+                />
+            </div>
         </MainLayout>
     );
 }

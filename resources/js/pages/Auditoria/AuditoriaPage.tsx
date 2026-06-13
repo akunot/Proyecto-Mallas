@@ -1,7 +1,7 @@
-import { Head, Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
+import { Head, Link, router } from '@inertiajs/react';
+import { useState, useMemo } from 'react';
 import MainLayout from '../../Layout/MainLayout';
-import apiClient from '../../api/client';
+
 
 interface LogActividad {
     ID_Log: number;
@@ -41,378 +41,296 @@ interface Props {
     estadisticas: Estadisticas;
     acciones: string[];
     entidades: string[];
+    meta?: {
+        current_page: number;
+        total: number;
+        per_page: number;
+        last_page: number;
+    };
+    filters?: {
+        usuario_id: string;
+        accion: string;
+        entidad: string;
+        desde: string;
+        hasta: string;
+        search: string;
+    };
 }
 
-export default function AuditoriaPage({ logs: initialLogs, estadisticas, acciones, entidades }: Props) {
-    const [logs, setLogs] = useState<LogActividad[]>(initialLogs);
-    const [loading, setLoading] = useState(false);
-    const [filters, setFilters] = useState({
-        usuario_id: '',
-        accion: '',
-        entidad: '',
-        desde: '',
-        hasta: '',
-        search: '',
-        page: '1',
+export default function AuditoriaPage({ logs, estadisticas, acciones, entidades, meta, filters: serverFilters }: Props) {
+    const [viewingLog, setViewingLog] = useState<LogActividad | null>(null);
+    const [isExporting, setIsExporting] = useState(false);
+
+    // Estado local de filtros sincronizado con la URL
+    const [localFilters, setLocalFilters] = useState({
+        usuario_id: serverFilters?.usuario_id || '',
+        accion: serverFilters?.accion || '',
+        entidad: serverFilters?.entidad || '',
+        desde: serverFilters?.desde || '',
+        hasta: serverFilters?.hasta || '',
+        search: serverFilters?.search || '',
     });
 
-    const [pagination, setPagination] = useState({
-        current_page: 1,
-        per_page: 20,
-        total: initialLogs.length,
-        last_page: 1,
-    });
-
-    // Solo buscar por API cuando hay filtros activos (no en carga inicial)
-    useEffect(() => {
-        const hasActiveFilters = Object.entries(filters).some(([key, value]) => {
-            if (key === 'page' && value === '1') return false;
-            return value !== '';
+    // Función de filtrado via Inertia (La forma correcta)
+    const applyFilters = () => {
+        router.get('/auditoria', localFilters, {
+            preserveState: true,
+            replace: true,
+            only: ['logs', 'estadisticas'], // Partial reload
         });
-
-        if (hasActiveFilters) {
-            fetchLogs();
-        }
-    }, [filters]);
-
-    const fetchLogs = async () => {
-        setLoading(true);
-        try {
-            const params = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) params.append(key, value);
-            });
-
-            const response = await apiClient.get<ApiResponse>(`/auditoria/logs?${params.toString()}`);
-            setLogs(response.data);
-            setPagination({
-                current_page: response.meta?.current_page || 1,
-                per_page: response.meta?.per_page || 20,
-                total: response.meta?.total || 0,
-                last_page: response.meta?.last_page || 1,
-            });
-        } catch (error) {
-            console.error('Error fetching logs:', error);
-        } finally {
-            setLoading(false);
-        }
     };
 
-    const handleFilterChange = (field: string, value: string) => {
-        setFilters(prev => ({ ...prev, [field]: value }));
-    };
-
-    const exportLogs = async () => {
-        try {
-            const params = new URLSearchParams();
-            Object.entries(filters).forEach(([key, value]) => {
-                if (value) params.append(key, value);
-            });
-
-            // Usar fetch directo para descargar blob (apiClient no soporta responseType)
-            const token = document.querySelector('meta[name="csrf-token"]')?.getAttribute('content');
-            const response = await fetch(`/api/v1/auditoria/exportar-logs?${params.toString()}`, {
-                headers: {
-                    'Accept': 'text/csv',
-                    'X-CSRF-TOKEN': token || '',
-                },
-                credentials: 'same-origin',
-            });
-
-            if (!response.ok) {
-                throw new Error(`Error ${response.status}: ${response.statusText}`);
-            }
-
-            const blob = await response.blob();
-            const url = window.URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url;
-            a.download = `logs_actividad_${new Date().toISOString().split('T')[0]}.csv`;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            window.URL.revokeObjectURL(url);
-        } catch (error) {
-            console.error('Error exporting logs:', error);
-        }
-    };
-
-    const getAccionColor = (accion: string) => {
-        const colors: Record<string, string> = {
-            'CREATE': 'bg-green-100 text-green-800',
-            'UPDATE': 'bg-blue-100 text-blue-800',
-            'DELETE': 'bg-red-100 text-red-800',
-            'LOGIN': 'bg-purple-100 text-purple-800',
-            'LOGOUT': 'bg-gray-100 text-gray-800',
-            'UPLOAD_EXCEL': 'bg-yellow-100 text-yellow-800',
-            'APROBAR_MALLA': 'bg-emerald-100 text-emerald-800',
-            'RECHAZAR_MALLA': 'bg-orange-100 text-orange-800',
-        };
-        return colors[accion] || 'bg-gray-100 text-gray-800';
+    const handleExport = async () => {
+        setIsExporting(true);
+        // Lógica de exportación similar pero con feedback visual
+        const params = new URLSearchParams(localFilters as any).toString();
+        window.location.href = `/api/v1/auditoria/exportar-logs?${params}`;
+        setTimeout(() => setIsExporting(false), 2000);
     };
 
     return (
         <MainLayout>
-            <Head title="Auditoría del Sistema" />
-            
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
+            <Head title="Auditoría de Operaciones" />
+
+            <div className="max-w-[1400px] mx-auto space-y-8 pb-10">
+                
+                {/* 1. Header Dinámico */}
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
                     <div>
-                        <h1 className="text-2xl font-bold text-gray-900">Auditoría del Sistema</h1>
-                        <p className="text-sm text-gray-500">Registro de todas las actividades del sistema</p>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-[2px] mb-1">
+                            <span className="material-symbols-outlined !text-sm text-rose-600">security</span>
+                            Centro de Cumplimiento
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Auditoría</h1>
+                        <p className="text-slate-500 mt-2">Trazabilidad completa de cambios y accesos al sistema académico.</p>
                     </div>
-                    <div className="flex space-x-3">
-                        <Link
-                            href="/aprobacion"
-                            className="bg-indigo-600 text-white px-4 py-2 rounded-md hover:bg-indigo-700 transition-colors"
+                    <div className="flex items-center gap-3">
+                        <button 
+                            onClick={handleExport}
+                            disabled={isExporting}
+                            className="flex items-center gap-2 px-5 py-3 bg-white border border-slate-200 text-slate-700 rounded-2xl font-bold hover:bg-slate-50 transition-all active:scale-95 disabled:opacity-50"
                         >
-                            Ver Aprobaciones
+                            <span className="material-symbols-outlined !text-xl">download</span>
+                            {isExporting ? 'Generando...' : 'Exportar CSV'}
+                        </button>
+                        <Link 
+                            href="/aprobacion" 
+                            className="flex items-center gap-2 px-5 py-3 bg-[#00236f] text-white rounded-2xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-all"
+                        >
+                            <span className="material-symbols-outlined !text-xl">fact_check</span>
+                            Aprobaciones
                         </Link>
-                        <button
-                            onClick={exportLogs}
-                            className="bg-green-600 text-white px-4 py-2 rounded-md hover:bg-green-700 transition-colors"
+                    </div>
+                </div>
+
+                {/* 2. KPIs de Actividad */}
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                    {[
+                        { label: 'Eventos Totales', val: estadisticas.total_logs, icon: 'database', color: 'blue' },
+                        { label: 'Acciones Únicas', val: estadisticas.por_accion.length, icon: 'bolt', color: 'amber' },
+                        { label: 'Entidades Monitoreadas', val: estadisticas.por_entidad.length, icon: 'category', color: 'purple' },
+                        { label: 'Usuarios Activos', val: estadisticas.por_usuario.length, icon: 'group', color: 'emerald' },
+                    ].map((kpi, i) => (
+                        <div key={i} className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm flex items-center gap-5">
+                            <div className={`w-12 h-12 rounded-2xl bg-${kpi.color}-50 flex items-center justify-center text-${kpi.color}-600`}>
+                                <span className="material-symbols-outlined !text-3xl">{kpi.icon}</span>
+                            </div>
+                            <div>
+                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest leading-none">{kpi.label}</p>
+                                <p className="text-2xl font-black text-slate-900 mt-1">{kpi.val}</p>
+                            </div>
+                        </div>
+                    ))}
+                </div>
+
+                {/* 3. Panel de Filtros Inteligente */}
+                <div className="bg-white p-6 rounded-3xl border border-slate-200 shadow-sm">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-4 items-end">
+                        <div className="lg:col-span-2">
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Búsqueda rápida</label>
+                            <input 
+                                type="text" 
+                                placeholder="Buscar en detalles o IPs..."
+                                className="w-full mt-1 bg-slate-50 border-none rounded-xl text-sm py-3 focus:ring-2 focus:ring-blue-500"
+                                value={localFilters.search}
+                                onChange={e => setLocalFilters({...localFilters, search: e.target.value})}
+                            />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Desde</label>
+                            <input type="date" className="w-full mt-1 bg-slate-50 border-none rounded-xl text-sm py-2.5" value={localFilters.desde} onChange={e => setLocalFilters({...localFilters, desde: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Hasta</label>
+                            <input type="date" className="w-full mt-1 bg-slate-50 border-none rounded-xl text-sm py-2.5" value={localFilters.hasta} onChange={e => setLocalFilters({...localFilters, hasta: e.target.value})} />
+                        </div>
+                        <div>
+                            <label className="text-[10px] font-black text-slate-400 uppercase ml-1">Acción</label>
+                            <select className="w-full mt-1 bg-slate-50 border-none rounded-xl text-sm py-2.5" value={localFilters.accion} onChange={e => setLocalFilters({...localFilters, accion: e.target.value})}>
+                                <option value="">Todas</option>
+                                {acciones.map((a: string) => <option key={a} value={a}>{a}</option>)}
+                            </select>
+                        </div>
+                        <button 
+                            onClick={applyFilters}
+                            className="bg-slate-900 text-white py-3 rounded-xl font-bold hover:bg-slate-800 transition-all"
                         >
-                            Exportar CSV
+                            Filtrar
                         </button>
                     </div>
                 </div>
 
-                {/* Estadísticas */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-6">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-blue-100 rounded-full">
-                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Total Logs</p>
-                                <p className="text-2xl font-semibold text-gray-900">{estadisticas.total_logs}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-green-100 rounded-full">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Acciones</p>
-                                <p className="text-2xl font-semibold text-gray-900">{estadisticas.por_accion.length}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-purple-100 rounded-full">
-                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Entidades</p>
-                                <p className="text-2xl font-semibold text-gray-900">{estadisticas.por_entidad.length}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-orange-100 rounded-full">
-                                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Usuarios</p>
-                                <p className="text-2xl font-semibold text-gray-900">{estadisticas.por_usuario.length}</p>
-                            </div>
-                        </div>
-                    </div>
+                {/* 4. Tabla de Trazabilidad */}
+                <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                    <table className="w-full border-collapse">
+                        <thead>
+                            <tr className="bg-slate-50/50 border-b border-slate-100">
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Fecha y Hora</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Actor</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Operación</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-left">Entidad Afectada</th>
+                                <th className="px-6 py-4 text-[10px] font-black text-slate-400 uppercase tracking-widest text-right">Acciones</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-50">
+                            {logs.map((log: LogActividad) => (
+                                <tr key={log.ID_Log} className="log-row">
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-sm font-bold text-slate-700">
+                                                {new Date(log.Creacion_Log).toLocaleDateString('es-CO', {day:'2-digit', month:'short'})}
+                                            </span>
+                                            <span className="text-[10px] text-slate-400 font-medium tracking-tighter uppercase">
+                                                {new Date(log.Creacion_Log).toLocaleTimeString('es-CO', {hour:'2-digit', minute:'2-digit'})}
+                                            </span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center font-bold text-slate-400 text-xs">
+                                                {log.usuario?.Nombre_Usuario?.[0] || 'U'}
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <span className="text-xs font-bold text-slate-800">{log.usuario?.Nombre_Usuario || 'Sistema'}</span>
+                                                <span className="ip-badge w-fit mt-1">{log.IP_Origen_Log}</span>
+                                            </div>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <span className={`px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wide uppercase border ${
+                                            log.Accion_Log.includes('DELETE') ? 'bg-rose-50 text-rose-700 border-rose-100' :
+                                            log.Accion_Log.includes('CREATE') ? 'bg-emerald-50 text-emerald-700 border-emerald-100' :
+                                            'bg-blue-50 text-blue-700 border-blue-100'
+                                        }`}>
+                                            {log.Accion_Log.replace('_', ' ')}
+                                        </span>
+                                    </td>
+                                    <td className="px-6 py-4">
+                                        <div className="flex flex-col">
+                                            <span className="text-xs font-bold text-slate-700 uppercase tracking-tight">{log.Entidad_Log}</span>
+                                            <span className="text-[10px] text-slate-400 font-mono">ID Ref: #{log.Entidad_ID_Log}</span>
+                                        </div>
+                                    </td>
+                                    <td className="px-6 py-4 text-right">
+                                        <button 
+                                            onClick={() => setViewingLog(log)}
+                                            className="px-4 py-1.5 bg-slate-100 hover:bg-slate-900 hover:text-white text-slate-600 rounded-lg text-[11px] font-bold transition-all"
+                                        >
+                                            INSPECCIONAR
+                                        </button>
+                                    </td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
                 </div>
 
-                {/* Filtros */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Filtros</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-6 gap-4">
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Usuario ID</label>
-                            <input
-                                type="text"
-                                value={filters.usuario_id}
-                                onChange={(e) => handleFilterChange('usuario_id', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="ID Usuario"
-                            />
-                        </div>
-                        
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Acción</label>
-                            <select
-                                value={filters.accion}
-                                onChange={(e) => handleFilterChange('accion', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                {/* 5. Paginación */}
+                {meta && meta.last_page > 1 && (
+                    <div className="flex items-center justify-between bg-white px-6 py-4 rounded-3xl border border-slate-200 shadow-sm">
+                        <p className="text-sm text-slate-500 font-medium">
+                            Mostrando <span className="font-bold text-slate-700">{(meta.current_page - 1) * meta.per_page + 1}</span> a{' '}
+                            <span className="font-bold text-slate-700">
+                                {Math.min(meta.current_page * meta.per_page, meta.total)}
+                            </span>{' '}
+                            de <span className="font-bold text-slate-700">{meta.total}</span> registros
+                        </p>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={() => router.get('/auditoria', { ...localFilters, page: meta.current_page - 1 }, { preserveState: true, replace: true })}
+                                disabled={meta.current_page <= 1}
+                                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
                             >
-                                <option value="">Todas</option>
-                                {acciones.map(accion => (
-                                    <option key={accion} value={accion}>{accion}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Entidad</label>
-                            <select
-                                value={filters.entidad}
-                                onChange={(e) => handleFilterChange('entidad', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            >
-                                <option value="">Todas</option>
-                                {entidades.map(entidad => (
-                                    <option key={entidad} value={entidad}>{entidad}</option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Desde</label>
-                            <input
-                                type="date"
-                                value={filters.desde}
-                                onChange={(e) => handleFilterChange('desde', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Hasta</label>
-                            <input
-                                type="date"
-                                value={filters.hasta}
-                                onChange={(e) => handleFilterChange('hasta', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-1">Buscar</label>
-                            <input
-                                type="text"
-                                value={filters.search}
-                                onChange={(e) => handleFilterChange('search', e.target.value)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-indigo-500"
-                                placeholder="Buscar..."
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Tabla de Logs */}
-                <div className="bg-white rounded-lg shadow overflow-hidden">
-                    <div className="px-6 py-4 border-b border-gray-200">
-                        <h2 className="text-lg font-semibold text-gray-900">Registro de Actividad</h2>
-                    </div>
-                    
-                    {loading ? (
-                        <div className="px-6 py-12 text-center">
-                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-indigo-600"></div>
-                            <p className="mt-2 text-gray-500">Cargando...</p>
-                        </div>
-                    ) : (
-                        <div className="overflow-x-auto">
-                            <table className="min-w-full divide-y divide-gray-200">
-                                <thead className="bg-gray-50">
-                                    <tr>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Fecha/Hora
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Usuario
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Acción
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Entidad
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            IP Origen
-                                        </th>
-                                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                                            Detalles
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody className="bg-white divide-y divide-gray-200">
-                                    {logs.map((log) => (
-                                        <tr key={log.ID_Log} className="hover:bg-gray-50">
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {log.Creacion_Log ? new Date(log.Creacion_Log).toLocaleString('es-CO') : 'N/A'}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {log.usuario?.Nombre_Usuario || `Usuario ${log.ID_Usuario}`}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap">
-                                                <span className={`inline-flex px-2 py-1 text-xs font-semibold rounded-full ${getAccionColor(log.Accion_Log)}`}>
-                                                    {log.Accion_Log}
-                                                </span>
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
-                                                {log.Entidad_Log} #{log.Entidad_ID_Log}
-                                            </td>
-                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                                {log.IP_Origen_Log}
-                                            </td>
-                                            <td className="px-6 py-4 text-sm text-gray-900">
-                                                <button
-                                                    onClick={() => alert(JSON.stringify(log.Detalle_Log, null, 2))}
-                                                    className="text-indigo-600 hover:text-indigo-900 font-medium"
-                                                >
-                                                    Ver detalles
-                                                </button>
-                                            </td>
-                                        </tr>
+                                ← Anterior
+                            </button>
+                            <div className="flex items-center gap-1">
+                                {Array.from({ length: meta.last_page }, (_, i) => i + 1)
+                                    .filter(p => p === 1 || p === meta.last_page || Math.abs(p - meta.current_page) <= 1)
+                                    .map((p, idx, arr) => (
+                                        <span key={p} className="flex items-center">
+                                            {idx > 0 && arr[idx - 1] !== p - 1 && (
+                                                <span className="px-1 text-slate-300 font-bold">...</span>
+                                            )}
+                                            <button
+                                                onClick={() => router.get('/auditoria', { ...localFilters, page: p }, { preserveState: true, replace: true })}
+                                                className={`w-9 h-9 rounded-xl text-xs font-bold transition-all ${
+                                                    p === meta.current_page
+                                                        ? 'bg-[#00236f] text-white shadow-md'
+                                                        : 'text-slate-500 hover:bg-slate-100'
+                                                }`}
+                                            >
+                                                {p}
+                                            </button>
+                                        </span>
                                     ))}
-                                </tbody>
-                            </table>
+                            </div>
+                            <button
+                                onClick={() => router.get('/auditoria', { ...localFilters, page: meta.current_page + 1 }, { preserveState: true, replace: true })}
+                                disabled={meta.current_page >= meta.last_page}
+                                className="px-4 py-2 bg-slate-50 border border-slate-200 rounded-xl text-sm font-bold text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:cursor-not-allowed transition-all"
+                            >
+                                Siguiente →
+                            </button>
                         </div>
-                    )}
+                    </div>
+                )}
 
-                    {/* Paginación */}
-                    <div className="px-6 py-4 border-t border-gray-200">
-                        <div className="flex items-center justify-between">
-                            <div className="text-sm text-gray-700">
-                                Mostrando {logs.length} de {pagination.total} resultados
-                            </div>
-                            <div className="flex space-x-2">
-                                <button
-                                    onClick={() => handleFilterChange('page', String(Math.max(1, pagination.current_page - 1)))}
-                                    disabled={pagination.current_page === 1}
-                                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50"
-                                >
-                                    Anterior
-                                </button>
-                                <span className="px-3 py-1">
-                                    Página {pagination.current_page}
-                                </span>
-                                <button
-                                    onClick={() => handleFilterChange('page', String(pagination.current_page + 1))}
-                                    disabled={logs.length < pagination.per_page}
-                                    className="px-3 py-1 border border-gray-300 rounded-md disabled:opacity-50"
-                                >
-                                    Siguiente
+            </div>
+
+            {/* MODAL DE INSPECCIÓN (Sustituye al alert) */}
+            {viewingLog && (
+                <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm">
+                    <div className="bg-white w-full max-w-2xl rounded-[2.5rem] shadow-2xl overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-8">
+                            <div className="flex justify-between items-start mb-6">
+                                <div>
+                                    <h3 className="text-2xl font-black text-slate-900 leading-tight">Detalle de Operación</h3>
+                                    <p className="text-slate-500 text-sm font-medium">Log de Auditoría ID: #{viewingLog.ID_Log}</p>
+                                </div>
+                                <button onClick={() => setViewingLog(null)} className="p-2 hover:bg-slate-100 rounded-full transition-colors">
+                                    <span className="material-symbols-outlined text-slate-400">close</span>
                                 </button>
                             </div>
+                            
+                            <div className="bg-slate-950 p-6 rounded-3xl overflow-x-auto max-h-[400px] custom-scrollbar">
+                                <pre className="text-xs leading-relaxed">
+                                    <code className="text-blue-300">
+                                        {JSON.stringify(viewingLog.Detalle_Log, null, 4)}
+                                    </code>
+                                </pre>
+                            </div>
+                        </div>
+                        <div className="p-6 bg-slate-50 flex justify-end">
+                            <button 
+                                onClick={() => setViewingLog(null)}
+                                className="px-8 py-3 bg-slate-900 text-white rounded-2xl font-bold shadow-lg"
+                            >
+                                CERRAR VISOR
+                            </button>
                         </div>
                     </div>
                 </div>
-            </div>
+            )}
         </MainLayout>
     );
 }

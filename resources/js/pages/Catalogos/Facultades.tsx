@@ -1,4 +1,4 @@
-import { Head, router, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
 
@@ -29,174 +29,117 @@ interface Props {
     sedes: { ID_Sede: number; Nombre_Sede: string }[];
 }
 
-export default function Facultades({ facultades, sedes }: Props) {
+export default function Facultades({ facultades }: Props) {
     const { url } = usePage();
-    const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
-
+    const currentParams = new URLSearchParams(url.split('?')[1] || '');
+    const currentSearch = currentParams.get('search') || '';
     const sortBy = facultades.meta.sort_by || 'ID_Facultad';
     const sortOrder = facultades.meta.sort_order || 'asc';
 
     const columns = [
-        { key: 'Codigo_Facultad', label: 'Código', sortable: true },
-        { key: 'ID_Facultad', label: 'ID', sortable: true },
-        { key: 'Nombre_Facultad', label: 'Nombre', sortable: true },
-        {
-            key: 'Nombre_Sede',
-            label: 'Sede',
-            render: (value: string | null) => value || '-',
+        { 
+            key: 'Nombre_Facultad', 
+            label: 'Facultad / Identificación', 
+            sortable: true,
+            render: (value: string, row: Facultad) => (
+                <div className="flex flex-col">
+                    <span className="font-bold text-slate-800 leading-tight">{value}</span>
+                    <span className="text-[10px] font-mono text-blue-600 font-bold uppercase tracking-tighter">
+                        CÓD: {row.Codigo_Facultad || 'N/A'} • ID: {row.ID_Facultad}
+                    </span>
+                </div>
+            )
         },
-        { key: 'Campus_Facultad', label: 'Campus' },
-        { key: 'Conmutador_Facultad', label: 'Conmutador' },
-        { key: 'Extension_Facultad', label: 'Extensión' },
+        { 
+            key: 'Nombre_Sede', 
+            label: 'Sede Institucional', 
+            sortable: true,
+            render: (value: string | null) => (
+                <div className="flex items-center gap-2 text-slate-600">
+                    <span className="material-symbols-outlined !text-sm text-slate-400">location_city</span>
+                    <span className="text-sm font-medium">{value || '—'}</span>
+                </div>
+            )
+        },
+        { 
+            key: 'Campus_Facultad', 
+            label: 'Campus / Ubicación',
+            render: (value: string | null) => (
+                <div className="flex flex-col">
+                    <span className="text-xs text-slate-700">{value || 'No asignado'}</span>
+                </div>
+            )
+        },
+        {
+            key: 'Url_Facultad',
+            label: 'Enlace',
+            render: (value: string | null) => value ? (
+                <a href={value} target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:text-blue-800 transition-colors">
+                    <span className="material-symbols-outlined !text-xl">language</span>
+                </a>
+            ) : <span className="text-slate-300">—</span>
+        }
     ];
 
-    const handleSearch = (search: string, page: number = 1) => {
-        const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
-        params.set('sort_by', sortBy);
-        params.set('sort_order', sortOrder);
-
-        router.visit(`/facultades?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleRefresh = () => {
-        router.visit('/facultades', {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleSort = (column: string) => {
-        const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
-
-        const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
-        params.set('sort_by', column);
-        params.set('sort_order', newDirection);
-        params.set('page', '1');
-
-        router.visit(`/facultades?${params.toString()}`, {
-            preserveState: true,
-            preserveScroll: true,
-        });
-    };
-
-    const handleDelete = async (id: number) => {
-        if (!confirm('¿Está seguro de eliminar esta facultad?')) return;
-
-        await fetch(`/facultades/${id}`, {
-            method: 'DELETE',
-            headers: {
-                'Content-Type': 'application/json',
-                Accept: 'application/json',
-            },
-            credentials: 'same-origin',
-        }).then(() => handleRefresh());
+    const handleDelete = (id: number) => {
+        if (confirm('¿Estás seguro de eliminar esta facultad? Todos los programas asociados podrían verse afectados.')) {
+            router.delete(`/facultades/${id}`, { preserveScroll: true });
+        }
     };
 
     const actions = (row: Facultad) => (
-        <div className="action-buttons">
-            <button
-                className="btn-edit"
-                onClick={() =>
-                    router.visit(`/facultades/${row.ID_Facultad}/edit`)
-                }
-                title="Editar"
+        <div className="flex justify-end gap-1">
+            <Link
+                href={`/facultades/${row.ID_Facultad}/edit`}
+                className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
-                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z" />
-                </svg>
-            </button>
+                <span className="material-symbols-outlined !text-xl">edit_note</span>
+            </Link>
             <button
-                className="btn-delete"
                 onClick={() => handleDelete(row.ID_Facultad)}
-                title="Eliminar"
+                className="p-2 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-all"
             >
-                <svg
-                    xmlns="http://www.w3.org/2000/svg"
-                    width="16"
-                    height="16"
-                    viewBox="0 0 24 24"
-                    fill="none"
-                    stroke="currentColor"
-                    strokeWidth="2"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                >
-                    <polyline points="3 6 5 6 21 6" />
-                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2" />
-                    <line x1="10" y1="11" x2="10" y2="17" />
-                    <line x1="14" y1="11" x2="14" y2="17" />
-                </svg>
+                <span className="material-symbols-outlined !text-xl">delete_sweep</span>
             </button>
         </div>
     );
 
     return (
         <MainLayout>
-            <Head title="Facultades - Mallas UNAL" />
+            <Head title="Facultades - UNAL" />
 
-            <div className="page-header">
-                <div className="page-title">
-                    <h1>Gestión de Facultades</h1>
-                    <p className="page-subtitle">
-                        Administra las facultades de la Universidad Nacional de
-                        Colombia
-                    </p>
-                </div>
-                <div className="page-actions">
-                    <button
-                        className="btn-primary"
-                        onClick={() => router.visit('/facultades/create')}
+            <div className="max-w-[1400px] mx-auto space-y-8 pb-10">
+                <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
+                    <div>
+                        <div className="flex items-center gap-2 text-slate-500 text-xs font-bold uppercase tracking-widest mb-1">
+                            <span className="material-symbols-outlined !text-sm">account_balance</span>
+                            Estructura Orgánica
+                        </div>
+                        <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">Facultades</h1>
+                        <p className="text-slate-500 mt-2">Gestión de unidades académicas y administrativas por sede.</p>
+                    </div>
+                    <Link
+                        href="/facultades/create"
+                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold shadow-lg shadow-blue-900/20 hover:scale-[1.02] transition-all"
                     >
-                        <svg
-                            xmlns="http://www.w3.org/2000/svg"
-                            width="16"
-                            height="16"
-                            viewBox="0 0 24 24"
-                            fill="none"
-                            stroke="currentColor"
-                            strokeWidth="2"
-                            strokeLinecap="round"
-                            strokeLinejoin="round"
-                        >
-                            <line x1="12" y1="5" x2="12" y2="19" />
-                            <line x1="5" y1="12" x2="19" y2="12" />
-                        </svg>
+                        <span className="material-symbols-outlined">add_business</span>
                         Nueva Facultad
-                    </button>
+                    </Link>
                 </div>
-            </div>
 
-            <DataTable
-                columns={columns}
-                data={facultades.data}
-                meta={facultades.meta}
-                sortBy={sortBy}
-                sortOrder={sortOrder}
-                searchValue={currentSearch}
-                onSort={handleSort}
-                searchPlaceholder="Buscar por nombre..."
-                onSearch={handleSearch}
-                onRefresh={handleRefresh}
-                actions={actions}
-                emptyMessage="No hay facultades registradas"
-            />
+                <DataTable
+                    columns={columns}
+                    data={facultades.data}
+                    meta={facultades.meta}
+                    sortBy={sortBy}
+                    sortOrder={sortOrder}
+                    searchValue={currentSearch}
+                    onSort={(col, dir) => router.get('/facultades', { search: currentSearch, sort_by: col, sort_order: dir }, { preserveState: true })}
+                    onSearch={(search, page) => router.get('/facultades', { search, page, sort_by: sortBy, sort_order: sortOrder }, { preserveState: true })}
+                    onRefresh={() => router.visit('/facultades')}
+                    actions={actions}
+                />
+            </div>
         </MainLayout>
     );
 }

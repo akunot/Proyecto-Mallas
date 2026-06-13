@@ -338,7 +338,14 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('agrupaciones');
-    Route::inertia('/agrupaciones/create', 'Catalogos/AgrupacionesForm')->name('agrupaciones.create');
+    Route::get('/agrupaciones/create', function () {
+        $programas = \App\Models\Programa::select('ID_Programa', 'Nombre_Programa')->get();
+        $componentes = \App\Models\Componente::select('ID_Componente', 'Nombre_Componente')->get();
+        return Inertia::render('Catalogos/AgrupacionesForm', [
+            'programas' => $programas,
+            'componentes' => $componentes,
+        ]);
+    })->name('agrupaciones.create');
     Route::get('/agrupaciones/{id}/edit', [AgrupacionController::class, 'edit']);
     Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
     Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
@@ -464,11 +471,36 @@ Route::middleware(['auth'])->group(function () {
     })->name('mallas.visualizer');
     
     // Auditoría y Aprobación (módulos nuevos)
-    Route::get('/auditoria', function () {
-        // Obtener logs iniciales
-        $logs = \App\Models\LogActividad::with('usuario')
-            ->orderBy('Creacion_Log', 'desc')
-            ->paginate(20);
+    Route::get('/auditoria', function (\Illuminate\Http\Request $request) {
+        $query = \App\Models\LogActividad::with('usuario');
+
+        // Aplicar filtros desde la URL
+        if ($request->filled('search')) {
+            $search = $request->search;
+            $query->where(function ($q) use ($search) {
+                $q->where('Detalle_Log', 'like', '%' . $search . '%')
+                  ->orWhere('IP_Origen_Log', 'like', '%' . $search . '%');
+            });
+        }
+        if ($request->filled('accion')) {
+            $query->where('Accion_Log', $request->accion);
+        }
+        if ($request->filled('entidad')) {
+            $query->where('Entidad_Log', $request->entidad);
+        }
+        if ($request->filled('usuario_id')) {
+            $query->where('ID_Usuario', $request->usuario_id);
+        }
+        if ($request->filled('desde')) {
+            $query->whereDate('Creacion_Log', '>=', $request->desde);
+        }
+        if ($request->filled('hasta')) {
+            $query->whereDate('Creacion_Log', '<=', $request->hasta);
+        }
+
+        $logs = $query->orderBy('Creacion_Log', 'desc')
+            ->paginate(20)
+            ->withQueryString();
         
         // Obtener estadísticas
         $totalLogs = \App\Models\LogActividad::count();
@@ -507,6 +539,12 @@ Route::middleware(['auth'])->group(function () {
         
         return Inertia::render('Auditoria/AuditoriaPage', [
             'logs' => $logs->items(),
+            'meta' => [
+                'current_page' => $logs->currentPage(),
+                'total' => $logs->total(),
+                'per_page' => $logs->perPage(),
+                'last_page' => $logs->lastPage(),
+            ],
             'estadisticas' => [
                 'total_logs' => $totalLogs,
                 'por_accion' => $porAccion,
@@ -515,6 +553,7 @@ Route::middleware(['auth'])->group(function () {
             ],
             'acciones' => $acciones,
             'entidades' => $entidades,
+            'filters' => $request->only(['usuario_id', 'accion', 'entidad', 'desde', 'hasta', 'search']),
         ]);
     })->name('auditoria');
     

@@ -84,6 +84,7 @@ interface Agrupacion {
 interface Props {
     malla: {
         ID_Malla: number;
+        Codigo_Plan?: string;
         programa: {
             Nombre_Programa: string;
             ID_Programa: number;
@@ -118,9 +119,7 @@ export default function MallaGrafica({ malla }: Props) {
     const [searchOptativas, setSearchOptativas]       = useState('');
     const [expandedOptativa, setExpandedOptativa]     = useState<number | null>(null);
 
-    // Drag-and-drop state: draggingKey = "asig-{id}" | "slot-{id}"
     const [draggingKey, setDraggingKey] = useState<string | null>(null);
-    // dragOver: which column + where to insert (beforeKey=null → append at end)
     const [dragOver, setDragOver]       = useState<{ sem: number; beforeKey: string | null } | null>(null);
 
     const fetchElectivas = async () => {
@@ -174,7 +173,6 @@ export default function MallaGrafica({ malla }: Props) {
         }
     };
 
-    // Encontrar la asignatura seleccionada para obtener sus requisitos rápidamente
     const selectedAsigData = useMemo(() => {
         if (!selectedAsig) return null;
         for (const agrup of malla.agrupaciones) {
@@ -184,7 +182,6 @@ export default function MallaGrafica({ malla }: Props) {
         return null;
     }, [selectedAsig, malla]);
 
-    // Construir el grid inicial (asignaturas + slots por semestre)
     const buildGrid = useCallback((src: Props['malla']): Record<number, GridItem[]> => {
         const g: Record<number, GridItem[]> = {};
         src.agrupaciones.forEach(agrup => {
@@ -220,7 +217,6 @@ export default function MallaGrafica({ malla }: Props) {
         return Array.from({ length: numSemestres }, (_, i) => i + 1);
     }, [numSemestres]);
 
-    // Drag-and-drop handlers
     const handleDragStart = (e: React.DragEvent, key: string) => {
         setDraggingKey(key);
         e.dataTransfer.effectAllowed = 'move';
@@ -231,7 +227,6 @@ export default function MallaGrafica({ malla }: Props) {
         setDragOver(null);
     };
 
-    // Called when dragging over a specific item — detects upper/lower half for insert position
     const handleItemDragOver = (e: React.DragEvent, sem: number, key: string) => {
         e.preventDefault();
         e.stopPropagation();
@@ -254,7 +249,6 @@ export default function MallaGrafica({ malla }: Props) {
         const isSlotKey = draggingKey.startsWith('slot-');
         const dragId    = parseInt(draggingKey.split('-')[1]);
 
-        // Locate the dragged item
         let dragItem: GridItem | null = null;
         let fromSem = -1;
         for (const [semStr, items] of Object.entries(semestres)) {
@@ -267,25 +261,21 @@ export default function MallaGrafica({ malla }: Props) {
         }
         if (!dragItem) { setDraggingKey(null); setDragOver(null); return; }
 
-        // Build updated grid
         const newGrid: Record<number, GridItem[]> = {};
         for (const [s, items] of Object.entries(semestres)) newGrid[Number(s)] = [...items];
         if (!newGrid[toSem]) newGrid[toSem] = [];
 
-        // Remove from source
         newGrid[fromSem] = newGrid[fromSem].filter(i =>
             isSlotKey
                 ? !i.isSlot || (i as Slot).ID_Slot          !== dragId
                 : i.isSlot  || (i as Asignatura).ID_Asignatura !== dragId
         );
 
-        // Update the semestre field on the dragged item
         const updatedItem: GridItem = isSlotKey
             ? { ...(dragItem as Slot & { isSlot: true; ID_Componente: number }), Semestre: toSem }
             : { ...(dragItem as Asignatura & { isSlot: false; ID_Componente: number }),
                 pivot: { ...(dragItem as Asignatura).pivot, Semestre_Sugerido: toSem } };
 
-        // Insert at the tracked position (beforeKey from dragOver)
         const insertBeforeKey = dragOver?.sem === toSem ? dragOver.beforeKey : null;
         if (insertBeforeKey === null) {
             newGrid[toSem] = [...newGrid[toSem], updatedItem];
@@ -302,7 +292,6 @@ export default function MallaGrafica({ malla }: Props) {
             }
         }
 
-        // Recalculate Orden for all affected columns
         const recalc = (items: GridItem[]): GridItem[] =>
             items.map((item, idx) =>
                 item.isSlot
@@ -316,7 +305,6 @@ export default function MallaGrafica({ malla }: Props) {
         setDraggingKey(null);
         setDragOver(null);
 
-        // Persist changes to both asignaturas and slots
         const affectedSems = fromSem === toSem ? [fromSem] : [fromSem, toSem];
         const cambios = affectedSems.flatMap(s =>
             (newGrid[s] || []).filter(i => !i.isSlot).map(item => ({
@@ -340,14 +328,13 @@ export default function MallaGrafica({ malla }: Props) {
         });
     };
 
-    // Colores por componente (basado en IDs comunes o nombres)
     const getComponentColor = (id: number) => {
         const colors: Record<number, string> = {
-            1: 'bg-green-100 border-green-500', // Fundamentación
-            2: 'bg-orange-100 border-orange-500', // Disciplinar
-            3: 'bg-blue-100 border-blue-500',    // Libre Elección
-            4: 'bg-yellow-100 border-yellow-500', // Nivelatorio
-            5: 'bg-red-100 border-red-500',       // Idiomas
+            1: 'bg-green-100 border-green-500',
+            2: 'bg-orange-100 border-orange-500',
+            3: 'bg-blue-100 border-blue-500',
+            4: 'bg-yellow-100 border-yellow-500',
+            5: 'bg-red-100 border-red-500',
         };
         return colors[id] || 'bg-gray-100 border-gray-400';
     };
@@ -357,8 +344,6 @@ export default function MallaGrafica({ malla }: Props) {
         if (type === 'any' && selectedAsig == asigId) return true;
 
         const reqs = selectedAsigData.requisitos || [];
-
-        // Verificar si la materia actual (asigId) es un requisito de la seleccionada
         const matchesReq = reqs.some(r => {
             if (r.ID_Asignatura_Requerida != asigId) return false;
             const reqType = r.Tipo_Requisito?.toLowerCase() || '';
@@ -366,43 +351,89 @@ export default function MallaGrafica({ malla }: Props) {
             if (type === 'co') return reqType.includes('co');
             return true;
         });
-
         if (matchesReq) return true;
-
         return false;
     };
 
     return (
         <Layout>
-            <Head title={`Visualización - ${malla.programa.Nombre_Programa}`} />
+            <Head title={`Diseño - ${malla.programa.Nombre_Programa}`} />
 
-            <div className="py-6 px-4 sm:px-6 lg:px-8 max-w-[1600px] mx-auto">
-                <div className="flex justify-between items-center mb-6">
-                    <div>
-                        <Link href="/mallas" className="text-blue-600 hover:underline text-sm">
-                            &larr; Volver
+            <div className="min-h-screen bg-[#f8fafc]">
+                {/* Header Glassmorphism — Con Hide on Scroll */}
+                <div className="bg-white border-b border-slate-200 px-6 py-3.5 flex items-center justify-between gap-4">
+                    {/* Left Section */}
+                    <div className="flex items-center gap-3">
+                        {/* Back Button */}
+                        <Link 
+                            href={`/mallas/${malla.ID_Malla}`} 
+                            className="w-8 h-8 rounded-full border border-slate-200 bg-slate-50 flex items-center justify-center text-slate-500 hover:bg-slate-100 transition-colors flex-shrink-0"
+                        >
+                            <span className="material-symbols-outlined" style={{ fontSize: '16px' }}>arrow_back</span>
                         </Link>
-                        <h1 className="text-2xl font-bold text-gray-900">Malla Curricular: {malla.programa.Nombre_Programa}</h1>
+
+                        {/* Vertical Divider */}
+                        <div className="w-px h-7 bg-slate-200" />
+
+                        {/* Program Info */}
+                        <div>
+                            <h1 className="text-[15px] font-medium text-slate-900 leading-tight">
+                                {malla.programa.Nombre_Programa}
+                            </h1>
+                            <span className="inline-flex items-center gap-1.5 mt-1.5 text-[11px] font-medium text-blue-700 bg-blue-50 border border-blue-100 rounded-full px-2.5 py-0.5">
+                                <span className="material-symbols-outlined" style={{ fontSize: '11px' }}>grid_view</span>
+                                Plan {malla.Codigo_Plan || '—'}
+                            </span>
+                        </div>
                     </div>
-                    <div className="flex gap-4">
-                         <div className="flex items-center gap-2 text-xs">
-                            <span className="w-3 h-3 bg-green-200 border border-green-500 block"></span> Fundamentación
-                            <span className="w-3 h-3 bg-orange-200 border border-orange-500 block ml-2"></span> Disciplinar
-                            <span className="w-3 h-3 bg-blue-200 border border-blue-500 block ml-2"></span> Libre Elección
-                         </div>
-                         <div className="flex items-center gap-2 text-xs border-l pl-4 border-gray-300">
-                            <span className="w-3 h-3 ring-2 ring-red-500 block"></span> Prerrequisito
-                            <span className="w-3 h-3 ring-2 ring-yellow-500 block ml-2"></span> Correquisito
-                         </div>
+
+                    {/* Right Section — Legend */}
+                    <div className="flex items-center gap-1.5 bg-slate-100 border border-slate-200 rounded-full px-3.5 py-1.5 shrink-0">
+                        {/* Fund. */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-green-600 flex-shrink-0" />
+                            <span className="text-[11px] font-medium text-slate-600">Fund.</span>
+                        </div>
+
+                        {/* Separator */}
+                        <span className="w-px h-3 bg-slate-300" />
+
+                        {/* Disc. */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-orange-600 flex-shrink-0" />
+                            <span className="text-[11px] font-medium text-slate-600">Disc.</span>
+                        </div>
+
+                        {/* Separator */}
+                        <span className="w-px h-3 bg-slate-300" />
+
+                        {/* Libre */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-blue-600 flex-shrink-0" />
+                            <span className="text-[11px] font-medium text-slate-600">Libre</span>
+                        </div>
+
+                        {/* Separator */}
+                        <span className="w-px h-3 bg-slate-300" />
+
+                        {/* Compl. */}
+                        <div className="flex items-center gap-1.5">
+                            <span className="w-2 h-2 rounded-full bg-amber-600 flex-shrink-0" />
+                            <span className="text-[11px] font-medium text-slate-600">Compl.</span>
+                        </div>
                     </div>
                 </div>
 
-                <div className="overflow-x-auto pb-8">
-                    <div className="flex gap-4 min-w-max">
+                {/* Canvas de Semestres */}
+                <div className="p-6 overflow-x-auto">
+                    <div className="flex gap-6 min-w-max">
                         {listaSemestres.map(sem => (
                             <div
                                 key={sem}
-                                className="flex-1 min-w-[150px] max-w-[180px]"
+                                className={[
+                                    'flex-1 min-w-[200px] max-w-[220px] bg-white/60 rounded-2xl p-3 border border-slate-200/80 transition-colors',
+                                    dragOver?.sem === sem ? 'bg-blue-50/50 border-blue-300' : '',
+                                ].join(' ')}
                                 onDragOver={e => {
                                     e.preventDefault();
                                     if (!dragOver || dragOver.sem !== sem) setDragOver({ sem, beforeKey: null });
@@ -412,10 +443,15 @@ export default function MallaGrafica({ malla }: Props) {
                                 }}
                                 onDrop={e => handleDrop(e, sem)}
                             >
-                                <div className={`text-white text-center py-2 rounded-t-lg font-bold mb-4 transition-colors ${dragOver?.sem === sem ? 'bg-blue-600' : 'bg-gray-800'}`}>
-                                    {sem === 0 ? 'OTRO' : sem === 1 ? 'I' : sem === 2 ? 'II' : sem === 3 ? 'III' : sem === 4 ? 'IV' : sem === 5 ? 'V' : sem === 6 ? 'VI' : sem === 7 ? 'VII' : sem === 8 ? 'VIII' : sem === 9 ? 'IX' : 'X'}
+                                <div className="flex items-center justify-between mb-4 px-1">
+                                    <span className="text-[11px] font-black text-slate-400 uppercase tracking-[2px]">
+                                        {sem === 0 ? 'Otros' : `Semestre ${sem}`}
+                                    </span>
+                                    <span className="text-[10px] font-bold text-slate-300 bg-slate-100 px-2 py-0.5 rounded">
+                                        {semestres[sem]?.length || 0}
+                                    </span>
                                 </div>
-                                <div className="space-y-2">
+                                <div className="space-y-3">
                                     {semestres[sem]?.map((item) => {
                                         const key           = itemKey(item);
                                         const showIndicator = dragOver?.sem === sem && dragOver?.beforeKey === key;
@@ -484,39 +520,46 @@ export default function MallaGrafica({ malla }: Props) {
                                                     onClick={() => setSelectedAsig(asig.ID_Asignatura === selectedAsig ? null : asig.ID_Asignatura)}
                                                     className={[
                                                         getComponentColor(asig.ID_Componente || 0),
-                                                        'border-l-4 p-2 shadow-sm cursor-grab active:cursor-grabbing transition-all duration-200',
+                                                        'border-l-4 rounded-xl p-2.5 shadow-sm cursor-grab active:cursor-grabbing transition-all duration-200',
                                                         'hover:shadow-md h-[120px] flex flex-col justify-between relative',
-                                                        active     ? 'ring-4 ring-blue-600 scale-105 z-20 shadow-xl' : '',
+                                                        active     ? 'ring-2 ring-blue-600 scale-[1.04] z-20 shadow-xl' : '',
                                                         isDragging ? 'opacity-40 scale-95' : '',
-                                                        selectedAsig && !active && !related && !isDragging ? 'opacity-30' : '',
-                                                        isPre ? 'ring-4 ring-red-500 z-10' : '',
-                                                        isCo  ? 'ring-4 ring-yellow-500 z-10' : '',
+                                                        selectedAsig && !active && !related && !isDragging ? 'opacity-40 grayscale-[0.5] scale-[0.98]' : '',
+                                                        isPre ? 'ring-2 ring-rose-500 bg-rose-50/30 z-10' : '',
+                                                        isCo  ? 'ring-2 ring-amber-500 bg-amber-50/30 z-10' : '',
                                                     ].join(' ')}
                                                 >
-                                                    <div className="flex justify-between text-[10px] font-bold text-gray-600">
-                                                        <span>{asig.Creditos_Asignatura}</span>
-                                                        <span>{asig.Horas_Presencial || 0}</span>
-                                                        <span>{asig.Horas_Estudiante || 0}</span>
-                                                    </div>
-                                                    <div className="text-center text-[11px] font-semibold leading-tight flex-grow flex items-center justify-center py-1">
-                                                        {asig.Nombre_Asignatura}
-                                                    </div>
-                                                    <div className="flex justify-between items-center mt-1 border-t border-gray-200 pt-1">
-                                                        <span className="text-[10px] text-gray-500">{asig.Codigo_Asignatura}</span>
+                                                    {/* Card Header */}
+                                                    <div className="flex justify-between items-center">
+                                                        <span className="text-[10px] font-black text-slate-400">CR: {asig.Creditos_Asignatura}</span>
                                                         <div className="flex gap-1">
-                                                            {asig.requisitos?.some(r => r.Tipo_Requisito?.toLowerCase().includes('pre')) && (
-                                                                <div className="w-3 h-3 bg-red-400 rounded-full flex items-center justify-center" title="Tiene prerrequisitos">
-                                                                    <span className="text-[8px] text-white">P</span>
+                                                            <span className="text-[9px] font-bold text-slate-300">P:{asig.Horas_Presencial || 0}</span>
+                                                            <span className="text-[9px] font-bold text-slate-300">I:{asig.Horas_Estudiante || 0}</span>
+                                                        </div>
+                                                    </div>
+                                                    {/* Course Name */}
+                                                    <div className="flex-1 flex items-center justify-center py-1">
+                                                        <h4 className="text-[11px] font-bold text-slate-800 text-center leading-tight line-clamp-3">
+                                                            {asig.Nombre_Asignatura}
+                                                        </h4>
+                                                    </div>
+                                                    {/* Card Footer */}
+                                                    <div className="flex justify-between items-center border-t border-slate-100 pt-1.5">
+                                                        <span className="text-[9px] font-mono font-bold text-slate-400">{asig.Codigo_Asignatura}</span>
+                                                        <div className="flex gap-1">
+                                                            {asig.requisitos?.some(r => r.Tipo_Requisito?.toLowerCase().includes('pre') || r.Tipo_Requisito?.toLowerCase() === 'opcional' || r.Tipo_Requisito?.toLowerCase().includes('obligatorio')) && (
+                                                                <div className="w-3.5 h-3.5 bg-rose-500 rounded-full flex items-center justify-center ring-2 ring-white" title="Tiene prerrequisitos">
+                                                                    <span className="text-[8px] text-white font-bold">P</span>
                                                                 </div>
                                                             )}
                                                             {asig.requisitos?.some(r => r.Tipo_Requisito?.toLowerCase().includes('co')) && (
-                                                                <div className="w-3 h-3 bg-yellow-400 rounded-full flex items-center justify-center" title="Tiene correquisitos">
+                                                                <div className="w-3.5 h-3.5 bg-amber-400 rounded-full flex items-center justify-center ring-2 ring-white" title="Tiene correquisitos">
                                                                     <span className="text-[8px] text-white font-bold">C</span>
                                                                 </div>
                                                             )}
                                                             {asig.requisitos?.some(r => r.Tipo_Requisito?.toLowerCase().includes('credito')) && (
-                                                                <div className="w-3 h-3 bg-blue-400 rounded-full flex items-center justify-center" title="Tiene requisitos de créditos">
-                                                                    <span className="text-[8px] text-white font-bold">Cr</span>
+                                                                <div className="w-3.5 h-3.5 bg-blue-400 rounded-full flex items-center justify-center ring-2 ring-white" title="Req. créditos">
+                                                                    <span className="text-[7px] text-white font-bold">Cr</span>
                                                                 </div>
                                                             )}
                                                         </div>
@@ -525,7 +568,6 @@ export default function MallaGrafica({ malla }: Props) {
                                             </React.Fragment>
                                         );
                                     })}
-                                    {/* Drop indicator at end of column (append position) */}
                                     {dragOver?.sem === sem && dragOver?.beforeKey === null && draggingKey && (
                                         <div className="h-1 bg-blue-500 rounded-full" />
                                     )}
@@ -535,41 +577,63 @@ export default function MallaGrafica({ malla }: Props) {
                     </div>
                 </div>
 
-                {selectedAsig && (
-                    <div className="mt-6 bg-white p-4 rounded-lg shadow-lg border border-gray-200">
-                        <h4 className="font-bold text-lg mb-2">Detalles de la Asignatura</h4>
-                        {(() => {
-                            const asig = malla.agrupaciones.flatMap(a => a.asignaturas).find(a => a.ID_Asignatura == selectedAsig);
-                            return (
-                                <>
-                                    <p><strong>{asig?.Nombre_Asignatura}</strong> ({asig?.Codigo_Asignatura})</p>
-                                    <p className="text-sm">Créditos: {asig?.Creditos_Asignatura}</p>
-                                    {asig?.requisitos && asig.requisitos.length > 0 ? (
-                                        <div className="mt-2">
-                                            <p className="text-sm font-bold text-red-600">Prerrequisitos / Correquisitos:</p>
-                                            <ul className="list-disc list-inside text-sm">
-                                                {asig.requisitos.map((r, idx) => (
-                                                    <li key={idx}>
-                                                        {r.ID_Asignatura_Requerida ? (
-                                                            <>
-                                                                {r.asignatura_requerida?.Nombre_Asignatura || 'Materia'} ({r.asignatura_requerida?.Codigo_Asignatura || 'N/A'})
-                                                            </>
-                                                        ) : (
-                                                            <span className="font-medium text-blue-700">
-                                                                {r.Descripcion_Requisito || `${r.Valor_Creditos} créditos requeridos`}
-                                                            </span>
-                                                        )}
-                                                        {' '}- <span className="italic text-gray-500">{formatTipoRequisito(r.Tipo_Requisito)}</span>
-                                                    </li>
-                                                ))}
-                                            </ul>
-                                        </div>
-                                    ) : (
-                                        <p className="text-sm text-gray-500 mt-2">No tiene requisitos registrados.</p>
-                                    )}
-                                </>
-                            );
-                        })()}
+                {/* Panel de Detalles — Side Drawer */}
+                {selectedAsig && selectedAsigData && (
+                    <div className="fixed right-6 bottom-6 w-80 bg-white rounded-3xl shadow-2xl border border-slate-200 z-[60] overflow-hidden animate-in slide-in-from-right duration-300">
+                        <div className="p-5 bg-slate-900 text-white flex justify-between items-start">
+                            <div>
+                                <h4 className="font-bold text-sm leading-tight">{selectedAsigData.Nombre_Asignatura}</h4>
+                                <p className="text-[10px] text-slate-400 mt-1 font-mono uppercase">{selectedAsigData.Codigo_Asignatura}</p>
+                            </div>
+                            <button onClick={() => setSelectedAsig(null)} className="text-slate-400 hover:text-white ml-3 shrink-0">
+                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                </svg>
+                            </button>
+                        </div>
+                        <div className="p-5 space-y-4">
+                            <div className="grid grid-cols-3 gap-2">
+                                <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block">Créditos</span>
+                                    <p className="text-sm font-black text-slate-800">{selectedAsigData.Creditos_Asignatura}</p>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block">Presencial</span>
+                                    <p className="text-sm font-black text-slate-800">{selectedAsigData.Horas_Presencial}</p>
+                                </div>
+                                <div className="bg-slate-50 p-2 rounded-xl border border-slate-100 text-center">
+                                    <span className="text-[9px] font-bold text-slate-400 uppercase block">Semestre</span>
+                                    <p className="text-sm font-black text-slate-800">#{selectedAsigData.pivot.Semestre_Sugerido}</p>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h5 className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2">Requisitos</h5>
+                                {selectedAsigData.requisitos && selectedAsigData.requisitos.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {selectedAsigData.requisitos.map((req, i) => {
+                                            const t = (req.Tipo_Requisito ?? '').toLowerCase();
+                                            const isPre = t.includes('pre') || t.includes('obligatorio') || t === 'opcional';
+                                            return (
+                                                <li key={i} className="flex items-start gap-2 text-xs bg-slate-50 p-2 rounded-lg border border-slate-100">
+                                                    <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${isPre ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
+                                                        {isPre ? 'PRE' : 'CO'}
+                                                    </span>
+                                                    <span className="font-medium text-slate-700">
+                                                        {req.asignatura_requerida
+                                                            ? `${req.asignatura_requerida.Nombre_Asignatura} (${req.asignatura_requerida.Codigo_Asignatura})`
+                                                            : req.Descripcion_Requisito || (req.Valor_Creditos ? `${req.Valor_Creditos} créditos` : '—')
+                                                        }
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                ) : (
+                                    <p className="text-xs text-slate-400 italic">Sin requisitos registrados.</p>
+                                )}
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
@@ -585,7 +649,6 @@ export default function MallaGrafica({ malla }: Props) {
                 return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
-                        {/* Header */}
                         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
                             <div>
                                 <h2 className="text-base font-semibold text-gray-900">Catálogo de Libre Elección</h2>
@@ -601,7 +664,6 @@ export default function MallaGrafica({ malla }: Props) {
                             </button>
                         </div>
 
-                        {/* Search bar */}
                         {!loadingElectivas && !errorElectivas && electivas.length > 0 && (
                             <div className="px-6 pt-4 pb-2 shrink-0">
                                 <div className="relative">
@@ -629,7 +691,6 @@ export default function MallaGrafica({ malla }: Props) {
                             </div>
                         )}
 
-                        {/* Body */}
                         <div className="overflow-y-auto px-6 py-4 flex-1">
                             {loadingElectivas ? (
                                 <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
@@ -637,17 +698,11 @@ export default function MallaGrafica({ malla }: Props) {
                                     <span className="text-sm">Cargando catálogo…</span>
                                 </div>
                             ) : errorElectivas ? (
-                                <p className="py-10 text-center text-sm text-red-500">
-                                    No se pudieron cargar las electivas. Intenta de nuevo.
-                                </p>
+                                <p className="py-10 text-center text-sm text-red-500">No se pudieron cargar las electivas. Intenta de nuevo.</p>
                             ) : electivas.length === 0 ? (
-                                <p className="py-10 text-center text-sm text-gray-500">
-                                    No hay electivas registradas.
-                                </p>
+                                <p className="py-10 text-center text-sm text-gray-500">No hay electivas registradas.</p>
                             ) : filtered.length === 0 ? (
-                                <p className="py-10 text-center text-sm text-gray-500">
-                                    Sin resultados para <span className="font-medium">"{searchElectivas}"</span>.
-                                </p>
+                                <p className="py-10 text-center text-sm text-gray-500">Sin resultados para <span className="font-medium">"{searchElectivas}"</span>.</p>
                             ) : (
                                 <table className="min-w-full text-sm">
                                     <thead>
@@ -670,19 +725,11 @@ export default function MallaGrafica({ malla }: Props) {
                             )}
                         </div>
 
-                        {/* Footer */}
                         <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
                             {!loadingElectivas && !errorElectivas && electivas.length > 0 && (
-                                <span className="text-xs text-gray-400">
-                                    {q ? `${filtered.length} de ${electivas.length}` : electivas.length} materias
-                                </span>
+                                <span className="text-xs text-gray-400">{q ? `${filtered.length} de ${electivas.length}` : electivas.length} materias</span>
                             )}
-                            <button
-                                onClick={() => setShowElectivasModal(false)}
-                                className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cerrar
-                            </button>
+                            <button onClick={() => setShowElectivasModal(false)} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
                         </div>
                     </div>
                 </div>
@@ -707,7 +754,6 @@ export default function MallaGrafica({ malla }: Props) {
                 return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
-                        {/* Header */}
                         <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
                             <div>
                                 <h2 className="text-base font-semibold text-gray-900">Catálogo de Optativas</h2>
@@ -721,10 +767,7 @@ export default function MallaGrafica({ malla }: Props) {
                                 )}
                             </div>
                             <button
-                                onClick={() => {
-                                    setShowOptativasModal(false);
-                                    setSelectedOptativaSlot(null);
-                                }}
+                                onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }}
                                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                             >
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -733,7 +776,6 @@ export default function MallaGrafica({ malla }: Props) {
                             </button>
                         </div>
 
-                        {/* Search */}
                         {!loadingOptativas && !errorOptativas && optativas.length > 0 && (
                             <div className="px-6 pt-4 pb-2 shrink-0">
                                 <div className="relative">
@@ -748,10 +790,7 @@ export default function MallaGrafica({ malla }: Props) {
                                         className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-800 placeholder-gray-400 focus:border-orange-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
                                     />
                                     {searchOptativas && (
-                                        <button
-                                            onClick={() => setSearchOptativas('')}
-                                            className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                        >
+                                        <button onClick={() => setSearchOptativas('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
                                             <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                             </svg>
@@ -761,7 +800,6 @@ export default function MallaGrafica({ malla }: Props) {
                             </div>
                         )}
 
-                        {/* Body */}
                         <div className="overflow-y-auto px-6 py-4 flex-1">
                             {loadingOptativas ? (
                                 <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
@@ -769,17 +807,11 @@ export default function MallaGrafica({ malla }: Props) {
                                     <span className="text-sm">Cargando catálogo…</span>
                                 </div>
                             ) : errorOptativas ? (
-                                <p className="py-10 text-center text-sm text-red-500">
-                                    No se pudieron cargar las optativas. Intenta de nuevo.
-                                </p>
+                                <p className="py-10 text-center text-sm text-red-500">No se pudieron cargar las optativas. Intenta de nuevo.</p>
                             ) : totalOptativas === 0 ? (
-                                <p className="py-10 text-center text-sm text-gray-500">
-                                    No hay optativas registradas para este programa.
-                                </p>
+                                <p className="py-10 text-center text-sm text-gray-500">No hay optativas registradas para este programa.</p>
                             ) : visibleOptativas === 0 ? (
-                                <p className="py-10 text-center text-sm text-gray-500">
-                                    Sin resultados para <span className="font-medium">"{searchOptativas}"</span>.
-                                </p>
+                                <p className="py-10 text-center text-sm text-gray-500">Sin resultados para <span className="font-medium">"{searchOptativas}"</span>.</p>
                             ) : (
                                 <table className="min-w-full text-sm">
                                     <thead>
@@ -803,10 +835,7 @@ export default function MallaGrafica({ malla }: Props) {
                                                     const isOpen = expandedOptativa === e.ID_Asignatura;
                                                     return (
                                                         <React.Fragment key={e.ID_Asignatura}>
-                                                            <tr
-                                                                onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)}
-                                                                className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none"
-                                                            >
+                                                            <tr onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)} className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none">
                                                                 <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
                                                                 <td className="py-2 pr-4 text-gray-800 font-medium">{e.Nombre_Asignatura}</td>
                                                                 <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
@@ -830,11 +859,7 @@ export default function MallaGrafica({ malla }: Props) {
                                                                         <ul className="space-y-1">
                                                                             {reqs.map((r, idx) => (
                                                                                 <li key={idx} className="flex items-start gap-2 text-xs text-gray-700">
-                                                                                    <span className={`mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${
-                                                                                        r.Tipo_Requisito?.toLowerCase().includes('pre') || r.Tipo_Requisito?.toLowerCase() === 'opcional' ? 'bg-red-100 text-red-700' :
-                                                                                        r.Tipo_Requisito?.toLowerCase().includes('co')  ? 'bg-yellow-100 text-yellow-700' :
-                                                                                        'bg-gray-100 text-gray-600'
-                                                                                    }`}>
+                                                                                    <span className={`mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${r.Tipo_Requisito?.toLowerCase().includes('pre') || r.Tipo_Requisito?.toLowerCase() === 'opcional' ? 'bg-red-100 text-red-700' : r.Tipo_Requisito?.toLowerCase().includes('co') ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
                                                                                         {formatTipoRequisito(r.Tipo_Requisito)}
                                                                                     </span>
                                                                                     <span>
@@ -859,22 +884,11 @@ export default function MallaGrafica({ malla }: Props) {
                             )}
                         </div>
 
-                        {/* Footer */}
                         <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
                             {!loadingOptativas && !errorOptativas && totalOptativas > 0 && (
-                                <span className="text-xs text-gray-400">
-                                    {q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias
-                                </span>
+                                <span className="text-xs text-gray-400">{q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias</span>
                             )}
-                            <button
-                                onClick={() => {
-                                    setShowOptativasModal(false);
-                                    setSelectedOptativaSlot(null);
-                                }}
-                                className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cerrar
-                            </button>
+                            <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
                         </div>
                     </div>
                 </div>

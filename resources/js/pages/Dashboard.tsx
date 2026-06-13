@@ -1,344 +1,290 @@
 import { Head, Link } from '@inertiajs/react';
+import { useState, useEffect } from 'react';
 import MainLayout from '../Layout/MainLayout';
+import apiClient from '../api/client';
 
-interface Props {
-  sedesCount: number;
-  facultadesCount: number;
-  programasCount: number;
-  asignaturasCount: number;
-  mallasCount: number;
-  usuariosCount: number;
-  normativasCount: number;
-  componentesCount: number;
-  agrupacionesCount: number;
-  cargasPendientes: number;
-  cargasRecientes: Array<{
-    id: number;
-    estado: string;
-    malla: string;
-    programa: string;
-    usuario: string;
-    fecha: string;
-  }>;
+interface CargaMalla {
+    ID_Carga: number;
+    ID_Programa: number;
+    ID_Normativa: number;
+    ID_Malla: number;
+    ID_Malla_Base?: number;
+    ID_Usuario: number;
+    Estado_Carga: string;
+    Comentario_Carga: string;
+    Creacion_Carga: string;
+    usuario?: {
+        ID_Usuario: number;
+        Nombre_Usuario: string;
+        Email_Usuario: string;
+    };
+    programa?: {
+        ID_Programa: number;
+        Nombre_Programa: string;
+    };
+    malla?: {
+        ID_Malla: number;
+        Version_Numero: number;
+        Version_Etiqueta: string;
+        Estado: string;
+    };
 }
 
-export default function Dashboard({ 
-  sedesCount, 
-  facultadesCount, 
-  programasCount,
-  asignaturasCount,
-  mallasCount,
-  usuariosCount,
-  normativasCount,
-  componentesCount,
-  agrupacionesCount,
-  cargasPendientes,
-  cargasRecientes
+interface Props {
+    sedesCount: number;
+    facultadesCount: number;
+    programasCount: number;
+    asignaturasCount: number;
+    mallasCount: number;
+    usuariosCount: number;
+    normativasCount: number;
+    componentesCount: number;
+    agrupacionesCount: number;
+    cargasPendientes: number;
+    cargasRecientes: Array<{
+        id: number;
+        estado: string;
+        malla: string;
+        programa: string;
+        usuario: string;
+        fecha: string;
+    }>;
+}
+
+const statCards = [
+    { label: 'Mallas Totales', value: 'mallasCount' as const, icon: 'grid_on', bg: '#eef2ff', color: '#3730a3' },
+    { label: 'Programas', value: 'programasCount' as const, icon: 'school', bg: '#f3e8ff', color: '#6b21a8' },
+    { label: 'Asignaturas', value: 'asignaturasCount' as const, icon: 'menu_book', bg: '#fff7ed', color: '#9a3412' },
+    { label: 'Facultades', value: 'facultadesCount' as const, icon: 'account_balance', bg: '#eff6ff', color: '#1e40af' },
+    { label: 'Usuarios', value: 'usuariosCount' as const, icon: 'group', bg: '#f0fdfa', color: '#115e59' },
+    { label: 'Sedes', value: 'sedesCount' as const, icon: 'apartment', bg: '#f0fdf4', color: '#15803d' },
+    { label: 'Normativas', value: 'normativasCount' as const, icon: 'gavel', bg: '#fdf2f8', color: '#9d174d' },
+    { label: 'Agrupaciones', value: 'agrupacionesCount' as const, icon: 'category', bg: '#fef9c3', color: '#854d0e' },
+];
+
+const quickActions = [
+    { label: 'Gestionar Sedes', href: '/sedes', icon: 'apartment' },
+    { label: 'Gestionar Facultades', href: '/facultades', icon: 'account_balance' },
+    { label: 'Gestionar Programas', href: '/programas', icon: 'school' },
+    { label: 'Gestionar Asignaturas', href: '/asignaturas', icon: 'menu_book' },
+    { label: 'Cargar Archivos', href: '/cargas', icon: 'upload_file' },
+    { label: 'Auditoría', href: '/auditoria', icon: 'history_edu' },
+];
+
+/**
+ * Paleta de estados mejorada para cumplimiento WCAG AA
+ * Colores más oscuros con mejor contraste (ratio > 4.5:1)
+ */
+const getEstadoColor = (estado: string) => {
+    const colors: Record<string, string> = {
+        'borrador': 'bg-slate-100 text-slate-700',
+        'listo_para_procesar': 'bg-blue-100 text-blue-700',
+        'iniciado': 'bg-amber-100 text-amber-700',
+        'validando': 'bg-orange-100 text-orange-700',
+        'pendiente_aprobacion': 'bg-violet-100 text-violet-700',
+        'aprobado': 'bg-emerald-100 text-emerald-700',
+        'rechazado': 'bg-rose-100 text-rose-700',
+        'con_errores': 'bg-rose-100 text-rose-700',
+    };
+    return colors[estado] || 'bg-slate-100 text-slate-700';
+};
+
+/**
+ * Dots de estado con colores más vibrantes para mejor visibilidad
+ */
+const getEstadoDot = (estado: string) => {
+    const dots: Record<string, string> = {
+        'borrador': '#64748b',
+        'listo_para_procesar': '#2563eb',
+        'iniciado': '#d97706',
+        'validando': '#ea580c',
+        'pendiente_aprobacion': '#7c3aed',
+        'aprobado': '#059669',
+        'rechazado': '#dc2626',
+        'con_errores': '#dc2626',
+    };
+    return dots[estado] || '#64748b';
+};
+
+export default function Dashboard({
+    sedesCount, facultadesCount, programasCount, asignaturasCount,
+    mallasCount, usuariosCount, normativasCount, agrupacionesCount, cargasPendientes,
 }: Props) {
+    const [cargasRecientes, setCargasRecientes] = useState<CargaMalla[]>([]);
+    const [loading, setLoading] = useState(true);
+
+    useEffect(() => { fetchCargasRecientes(); }, []);
+
+    const fetchCargasRecientes = async () => {
+        try {
+            setLoading(true);
+            const response = await apiClient.get<{ data: CargaMalla[] }>('/aprobacion/mis-cargas');
+            const filtradas = (response.data || []).filter(c => c.programa?.ID_Programa);
+            const recientes = filtradas.sort((a, b) => 
+                new Date(b.Creacion_Carga).getTime() - new Date(a.Creacion_Carga).getTime()
+            ).slice(0, 6); // Aumentado a 6 para mejor equilibrio visual
+            setCargasRecientes(recientes);
+        } catch (error) {
+            console.error('Error fetching cargas recientes:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const counts: Record<string, number> = {
+        mallasCount, programasCount, asignaturasCount, facultadesCount,
+        usuariosCount, sedesCount, normativasCount, agrupacionesCount,
+    };
+
     return (
         <MainLayout>
-            <Head title="Dashboard" />
-            
-            <div className="space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold text-gray-900">Panel de Control</h1>
-                    <span className="text-sm text-gray-500">
-                        Sistema de Gestión de Mallas Académicas
-                    </span>
+            <Head title="Panel Principal" />
+
+            <div className="max-w-[1400px] mx-auto space-y-8">
+                
+                {/* Header Section */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-slate-200 pb-6">
+                    <div>
+                        <h1 className="text-3xl font-extrabold text-slate-900 tracking-tight">Panel de Control</h1>
+                        <p className="text-slate-500 mt-1">Gestión integral de mallas y programas académicos.</p>
+                    </div>
+                    <Link
+                        href="/cargas"
+                        className="btn-primary-action px-6 py-3 rounded-xl shadow-lg shadow-blue-900/20 flex items-center gap-2 font-semibold transition-transform active:scale-95"
+                    >
+                        <span className="material-symbols-outlined !text-xl">add_circle</span>
+                        Nueva Malla
+                    </Link>
                 </div>
 
-                {/* Tarjetas de información */}
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-green-100 rounded-full">
-                                <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
+                {/* Metrics Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-6">
+                    
+                    {/* Tarjeta de Acción Requerida (Alta Prioridad) */}
+                    <div className={`md:col-span-4 lg:col-span-3 p-6 rounded-2xl border-2 flex flex-col justify-between min-h-[180px] transition-all
+                        ${cargasPendientes > 0 ? 'bg-rose-50 border-rose-200' : 'bg-slate-50 border-slate-200'}`}>
+                        <div>
+                            <div className="flex items-center gap-2 mb-2">
+                                <span className={`material-symbols-outlined ${cargasPendientes > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                    {cargasPendientes > 0 ? 'priority_high' : 'check_circle'}
+                                </span>
+                                <span className="text-xs font-bold uppercase tracking-widest text-slate-500">Pendientes</span>
                             </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Sedes</p>
-                                <p className="text-2xl font-semibold text-gray-900">{sedesCount}</p>
-                            </div>
+                            <h3 className="text-slate-900 font-bold text-lg leading-tight">Acciones que requieren atención</h3>
+                        </div>
+                        <div className="flex items-baseline gap-2">
+                            <span className={`text-5xl font-black ${cargasPendientes > 0 ? 'text-rose-600' : 'text-slate-400'}`}>
+                                {cargasPendientes}
+                            </span>
+                            <span className="text-slate-500 font-medium">solicitudes</span>
                         </div>
                     </div>
 
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-blue-100 rounded-full">
-                                <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Facultades</p>
-                                <p className="text-2xl font-semibold text-gray-900">{facultadesCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-purple-100 rounded-full">
-                                <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Programas</p>
-                                <p className="text-2xl font-semibold text-gray-900">{programasCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-orange-100 rounded-full">
-                                <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Asignaturas</p>
-                                <p className="text-2xl font-semibold text-gray-900">{asignaturasCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-indigo-100 rounded-full">
-                                <svg className="w-6 h-6 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Mallas Curriculares</p>
-                                <p className="text-2xl font-semibold text-gray-900">{mallasCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-teal-100 rounded-full">
-                                <svg className="w-6 h-6 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Usuarios</p>
-                                <p className="text-2xl font-semibold text-gray-900">{usuariosCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-pink-100 rounded-full">
-                                <svg className="w-6 h-6 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Normativas</p>
-                                <p className="text-2xl font-semibold text-gray-900">{normativasCount}</p>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="bg-white rounded-lg shadow p-6">
-                        <div className="flex items-center">
-                            <div className="p-3 bg-red-100 rounded-full">
-                                <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-4">
-                                <p className="text-sm font-medium text-gray-500">Cargas Pendientes</p>
-                                <p className="text-2xl font-semibold text-gray-900">{cargasPendientes}</p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
-                {/* Sección de información adicional */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <div className="flex items-center justify-between mb-4">
-                        <h2 className="text-lg font-semibold text-gray-900">Cargas Recientes</h2>
-                        <Link href="/cargas" className="text-sm text-blue-600 hover:text-blue-800">Ver todo</Link>
-                    </div>
-                    <div className="space-y-3">
-                        {cargasRecientes.length > 0 ? (
-                            cargasRecientes.map((carga) => (
-                                <div key={carga.id} className="flex items-start p-3 bg-gray-50 rounded-lg">
-                                    <div className="flex-shrink-0">
-                                        <div className={`w-2 h-2 rounded-full mt-2 ${
-                                            carga.estado === 'aprobado' ? 'bg-green-500' :
-                                            carga.estado === 'rechazado' ? 'bg-red-500' :
-                                            'bg-yellow-500'
-                                        }`}></div>
-                                    </div>
-                                    <div className="ml-3 flex-1">
-                                        <p className="text-sm font-medium text-gray-900">{carga.malla}</p>
-                                        <p className="text-xs text-gray-500">{carga.programa} - {carga.usuario}</p>
-                                        <div className="flex items-center mt-1">
-                                            <span className={`text-xs px-2 py-1 rounded-full ${
-                                                carga.estado === 'aprobado' ? 'bg-green-100 text-green-800' :
-                                                carga.estado === 'rechazado' ? 'bg-red-100 text-red-800' :
-                                                'bg-yellow-100 text-yellow-800'
-                                            }`}>
-                                                {carga.estado}
-                                            </span>
-                                            <span className="text-xs text-gray-400 ml-2">{carga.fecha}</span>
-                                        </div>
-                                    </div>
+                    {/* Grid de Métricas Secundarias */}
+                    <div className="md:col-span-8 lg:col-span-9 grid grid-cols-2 lg:grid-cols-4 gap-4">
+                        {statCards.map((card) => (
+                            <div key={card.label} className="dashboard-card p-4 flex flex-col gap-3 group cursor-default">
+                                <div className="w-10 h-10 rounded-lg flex items-center justify-center transition-colors"
+                                     style={{ backgroundColor: card.bg, color: card.color }}>
+                                    <span className="material-symbols-outlined">{card.icon}</span>
                                 </div>
-                            ))
-                        ) : (
-                            <p className="text-sm text-gray-500 text-center py-4">No hay cargas recientes</p>
-                        )}
+                                <div>
+                                    <p className="text-xs font-bold text-slate-500 uppercase tracking-wide">{card.label}</p>
+                                    <p className="metric-value-text group-hover:text-[#00236f] transition-colors">
+                                        {counts[card.value] || 0}
+                                    </p>
+                                </div>
+                            </div>
+                        ))}
                     </div>
                 </div>
 
-                {/* Acciones rápidas */}
-                <div className="bg-white rounded-lg shadow p-6">
-                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Acciones Rápidas</h2>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                        <Link
-                            href="/sedes"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-green-100 rounded-lg">
-                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-                                </svg>
+                {/* Main Content Areas */}
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                    
+                    {/* Lista de Cargas Recientes (2/3) */}
+                    <div className="lg:col-span-2 dashboard-card overflow-hidden">
+                        <div className="px-6 py-5 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                            <div className="flex items-center gap-2">
+                                <span className="material-symbols-outlined text-blue-600">history</span>
+                                <h3 className="font-bold text-slate-800">Actividad Reciente</h3>
                             </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Gestionar Sedes</p>
-                                <p className="text-sm text-gray-500">Administrar sedes</p>
-                            </div>
-                        </Link>
+                            <Link href="/cargas" className="text-sm font-semibold text-blue-600 hover:text-blue-800 transition-colors flex items-center gap-1">
+                                Ver todo
+                                <span className="material-symbols-outlined !text-sm">arrow_forward</span>
+                            </Link>
+                        </div>
 
-                        <Link
-                            href="/facultades"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-blue-100 rounded-lg">
-                                <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Gestionar Facultades</p>
-                                <p className="text-sm text-gray-500">Administrar facultades</p>
-                            </div>
-                        </Link>
+                        <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
+                            {loading ? (
+                                <div className="p-20 flex flex-col items-center justify-center gap-4">
+                                    <div className="spinner border-4 border-blue-100 border-t-blue-600 w-10 h-10 rounded-full animate-spin"></div>
+                                    <p className="text-slate-400 font-medium text-sm">Actualizando datos...</p>
+                                </div>
+                            ) : cargasRecientes.length > 0 ? (
+                                <div className="divide-y divide-slate-100">
+                                    {cargasRecientes.map((carga) => (
+                                        <div key={carga.ID_Carga} className="p-5 hover:bg-slate-50 transition-colors flex items-start gap-4">
+                                            <div className="mt-1">
+                                                <div className="w-2.5 h-2.5 rounded-full" 
+                                                     style={{ backgroundColor: getEstadoDot(carga.Estado_Carga), boxShadow: `0 0 10px ${getEstadoDot(carga.Estado_Carga)}60` }} />
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center justify-between gap-4 mb-1">
+                                                    <h4 className="font-bold text-slate-900 truncate">
+                                                        {carga.malla?.Version_Etiqueta || carga.programa?.Nombre_Programa}
+                                                    </h4>
+                                                    <span className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider ${getEstadoColor(carga.Estado_Carga)}`}>
+                                                        {carga.Estado_Carga.replace(/_/g, ' ')}
+                                                    </span>
+                                                </div>
+                                                <p className="text-sm text-slate-500 mb-2">
+                                                    <span className="font-medium text-slate-700">{carga.programa?.Nombre_Programa}</span> • {carga.usuario?.Nombre_Usuario}
+                                                </p>
+                                                <div className="flex items-center gap-3 text-xs text-slate-400">
+                                                    <time className="flex items-center gap-1">
+                                                        <span className="material-symbols-outlined !text-xs">calendar_today</span>
+                                                        {new Date(carga.Creacion_Carga).toLocaleDateString('es-CO', { day: 'numeric', month: 'short' })}
+                                                    </time>
+                                                    {carga.Comentario_Carga && (
+                                                        <span className="flex items-center gap-1 truncate italic">
+                                                            <span className="material-symbols-outlined !text-xs">chat_bubble_outline</span>
+                                                            {carga.Comentario_Carga}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="p-20 text-center">
+                                    <span className="material-symbols-outlined text-slate-200 !text-6xl mb-4">inbox</span>
+                                    <p className="text-slate-500 font-medium">No hay actividad reciente en el sistema.</p>
+                                </div>
+                            )}
+                        </div>
+                    </div>
 
-                        <Link
-                            href="/programas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-purple-100 rounded-lg">
-                                <svg className="w-5 h-5 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
+                    {/* Acciones Rápidas (1/3) */}
+                    <div className="space-y-6">
+                        <section className="dashboard-card p-6">
+                            <h3 className="font-bold text-slate-800 mb-4 flex items-center gap-2">
+                                <span className="material-symbols-outlined text-orange-500">bolt</span>
+                                Accesos Directos
+                            </h3>
+                            <div className="grid grid-cols-1 gap-2">
+                                {quickActions.map((action) => (
+                                    <Link key={action.label} href={action.href} className="quick-action-btn group">
+                                        <div className="w-10 h-10 rounded-lg bg-slate-100 flex items-center justify-center text-slate-500 group-hover:bg-[#00236f] group-hover:text-white transition-all">
+                                            <span className="material-symbols-outlined">{action.icon}</span>
+                                        </div>
+                                        <span className="flex-1 font-semibold text-slate-700 group-hover:text-[#00236f]">{action.label}</span>
+                                        <span className="material-symbols-outlined text-slate-300 group-hover:translate-x-1 transition-transform">chevron_right</span>
+                                    </Link>
+                                ))}
                             </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Gestionar Programas</p>
-                                <p className="text-sm text-gray-500">Administrar programas</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/asignaturas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-orange-100 rounded-lg">
-                                <svg className="w-5 h-5 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.747 0 3.332.477 4.5 1.253v13C19.832 18.477 18.247 18 16.5 18c-1.746 0-3.332.477-4.5 1.253" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Gestionar Asignaturas</p>
-                                <p className="text-sm text-gray-500">Administrar asignaturas</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/mallas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-indigo-100 rounded-lg">
-                                <svg className="w-5 h-5 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Ver Mallas Curriculares</p>
-                                <p className="text-sm text-gray-500">Gestionar mallas</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/cargas"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-teal-100 rounded-lg">
-                                <svg className="w-5 h-5 text-teal-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Cargar Archivos</p>
-                                <p className="text-sm text-gray-500">Cargar mallas desde Excel</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/aprobacion"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-red-100 rounded-lg">
-                                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Aprobaciones Pendientes</p>
-                                <p className="text-sm text-gray-500">Revisar cargas ({cargasPendientes})</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/auditoria"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-pink-100 rounded-lg">
-                                <svg className="w-5 h-5 text-pink-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Auditoría</p>
-                                <p className="text-sm text-gray-500">Ver logs de actividad</p>
-                            </div>
-                        </Link>
-
-                        <Link
-                            href="/usuarios"
-                            className="flex items-center p-4 border border-gray-200 rounded-lg hover:bg-gray-50 transition-colors"
-                        >
-                            <div className="p-2 bg-gray-100 rounded-lg">
-                                <svg className="w-5 h-5 text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
-                                </svg>
-                            </div>
-                            <div className="ml-3">
-                                <p className="font-medium text-gray-900">Gestionar Usuarios</p>
-                                <p className="text-sm text-gray-500">Administrar usuarios</p>
-                            </div>
-                        </Link>
+                        </section>
                     </div>
                 </div>
             </div>

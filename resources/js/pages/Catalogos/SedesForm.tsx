@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 
 interface Props {
@@ -16,14 +15,10 @@ interface Props {
     errors?: Record<string, string>;
 }
 
-export default function SedesForm({ sede, errors: initialErrors }: Props) {
+export default function SedesForm({ sede }: Props) {
     const isEditing = !!sede;
-    const [loading, setLoading] = useState(false);
-    const [errors, setErrors] = useState<Record<string, string>>(
-        initialErrors || {},
-    );
-
-    const [formData, setFormData] = useState({
+    
+    const { data, setData, post, put, processing, errors } = useForm({
         Codigo_Sede: sede?.Codigo_Sede || '',
         Nombre_Sede: sede?.Nombre_Sede || '',
         Ciudad_Sede: sede?.Ciudad_Sede || '',
@@ -33,202 +28,133 @@ export default function SedesForm({ sede, errors: initialErrors }: Props) {
         Url_Sede: sede?.Url_Sede || '',
     });
 
-    const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const { name, value } = e.target;
-        setFormData((prev) => ({ ...prev, [name]: value }));
-        // Clear error when field is modified
-        if (errors[name]) {
-            setErrors((prev) => {
-                const newErrors = { ...prev };
-                delete newErrors[name];
-                return newErrors;
-            });
-        }
-    };
-
-    const handleSubmit = async (e: React.FormEvent) => {
+    const onSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-        setErrors({});
-
-        try {
-            const method = isEditing ? 'PUT' : 'POST';
-            const url = isEditing
-                ? `/api/v1/sedes/${sede.ID_Sede}`
-                : '/api/v1/sedes';
-
-            const response = await fetch(url, {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                },
-                credentials: 'same-origin', // Incluir cookies de sesión
-                body: JSON.stringify(formData),
-            });
-
-            const result = await response.json();
-
-            if (!response.ok) {
-                if (result.errors) {
-                    setErrors(result.errors);
-                } else if (result.message) {
-                    setErrors({ general: result.message });
-                }
-                setLoading(false);
-                return;
-            }
-
-            // Success - redirect to list
-            window.location.href = '/sedes';
-        } catch (error) {
-            console.error('Error submitting form:', error);
-            setErrors({ general: 'Error de conexión. Intente nuevamente.' });
-        } finally {
-            setLoading(false);
-        }
+        if (isEditing) put(`/sedes/${sede.ID_Sede}`);
+        else post('/sedes');
     };
 
     return (
         <MainLayout>
-            <Head title={isEditing ? 'Editar Sede' : 'Nueva Sede'} />
+            <Head title={isEditing ? 'Editar Sede' : 'Registrar Sede'} />
 
-            <div className="page-header">
-                <div className="page-title">
-                    <h1>{isEditing ? 'Editar Sede' : 'Nueva Sede'}</h1>
-                    <p className="page-subtitle">
-                        {isEditing
-                            ? 'Modifica los datos de la sede'
-                            : 'Registra una nueva sede'}
-                    </p>
+            <div className="max-w-4xl mx-auto py-10 px-4">
+                <div className="mb-8 flex justify-between items-center">
+                    <div>
+                        <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                            {isEditing ? 'Actualizar Sede' : 'Nueva Sede'}
+                        </h1>
+                        <p className="text-slate-500 mt-2">Configuración de información básica y contacto institucional.</p>
+                    </div>
+                    <Link href="/sedes" className="text-slate-400 hover:text-[#00236f] transition-colors">
+                        <span className="material-symbols-outlined !text-3xl">cancel</span>
+                    </Link>
                 </div>
-            </div>
 
-            {errors.general && (
-                <div className="alert alert-error">{errors.general}</div>
-            )}
-
-            <div className="form-container">
-                <form onSubmit={handleSubmit} className="form">
-                    <div className="form-grid">
-                        <div className="form-group">
-                            <label htmlFor="Codigo_Sede">Código de Sede</label>
-                            <input
-                                type="text"
-                                id="Codigo_Sede"
-                                name="Codigo_Sede"
-                                value={formData.Codigo_Sede}
-                                onChange={handleChange}
-                                placeholder="Ej: 1"
-                            />
+                <form onSubmit={onSubmit} className="space-y-6">
+                    {/* Sección: Identificación */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-blue-600">info</span>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Identificación Principal</h3>
                         </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Nombre_Sede">
-                                Nombre de la Sede *
-                            </label>
-                            <input
-                                type="text"
-                                id="Nombre_Sede"
-                                name="Nombre_Sede"
-                                value={formData.Nombre_Sede}
-                                onChange={handleChange}
-                                className={
-                                    errors.Nombre_Sede ? 'input-error' : ''
-                                }
-                                required
-                            />
-                            {errors.Nombre_Sede && (
-                                <span className="error-message">
-                                    {errors.Nombre_Sede}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Ciudad_Sede">Ciudad *</label>
-                            <input
-                                type="text"
-                                id="Ciudad_Sede"
-                                name="Ciudad_Sede"
-                                value={formData.Ciudad_Sede}
-                                onChange={handleChange}
-                                className={
-                                    errors.Ciudad_Sede ? 'input-error' : ''
-                                }
-                                required
-                            />
-                            {errors.Ciudad_Sede && (
-                                <span className="error-message">
-                                    {errors.Ciudad_Sede}
-                                </span>
-                            )}
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Direccion_Sede">Dirección</label>
-                            <input
-                                type="text"
-                                id="Direccion_Sede"
-                                name="Direccion_Sede"
-                                value={formData.Direccion_Sede}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Conmutador_Sede">Conmutador</label>
-                            <input
-                                type="text"
-                                id="Conmutador_Sede"
-                                name="Conmutador_Sede"
-                                value={formData.Conmutador_Sede}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Campus_Sede">Campus</label>
-                            <input
-                                type="text"
-                                id="Campus_Sede"
-                                name="Campus_Sede"
-                                value={formData.Campus_Sede}
-                                onChange={handleChange}
-                            />
-                        </div>
-
-                        <div className="form-group">
-                            <label htmlFor="Url_Sede">URL</label>
-                            <input
-                                type="url"
-                                id="Url_Sede"
-                                name="Url_Sede"
-                                value={formData.Url_Sede}
-                                onChange={handleChange}
-                                placeholder="https://..."
-                            />
+                        <div className="p-8 grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Nombre de la Sede *</label>
+                                <input
+                                    type="text"
+                                    value={data.Nombre_Sede}
+                                    onChange={e => setData('Nombre_Sede', e.target.value)}
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all focus:ring-4 focus:ring-blue-100 ${errors.Nombre_Sede ? 'border-rose-300 bg-rose-50' : 'border-transparent focus:border-blue-500'}`}
+                                    placeholder="Ej: Sede Manizales"
+                                />
+                                {errors.Nombre_Sede && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Nombre_Sede}</p>}
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Código Oficial</label>
+                                <input
+                                    type="text"
+                                    value={data.Codigo_Sede}
+                                    onChange={e => setData('Codigo_Sede', e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all focus:ring-4 focus:ring-blue-100"
+                                    placeholder="Código SIA/DANE"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Ciudad *</label>
+                                <input
+                                    type="text"
+                                    value={data.Ciudad_Sede}
+                                    onChange={e => setData('Ciudad_Sede', e.target.value)}
+                                    className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all focus:ring-4 focus:ring-blue-100 ${errors.Ciudad_Sede ? 'border-rose-300 bg-rose-50' : 'border-transparent focus:border-blue-500'}`}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Nombre del Campus</label>
+                                <input
+                                    type="text"
+                                    value={data.Campus_Sede}
+                                    onChange={e => setData('Campus_Sede', e.target.value)}
+                                    className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all focus:ring-4 focus:ring-blue-100"
+                                    placeholder="Ej: Campus La Nubia"
+                                />
+                            </div>
                         </div>
                     </div>
 
-                    <div className="form-actions">
-                        <button
-                            type="button"
-                            className="btn-secondary"
-                            onClick={() => window.history.back()}
-                        >
+                    {/* Sección: Ubicación y Contacto */}
+                    <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+                        <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                            <span className="material-symbols-outlined text-orange-500">contact_mail</span>
+                            <h3 className="text-sm font-bold text-slate-800 uppercase tracking-wider">Ubicación y Contacto</h3>
+                        </div>
+                        <div className="p-8 space-y-6">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Dirección Física</label>
+                                    <input
+                                        type="text"
+                                        value={data.Direccion_Sede}
+                                        onChange={e => setData('Direccion_Sede', e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Conmutador / Teléfono</label>
+                                    <input
+                                        type="text"
+                                        value={data.Conmutador_Sede}
+                                        onChange={e => setData('Conmutador_Sede', e.target.value)}
+                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
+                                    />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">URL Sitio Web Oficial</label>
+                                <div className="relative">
+                                    <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-slate-400">language</span>
+                                    <input
+                                        type="url"
+                                        value={data.Url_Sede}
+                                        onChange={e => setData('Url_Sede', e.target.value)}
+                                        className="w-full pl-10 pr-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
+                                        placeholder="https://manizales.unal.edu.co"
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="flex justify-end items-center gap-4 pt-4">
+                        <Link href="/sedes" className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
                             Cancelar
-                        </button>
+                        </Link>
                         <button
                             type="submit"
-                            className="btn-primary"
-                            disabled={loading}
+                            disabled={processing}
+                            className="px-10 py-4 bg-[#00236f] text-white rounded-2xl font-black shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all uppercase tracking-widest text-xs"
                         >
-                            {loading
-                                ? 'Guardando...'
-                                : isEditing
-                                  ? 'Actualizar'
-                                  : 'Crear'}
+                            {processing ? 'Guardando...' : isEditing ? 'Actualizar Sede' : 'Guardar Sede'}
                         </button>
                     </div>
                 </form>
