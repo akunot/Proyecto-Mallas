@@ -4,6 +4,8 @@
 
 ---
 
+[![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/akunot/Proyecto-Mallas)
+
 ## Metadatos del proyecto
 
 | **Campo** | **Valor** |
