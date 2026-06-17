@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Services\LogActividadService;
 use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
+use Inertia\Inertia;
 
 class CatalogoController extends Controller
 {
@@ -18,6 +19,7 @@ class CatalogoController extends Controller
      * Nombre de la ruta para mensajes
      */
     protected string $routeName;
+    protected string $routeBase = '';
 
     /**
      * Campos fillable del modelo
@@ -97,13 +99,7 @@ class CatalogoController extends Controller
             );
         }
 
-        // Limpieza eficiente de UTF-8
-        $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
-
-        return response()->json([
-            'data' => $cleanRecord,
-            'message' => ucfirst($this->routeName) . ' creado exitosamente.',
-        ], 201);
+        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'))->with('success', ucfirst($this->routeName) . ' creado exitosamente.');
     }
 
     /**
@@ -117,7 +113,6 @@ class CatalogoController extends Controller
 
         $record->update($validated);
 
-        // Registrar log de actualización
         if (auth()->check()) {
             LogActividadService::registrar(
                 auth()->user(),
@@ -128,13 +123,7 @@ class CatalogoController extends Controller
             );
         }
 
-        // Limpieza eficiente de UTF-8
-        $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
-
-        return response()->json([
-            'data' => $cleanRecord,
-            'message' => ucfirst($this->routeName) . ' actualizado exitosamente.',
-        ]);
+        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'));
     }
 
     /**
@@ -173,7 +162,11 @@ class CatalogoController extends Controller
             );
         }
 
-        // Limpieza eficiente de UTF-8
+        if (request()->header('X-Inertia')) {
+            return Inertia::location(url()->previous());
+        }
+
+        // Para API
         $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
 
         return response()->json([
@@ -202,10 +195,7 @@ class CatalogoController extends Controller
 
         $record->delete();
 
-        return response()->json([
-            'data' => null,
-            'message' => ucfirst($this->routeName) . ' eliminado exitosamente.',
-        ]);
+        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'))->with('success', ucfirst($this->routeName) . ' eliminado exitosamente.');
     }
 
     /**
@@ -213,13 +203,14 @@ class CatalogoController extends Controller
      */
     public function edit(int $id)
     {
-        $record = $this->model->findOrFail($id);
+        $record = $this->model->newQuery()->with('programa')->findOrFail($id);
         
-        // Obtener datos relacionados según el controlador
         $relatedData = $this->getRelatedData();
         
+        $recordArray = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
+
         return inertia($this->getInertiaComponent(), array_merge(
-            [strtolower($this->routeName) => $record->toArray()],
+            [strtolower($this->routeName) => $recordArray],
             $relatedData
         ));
     }
@@ -237,7 +228,8 @@ class CatalogoController extends Controller
      */
     protected function getInertiaComponent(): string
     {
-        return 'Catalogos/' . ucfirst($this->routeName) . 'sForm';
+        $name = $this->routeBase ? ucfirst($this->routeBase) : ucfirst($this->routeName) . 's';
+        return 'Catalogos/' . $name . 'Form';
     }
 
     /**
@@ -254,7 +246,7 @@ class CatalogoController extends Controller
             } elseif (str_contains($field, 'Ciudad') || str_contains($field, 'Ciudad')) {
                 $rules[$field] = 'required|string|max:100';
             } elseif (str_contains($field, 'Codigo') || str_contains($field, 'codigo')) {
-                $rules[$field] = 'required|string|max:20';
+                $rules[$field] = 'required|integer|min:0|max:9223372036854775807';
             } elseif (str_contains($field, 'Email')) {
                 $rules[$field] = 'required|email';
             } elseif (str_contains($field, 'Creditos') || str_contains($field, 'Duracion') || str_contains($field, 'Horas_')) {

@@ -1,5 +1,4 @@
-import { useState } from 'react';
-import { Head } from '@inertiajs/react';
+import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
 
 interface Componente {
@@ -13,63 +12,20 @@ interface Props {
   errors?: Record<string, string>;
 }
 
-export default function ComponentesForm({ componente, errors: initialErrors }: Props) {
+export default function ComponentesForm({ componente }: Props) {
   const isEditing = !!componente;
-  const [loading, setLoading] = useState(false);
-  const [errors, setErrors] = useState<Record<string, string>>(initialErrors || {});
   
-  const [formData, setFormData] = useState({
+  const { data, setData, post, put, processing, errors } = useForm({
     Nombre_Componente: componente?.Nombre_Componente || '',
     Descripcion_Componente: componente?.Descripcion_Componente || '',
   });
 
-  const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const { name, value } = e.target;
-    setFormData(prev => ({ ...prev, [name]: value }));
-    if (errors[name]) {
-      setErrors(prev => {
-        const newErrors = { ...prev };
-        delete newErrors[name];
-        return newErrors;
-      });
-    }
-  };
-
-  const handleSubmit = async (e: React.FormEvent) => {
+  const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    setLoading(true);
-    setErrors({});
-
-    try {
-      const method = isEditing ? 'PUT' : 'POST';
-      const url = isEditing 
-        ? `/api/v1/componentes/${componente.ID_Componente}` 
-        : '/api/v1/componentes';
-
-      const response = await fetch(url, {
-        method,
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        credentials: 'same-origin', // Incluir cookies de sesión
-        body: JSON.stringify(formData),
-      });
-
-      const result = await response.json();
-
-      if (!response.ok) {
-        if (result.errors) setErrors(result.errors);
-        else if (result.message) setErrors({ general: result.message });
-        setLoading(false);
-        return;
-      }
-
-      window.location.href = '/componentes';
-    } catch (error) {
-      setErrors({ general: 'Error de conexión.' });
-    } finally {
-      setLoading(false);
+    if (isEditing) {
+      put(`/componentes/${componente.ID_Componente}`);
+    } else {
+      post('/componentes');
     }
   };
 
@@ -77,48 +33,59 @@ export default function ComponentesForm({ componente, errors: initialErrors }: P
     <MainLayout>
       <Head title={isEditing ? 'Editar Componente' : 'Nuevo Componente'} />
       
-      <div className="page-header">
-        <div className="page-title">
-          <h1>{isEditing ? 'Editar Componente' : 'Nuevo Componente'}</h1>
-          <p className="page-subtitle">{isEditing ? 'Modifica el componente' : 'Registra un nuevo componente'}</p>
-        </div>
-      </div>
+      <div className="max-w-4xl mx-auto py-10 px-4">
+        <header className="mb-10">
+          <Link href="/componentes" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+            <span className="material-symbols-outlined !text-sm">arrow_back</span> Volver a componentes
+          </Link>
+          <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
+            {isEditing ? 'Actualizar Componente' : 'Nuevo Componente'}
+          </h1>
+          <p className="text-slate-500 mt-2">{isEditing ? 'Modifica el componente curricular.' : 'Registra un nuevo componente en el sistema.'}</p>
+        </header>
 
-      {errors.general && <div className="alert alert-error">{errors.general}</div>}
-
-      <div className="form-container">
-        <form onSubmit={handleSubmit} className="form">
-          <div className="form-grid">
-            <div className="form-group">
-              <label htmlFor="Nombre_Componente">Nombre del Componente *</label>
-              <input
-                type="text"
-                id="Nombre_Componente"
-                name="Nombre_Componente"
-                value={formData.Nombre_Componente}
-                onChange={handleChange}
-                className={errors.Nombre_Componente ? 'input-error' : ''}
-                required
-              />
-              {errors.Nombre_Componente && <span className="error-message">{errors.Nombre_Componente}</span>}
+        <form onSubmit={handleSubmit} className="space-y-6">
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="p-6 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-blue-600">widgets</span>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-500">Datos del Componente</h3>
             </div>
+            <div className="p-8 space-y-6">
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Nombre del Componente *</label>
+                <input
+                  type="text"
+                  value={data.Nombre_Componente}
+                  onChange={e => setData('Nombre_Componente', e.target.value)}
+                  className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.Nombre_Componente ? 'border-rose-300 bg-rose-50' : 'border-transparent focus:border-blue-500'}`}
+                  placeholder="Ej: Fundamentación"
+                />
+                {errors.Nombre_Componente && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Nombre_Componente}</p>}
+              </div>
 
-            <div className="form-group full-width">
-              <label htmlFor="Descripcion_Componente">Descripción</label>
-              <textarea
-                id="Descripcion_Componente"
-                name="Descripcion_Componente"
-                value={formData.Descripcion_Componente}
-                onChange={handleChange}
-                rows={3}
-              />
+              <div className="space-y-2">
+                <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Descripción</label>
+                <textarea
+                  value={data.Descripcion_Componente}
+                  onChange={e => setData('Descripcion_Componente', e.target.value)}
+                  rows={4}
+                  className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all resize-none"
+                  placeholder="Descripción del componente curricular..."
+                />
+              </div>
             </div>
           </div>
 
-          <div className="form-actions">
-            <button type="button" className="btn-secondary" onClick={() => window.history.back()}>Cancelar</button>
-            <button type="submit" className="btn-primary" disabled={loading}>
-              {loading ? 'Guardando...' : isEditing ? 'Actualizar' : 'Crear'}
+          <div className="flex justify-end items-center gap-4 pt-4">
+            <Link href="/componentes" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+              Cancelar
+            </Link>
+            <button
+              type="submit"
+              disabled={processing}
+              className="px-10 py-4 bg-[#00236f] text-white rounded-2xl font-black shadow-xl shadow-blue-900/20 hover:scale-[1.02] active:scale-95 disabled:opacity-50 transition-all uppercase tracking-widest text-[11px]"
+            >
+              {processing ? 'GUARDANDO...' : isEditing ? 'ACTUALIZAR COMPONENTE' : 'CREAR COMPONENTE'}
             </button>
           </div>
         </form>

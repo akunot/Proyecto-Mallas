@@ -16,7 +16,7 @@ interface Programa {
     Extension: string | null;
     Correo: string | null;
     Area_Curricular: string | null;
-    Activo_Programa: number;
+    Esta_Activo: number;
     Nombre_Facultad?: string;
 }
 
@@ -72,7 +72,7 @@ export default function Programas({ programas }: Props) {
             ),
         },
         {
-            key: 'Activo_Programa',
+            key: 'Esta_Activo',
             label: 'Estado',
             render: (value: number) => (
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${
@@ -95,10 +95,10 @@ export default function Programas({ programas }: Props) {
             </Link>
             <button
                 onClick={() => router.patch(`/programas/${row.ID_Programa}/toggle`)}
-                className={`p-2 rounded-lg transition-all ${row.Activo_Programa ? 'text-rose-400 hover:text-rose-600 hover:bg-rose-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
+                className={`p-2 rounded-lg transition-all ${row.Esta_Activo ? 'text-rose-400 hover:text-rose-600 hover:bg-rose-50' : 'text-emerald-400 hover:text-emerald-600 hover:bg-emerald-50'}`}
             >
                 <span className="material-symbols-outlined !text-xl">
-                    {row.Activo_Programa ? 'visibility_off' : 'visibility'}
+                    {row.Esta_Activo ? 'visibility_off' : 'visibility'}
                 </span>
             </button>
         </div>

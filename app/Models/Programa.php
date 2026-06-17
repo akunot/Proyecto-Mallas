@@ -41,6 +41,11 @@ class Programa extends Model
         return $this->hasMany(Normativa::class, 'Codigo_Programa', 'Codigo_Programa');
     }
 
+    public function mallas(): HasMany
+    {
+        return $this->hasMany(MallaCurricular::class, 'ID_Programa', 'ID_Programa');
+    }
+
     public function mallaVigente()
     {
         return $this->hasOne(MallaCurricular::class, 'ID_Programa', 'ID_Programa')

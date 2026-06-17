@@ -63,11 +63,25 @@ export default function AprobacionPage({ pendientes: initialPendientes, misCarga
         } catch (error) { console.error(error); }
     };
 
+    const handleEnviarRevision = async () => {
+        if (!selectedCarga) return;
+        setLoading(true);
+        try {
+            await apiClient.post(`/aprobacion/cargas/${selectedCarga.ID_Carga}/enviar-revision`);
+            setSelectedCarga(null);
+            fetchCargas();
+        } catch (error) {
+            console.error(error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     const handleRevisar = async () => {
         if (!selectedCarga) return;
         setLoading(true);
         try {
-            await apiClient.post(`/aprobacion/${selectedCarga.ID_Carga}/revisar`, {
+            await apiClient.patch(`/aprobacion/cargas/${selectedCarga.ID_Carga}/revisar`, {
                 accion: reviewForm.accion,
                 comentario: reviewForm.comentario,
             });
@@ -274,6 +288,23 @@ export default function AprobacionPage({ pendientes: initialPendientes, misCarga
                                         className={`w-full py-4 rounded-2xl font-black text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 ${reviewForm.accion === 'aprobar' ? 'bg-emerald-600 shadow-emerald-900/20' : 'bg-rose-600 shadow-rose-900/20'}`}
                                     >
                                         {loading ? 'PROCESANDO...' : `CONFIRMAR ${reviewForm.accion.toUpperCase()}`}
+                                    </button>
+                                </div>
+                            ) : selectedCarga.Estado_Carga === 'borrador' ? (
+                                <div className="decision-panel space-y-6">
+                                    <h3 className="text-sm font-black text-slate-900 uppercase tracking-widest flex items-center gap-2">
+                                        <span className="material-symbols-outlined !text-lg">send</span>
+                                        Enviar a Revisión
+                                    </h3>
+                                    <p className="text-sm text-slate-600 font-medium">
+                                        Una vez enviada, un revisor podrá aprobar o rechazar esta malla. Asegúrate de que la información esté completa antes de continuar.
+                                    </p>
+                                    <button 
+                                        onClick={handleEnviarRevision}
+                                        disabled={loading}
+                                        className="w-full py-4 rounded-2xl font-black text-white shadow-xl transition-all active:scale-95 disabled:opacity-50 bg-blue-600 shadow-blue-900/20"
+                                    >
+                                        {loading ? 'PROCESANDO...' : 'ENVIAR A REVISIÓN'}
                                     </button>
                                 </div>
                             ) : (

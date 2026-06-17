@@ -39,8 +39,7 @@ export default function Normativas({ normativas }: Props) {
     const columns = [
         { 
             key: 'Documento', 
-            label: 'Documento Legal', 
-            sortable: true,
+            label: 'Documento Legal',
             render: (_: any, row: Normativa) => (
                 <div className="flex flex-col">
                     <div className="flex items-center gap-2">
@@ -67,24 +66,26 @@ export default function Normativas({ normativas }: Props) {
         { 
             key: 'Nombre_Programa', 
             label: 'Programa Relacionado',
-            render: (value: string) => (
+            render: (_value: any, row: Normativa) => (
                 <span className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[200px]">
-                    {value || 'General / No asignado'}
+                    {row.Nombre_Programa || 'General / No asignado'}
                 </span>
             )
         },
         { 
             key: 'Instancia', 
             label: 'Instancia / Emisor',
-            render: (value: string) => (
-                <span className="px-2 py-1 bg-slate-100 text-slate-600 text-[10px] font-bold rounded uppercase border border-slate-200">
-                    {value}
+            sortable: true,
+            render: (_: any, row: Normativa) => (
+                <span className="text-xs text-slate-600 font-medium line-clamp-1 max-w-[200px]">
+                    {row.Instancia || 'General / No asignado'}
                 </span>
             )
         },
         {
             key: 'Esta_Activo',
             label: 'Estado',
+            sortable: true,
             render: (value: number) => (
                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${
                     value ? 'bg-emerald-100 text-emerald-700 ring-emerald-600/20' : 'bg-rose-100 text-rose-700 ring-rose-600/20'

@@ -2071,3 +2071,32 @@ body {
 .otp-input-field {
     @apply text-center text-4xl font-black tracking-[0.75em] py-4 bg-slate-50 border-2 border-slate-200 rounded-2xl focus:border-blue-600 focus:ring-4 focus:ring-blue-100 transition-all text-slate-900;
 }
+
+/* Extensiones para Vista Pública */
+.facultad-glow {
+    box-shadow: 0 10px 30px -10px rgba(119, 197, 63, 0.4);
+}
+
+.program-card-overlay {
+    background: linear-gradient(0deg, rgba(0, 35, 111, 0.95) 0%, rgba(0, 35, 111, 0.6) 50%, transparent 100%);
+}
+
+.scroll-hide::-webkit-scrollbar {
+    display: none;
+}
+
+/* Estilos Malla Académica Clásica */
+.academic-card-grid {
+    display: grid;
+    grid-template-rows: auto 1fr auto;
+    height: 115px; /* Altura fija para consistencia visual */
+}
+
+.metric-divider {
+    @apply border-r border-black/5 last:border-r-0;
+}
+
+.component-border-fundamentacion { border-left-color: #f97316; } /* Naranja */
+.component-border-disciplinar { border-left-color: #22c55e; }    /* Verde */
+.component-border-libre { border-left-color: #3b82f6; }           /* Azul */
+.component-border-idiomas { border-left-color: #ec4899; }         /* Rosa */

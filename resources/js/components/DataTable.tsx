@@ -156,9 +156,9 @@ export default function DataTable({
                       {col.render ? col.render(row[col.key], row) : (row[col.key] || '—')}
                     </td>
                   ))}
-                  {actions && (
+                   {actions && (
                     <td className="table-cell text-right">
-                      <div className="flex justify-end opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div className="flex justify-end">
                         {actions(row)}
                       </div>
                     </td>

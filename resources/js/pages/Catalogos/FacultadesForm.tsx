@@ -3,8 +3,8 @@ import MainLayout from '@/Layout/MainLayout';
 
 interface Facultad {
     ID_Facultad: number;
-    ID_Sede: number;
-    Codigo_Facultad: string | null;
+    Codigo_Sede: number;
+    Codigo_Facultad: number;
     Nombre_Facultad: string;
     Conmutador_Facultad: string | null;
     Extension_Facultad: string | null;
@@ -14,7 +14,7 @@ interface Facultad {
 }
 
 interface Sede {
-    ID_Sede: number;
+    Codigo_Sede: number;
     Nombre_Sede: string;
 }
 
@@ -28,8 +28,8 @@ export default function FacultadesForm({ facultad, sedes }: Props) {
     const isEditing = !!facultad;
     
     const { data, setData, post, put, processing, errors } = useForm({
-        Codigo_Facultad: facultad?.Codigo_Facultad || '',
-        ID_Sede: facultad?.ID_Sede?.toString() || '',
+        Codigo_Sede: facultad?.Codigo_Sede?.toString() || '',
+        Codigo_Facultad: facultad?.Codigo_Facultad?.toString() || '',
         Nombre_Facultad: facultad?.Nombre_Facultad || '',
         Conmutador_Facultad: facultad?.Conmutador_Facultad || '',
         Extension_Facultad: facultad?.Extension_Facultad || '',
@@ -83,14 +83,14 @@ export default function FacultadesForm({ facultad, sedes }: Props) {
                                 <div className="space-y-2">
                                     <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Sede *</label>
                                     <select
-                                        value={data.ID_Sede}
-                                        onChange={e => setData('ID_Sede', e.target.value)}
-                                        className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.ID_Sede ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
+                                        value={data.Codigo_Sede}
+                                        onChange={e => setData('Codigo_Sede', e.target.value)}
+                                        className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.Codigo_Sede ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
                                     >
                                         <option value="">Seleccionar Sede...</option>
-                                        {sedes.map(s => <option key={s.ID_Sede} value={s.ID_Sede}>{s.Nombre_Sede}</option>)}
+                                        {sedes.map(s => <option key={s.Codigo_Sede} value={s.Codigo_Sede.toString()}>{s.Nombre_Sede}</option>)}
                                     </select>
-                                    {errors.ID_Sede && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.ID_Sede}</p>}
+                                    {errors.Codigo_Sede && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Codigo_Sede}</p>}
                                 </div>
                             </div>
                             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

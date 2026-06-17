@@ -10,6 +10,7 @@ class FacultadController extends CatalogoController
 {
     protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'facultad';
+    protected string $routeBase = 'facultades';
 
     public function __construct()
     {

@@ -3,7 +3,7 @@ import MainLayout from '@/Layout/MainLayout';
 
 interface Normativa {
   ID_Normativa: number;
-  ID_Programa: number;
+  Codigo_Programa: number;
   Tipo_Normativa: string;
   Numero_Normativa: string;
   Anio_Normativa: number;
@@ -15,6 +15,7 @@ interface Normativa {
 
 interface Programa {
   ID_Programa: number;
+  Codigo_Programa: number;
   Nombre_Programa: string;
 }
 
@@ -28,7 +29,7 @@ export default function NormativasForm({ normativa, programas }: Props) {
   const isEditing = !!normativa;
   
   const { data, setData, post, put, processing, errors } = useForm({
-    ID_Programa: normativa?.ID_Programa?.toString() || '',
+    Codigo_Programa: normativa?.Codigo_Programa?.toString() || '',
     Tipo_Normativa: normativa?.Tipo_Normativa || 'Acuerdo',
     Numero_Normativa: normativa?.Numero_Normativa || '',
     Anio_Normativa: normativa?.Anio_Normativa?.toString() || new Date().getFullYear().toString(),
@@ -113,12 +114,12 @@ export default function NormativasForm({ normativa, programas }: Props) {
                     <div className="space-y-2">
                         <label className="text-[10px] font-black uppercase text-slate-500 ml-1">Programa Académico *</label>
                         <select 
-                            value={data.ID_Programa} 
-                            onChange={e => setData('ID_Programa', e.target.value)}
+                            value={data.Codigo_Programa} 
+                            onChange={e => setData('Codigo_Programa', e.target.value)}
                             className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all focus:ring-4 focus:ring-blue-100"
                         >
                             <option value="">Seleccionar...</option>
-                            {programas.map(p => <option key={p.ID_Programa} value={p.ID_Programa}>{p.Nombre_Programa}</option>)}
+                            {programas.map(p => <option key={p.Codigo_Programa.toString()} value={p.Codigo_Programa.toString()}>{p.Nombre_Programa}</option>)}
                         </select>
                     </div>
                     <div className="space-y-2">

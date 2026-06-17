@@ -78,7 +78,7 @@ export default function AgrupacionesForm({ agrupacion, programas = [], component
                                         className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.ID_Programa ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
                                     >
                                         <option value="">Seleccionar programa...</option>
-                                        {programas.map(p => <option key={p.ID_Programa} value={p.ID_Programa}>{p.Nombre_Programa}</option>)}
+                                    {programas.map(p => <option key={p.ID_Programa.toString()} value={p.ID_Programa.toString()}>{p.Nombre_Programa}</option>)}
                                     </select>
                                     {errors.ID_Programa && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.ID_Programa}</p>}
                                 </div>
@@ -90,7 +90,7 @@ export default function AgrupacionesForm({ agrupacion, programas = [], component
                                         className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
                                     >
                                         <option value="">Seleccionar componente...</option>
-                                        {componentes.map(c => <option key={c.ID_Componente} value={c.ID_Componente}>{c.Nombre_Componente}</option>)}
+                                        {componentes.map(c => <option key={c.ID_Componente.toString()} value={c.ID_Componente.toString()}>{c.Nombre_Componente}</option>)}
                                     </select>
                                 </div>
                             </div>

@@ -4,7 +4,7 @@ import MainLayout from '@/Layout/MainLayout';
 interface Props {
     sede?: {
         ID_Sede: number;
-        Codigo_Sede: string | null;
+        Codigo_Sede: number;
         Nombre_Sede: string;
         Ciudad_Sede: string;
         Direccion_Sede: string | null;
@@ -19,7 +19,7 @@ export default function SedesForm({ sede }: Props) {
     const isEditing = !!sede;
     
     const { data, setData, post, put, processing, errors } = useForm({
-        Codigo_Sede: sede?.Codigo_Sede || '',
+        Codigo_Sede: sede?.Codigo_Sede?.toString() || '',
         Nombre_Sede: sede?.Nombre_Sede || '',
         Ciudad_Sede: sede?.Ciudad_Sede || '',
         Direccion_Sede: sede?.Direccion_Sede || '',

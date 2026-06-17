@@ -23,6 +23,10 @@ class Sede extends Model
         'Url_Sede',
     ];
 
+    protected $casts = [
+        'Codigo_Sede' => 'string',
+    ];
+
     public function facultades(): HasMany
     {
         return $this->hasMany(Facultad::class, 'Codigo_Sede', 'Codigo_Sede');

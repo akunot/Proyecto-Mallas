@@ -4,6 +4,11 @@ use Illuminate\Support\Facades\Route;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use App\Http\Controllers\Api\SedeController;
+use App\Models\Asignatura;
+use App\Models\Usuario;
+use App\Models\LogActividad;
+use App\Models\CargaMalla;
+use App\Models\PlantillaAgrupacion;
 use App\Http\Controllers\Api\FacultadController;
 use App\Http\Controllers\Api\ProgramaController;
 use App\Http\Controllers\Api\NormativaController;
@@ -15,6 +20,10 @@ use App\Http\Controllers\Api\AuthController;
 use App\Models\Sede;
 use App\Models\Facultad;
 use App\Models\Programa;
+use App\Models\MallaCurricular;
+use App\Models\Agrupacion;
+use App\Models\Normativa;
+use App\Models\Componente;
 
 /*
 |--------------------------------------------------------------------------
@@ -26,10 +35,67 @@ use App\Models\Programa;
 |
 */
 
-// Ruta raíz - redirigir a login
-Route::get('/', function () {
-    return Inertia::location('/login');
-})->name('home');
+// ============================================================================
+// VISTAS PÚBLICAS — Sistema de Mallas (sin autenticación)
+// ============================================================================
+
+/**
+ * Lógica compartida para renderizar el listado de programas activos.
+ */
+$renderProgramasActivos = function () {
+    // Obtener todas las facultades activas
+    $facultades = Facultad::where('Esta_Activo', 1)->orderBy('Nombre_Facultad')->get();
+    
+    $data = $facultades->map(function ($facultad) {
+        // Programas que pertenecen a esta facultad y tienen al menos una malla ACTIVA
+        // Nota: Estado "activa" en minúsculas (valor real en BD)
+        $programas = Programa::where('Codigo_Facultad', $facultad->Codigo_Facultad)
+            ->where('Esta_Activo', 1)
+            ->whereHas('mallas', function ($query) {
+                $query->whereIn('Estado', ['activa', 'ACTIVO']);
+            })
+            ->with(['mallas' => function ($query) {
+                $query->whereIn('Estado', ['activa', 'ACTIVO'])->orderBy('Fecha_Vigencia', 'desc');
+            }])
+            ->orderBy('Nombre_Programa')
+            ->get()
+            ->map(function ($programa) {
+                $mallaActiva = $programa->mallas->first();
+                return [
+                    'ID_Programa'   => $programa->ID_Programa,
+                    'Nombre_Programa' => $programa->Nombre_Programa,
+                    'Codigo_Programa' => $programa->Codigo_Programa,
+                    'Nivel_Formacion' => $programa->Nivel_Formacion,
+                    'Creditos_Totales' => $programa->Creditos_Totales,
+                    'Duracion_Semestres' => $programa->Duracion_Semestres,
+                    'Codigo_SNIES'    => $programa->Codigo_SNIES,
+                    'Titulo_Otorgado' => $programa->Titulo_Otorgado,
+                    'ID_Malla'        => $mallaActiva ? $mallaActiva->ID_Malla : null,
+                    'Estado_Malla'    => $mallaActiva ? $mallaActiva->Estado : null,
+                ];
+            })
+            ->filter(fn($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))
+            ->values();
+
+        return [
+            'ID_Facultad'      => $facultad->ID_Facultad,
+            'Nombre_Facultad'  => $facultad->Nombre_Facultad,
+            'Codigo_Facultad'  => $facultad->Codigo_Facultad,
+            'Url_Facultad'     => $facultad->Url_Facultad,
+            'programas'        => $programas,
+        ];
+    })->filter(fn($f) => $f['programas']->isNotEmpty())->values();
+
+    return Inertia::render('Inicio/ProgramasActivos', [
+        'facultades' => $data,
+    ]);
+};
+
+// Ruta raíz — muestra el listado público de programas activos
+Route::get('/', $renderProgramasActivos)->name('home');
+
+// Ruta alternativa /inicio (por si alguien la usa)
+Route::get('/inicio', $renderProgramasActivos);
 
 // Rutas de autenticación (públicas) - usan sesión para mantener estado
 Route::inertia('/login', 'Auth/Login')->name('login');
@@ -38,7 +104,184 @@ Route::inertia('/login', 'Auth/Login')->name('login');
 Route::post('/auth/request-otp', [AuthController::class, 'requestOtp']);
 Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
 
-// Rutas protegidas (requieren autenticación usando sesión web)
+/**
+ * Vista de Detalle — Malla Académica por Programa
+ * Muestra la estructura completa de la malla activa de un programa.
+ */
+Route::get('/malla-publica/{id_programa}', function ($id_programa) {
+    $programa = Programa::with('facultad')->findOrFail($id_programa);
+
+    // Buscar la malla activa para este programa
+    // Cargar la malla activa con sus agrupaciones y asignaturas
+    // Las agrupaciones ya pertenecen a esta malla (ID_Malla),
+    // y las asignaturas vienen a través de la relación BelongsToMany
+    $malla = MallaCurricular::with([
+        'normativa',
+        'agrupaciones' => function ($query) {
+            $query->orderBy('Nombre_Agrupacion');
+        },
+        'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
+        'agrupaciones.componente',
+        'agrupaciones.slots',
+    ])
+    ->where('ID_Programa', $id_programa)
+    ->whereIn('Estado', ['activa', 'ACTIVO'])
+    ->orderBy('Fecha_Vigencia', 'desc')
+    ->first();
+
+    // Si no hay malla activa, retornar estado de no disponible
+    if (!$malla) {
+        return Inertia::render('Mallas/DetallePublico', [
+            'disponible' => false,
+            'programa'   => [
+                'ID_Programa'   => $programa->ID_Programa,
+                'Nombre_Programa' => $programa->Nombre_Programa,
+                'Nivel_Formacion' => $programa->Nivel_Formacion,
+                'Duracion_Semestres' => $programa->Duracion_Semestres,
+            ],
+        ]);
+    }
+
+    // Construir semestres con asignaturas y slots
+    $semestres = collect();
+    $maxSemestre = $programa->Duracion_Semestres ?? 10;
+
+    foreach ($malla->agrupaciones as $agrupacion) {
+        // En la vista pública solo se renderizan como tarjetas las asignaturas
+        // de tipo 'obligatoria'. Las de tipo 'optativa' se acceden a través del
+        // catálogo de los slots (placeholder). También se muestran asignaturas
+        // de agrupaciones no obligatorias sin slots (ej. INGLES).
+        $mostrarAgrupacion = $agrupacion->Es_Obligatoria || $agrupacion->slots->isEmpty();
+        if ($mostrarAgrupacion) {
+            foreach ($agrupacion->asignaturas as $asignatura) {
+                // Solo mostrar asignaturas marcadas como 'obligatoria' en el pivot
+                $tipo = $asignatura->pivot->Tipo_Asignatura ?? '';
+                if ($tipo !== 'obligatoria') {
+                    continue;
+                }
+                $semestre = $asignatura->pivot->Semestre_Sugerido ?? 1;
+                if ($semestre > $maxSemestre) $semestre = $maxSemestre;
+                
+                if (!$semestres->has($semestre)) {
+                    $semestres->put($semestre, collect(['asignaturas' => collect(), 'slots' => collect()]));
+                }
+                
+                $semestres->get($semestre)['asignaturas']->push([
+                    'ID_Asignatura'      => $asignatura->ID_Asignatura,
+                    'Nombre_Asignatura'  => $asignatura->Nombre_Asignatura,
+                    'Codigo_Asignatura'  => $asignatura->Codigo_Asignatura,
+                    'Creditos_Asignatura' => $asignatura->Creditos_Asignatura,
+                    'Horas_Presencial'   => $asignatura->Horas_Presencial ?? 0,
+                    'Horas_Estudiante'   => $asignatura->Horas_Estudiante ?? 0,
+                    'Tipo_Asignatura'    => $asignatura->pivot->Tipo_Asignatura ?? 'obligatoria',
+                    'Nombre_Agrupacion'  => $agrupacion->Nombre_Agrupacion,
+                    'ID_Componente'      => $agrupacion->ID_Componente,
+                    'Nombre_Componente'  => $agrupacion->componente->Nombre_Componente ?? 'General',
+                    'Tipo_Agrupacion'    => $agrupacion->Tipo_Agrupacion,
+                    'Orden'              => $asignatura->pivot->Orden ?? 0,
+                    // Incluir requisitos si existen
+                    'requisitos'         => $asignatura->requisitos->map(fn($r) => [
+                        'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
+                        'Tipo_Requisito'          => $r->Tipo_Requisito,
+                        'Descripcion_Requisito'   => $r->Descripcion_Requisito,
+                        'asignatura_requerida'    => $r->asignaturaRequerida ? [
+                            'Nombre_Asignatura' => $r->asignaturaRequerida->Nombre_Asignatura,
+                            'Codigo_Asignatura' => $r->asignaturaRequerida->Codigo_Asignatura,
+                        ] : null,
+                    ])->toArray(),
+                ]);
+            }
+        }
+
+        // Agregar slots
+        foreach ($agrupacion->slots as $slot) {
+            $semestre = $slot->Semestre ?? 1;
+            if ($semestre > $maxSemestre) $semestre = $maxSemestre;
+            
+            if (!$semestres->has($semestre)) {
+                $semestres->put($semestre, collect(['asignaturas' => collect(), 'slots' => collect()]));
+            }
+            
+            $semestres->get($semestre)['slots']->push([
+                'ID_Slot'           => $slot->ID_Slot,
+                'ID_Agrupacion'     => $slot->ID_Agrupacion,
+                'Nombre_Slot'       => $slot->Nombre_Slot,
+                'Tipo_Slot'         => $slot->Tipo_Slot,
+                'Semestre'          => $slot->Semestre,
+                'Orden'             => $slot->Orden,
+                'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
+                'ID_Componente'     => $agrupacion->ID_Componente,
+            ]);
+        }
+    }
+
+    // Llenar semestres vacíos
+    for ($i = 1; $i <= $maxSemestre; $i++) {
+        if (!$semestres->has($i)) {
+            $semestres->put($i, collect(['asignaturas' => collect(), 'slots' => collect()]));
+        }
+    }
+
+    // Ordenar y estructurar
+    $semestres = $semestres->sortKeys()->map(function ($data, $semestre) {
+        return [
+            'semestre'    => $semestre,
+            'asignaturas' => $data['asignaturas']->sortBy('Nombre_Asignatura')->values(),
+            'slots'       => $data['slots']->sortBy('Orden')->values(),
+        ];
+    })->values();
+
+    // Resumen de créditos por agrupación
+    $resumenCreditos = $malla->agrupaciones->map(function ($agrupacion) {
+        $totalCreditos = $agrupacion->asignaturas->sum('Creditos_Asignatura');
+        $totalHorasP = $agrupacion->asignaturas->sum('Horas_Presencial');
+        $totalHorasE = $agrupacion->asignaturas->sum('Horas_Estudiante');
+        return [
+            'Nombre_Agrupacion'  => $agrupacion->Nombre_Agrupacion,
+            'Tipo_Agrupacion'    => $agrupacion->Tipo_Agrupacion,
+            'Creditos_Requeridos' => $agrupacion->Creditos_Requeridos,
+            'Total_Creditos'     => $totalCreditos,
+            'Total_Horas_P'      => $totalHorasP,
+            'Total_Horas_E'      => $totalHorasE,
+            'Es_Obligatoria'     => $agrupacion->Es_Obligatoria,
+            'Nombre_Componente'  => $agrupacion->componente->Nombre_Componente ?? 'General',
+        ];
+    });
+
+    return Inertia::render('Mallas/DetallePublico', [
+        'disponible' => true,
+        'programa'   => [
+            'ID_Programa'        => $programa->ID_Programa,
+            'Nombre_Programa'    => $programa->Nombre_Programa,
+            'Nivel_Formacion'    => $programa->Nivel_Formacion,
+            'Duracion_Semestres' => $programa->Duracion_Semestres,
+            'Creditos_Totales'   => $programa->Creditos_Totales,
+            'Codigo_SNIES'       => $programa->Codigo_SNIES,
+            'Titulo_Otorgado'    => $programa->Titulo_Otorgado,
+            'Facultad'           => $programa->facultad->Nombre_Facultad ?? '',
+        ],
+        'malla' => [
+            'ID_Malla'          => $malla->ID_Malla,
+            'Version_Etiqueta'  => $malla->Version_Etiqueta,
+            'Version_Numero'    => $malla->Version_Numero,
+            'Fecha_Vigencia'    => $malla->Fecha_Vigencia,
+            'Estado'            => $malla->Estado,
+            'Normativa'         => $malla->normativa ? [
+                'Tipo_Normativa'   => $malla->normativa->Tipo_Normativa,
+                'Numero_Normativa' => $malla->normativa->Numero_Normativa,
+                'Instancia'        => $malla->normativa->Instancia,
+                'Anio_Normativa'   => $malla->normativa->Anio_Normativa,
+            ] : null,
+        ],
+        'semestres'      => $semestres,
+        'resumenCreditos' => $resumenCreditos,
+    ]);
+})->name('malla.publica');
+
+// ============================================================================
+// RUTAS PROTEGIDAS (requieren autenticación usando sesión web)
+// ============================================================================
+
 Route::middleware(['auth'])->group(function () {
     // Cerrar sesión
     Route::post('/auth/logout', [AuthController::class, 'logout']);
@@ -49,10 +292,10 @@ Route::middleware(['auth'])->group(function () {
         $facultadesCount = Facultad::count();
         $programasCount = Programa::count();
         $asignaturasCount = \App\Models\Asignatura::count();
-        $mallasCount = \App\Models\MallaCurricular::count();
+        $mallasCount = MallaCurricular::count();
         $usuariosCount = \App\Models\Usuario::count();
         $normativasCount = \App\Models\Normativa::count();
-        $componentesCount = \App\Models\Componente::count();
+        $componentesCount = Componente::count();
         $agrupacionesCount = \App\Models\PlantillaAgrupacion::count();
         
         // Cargas pendientes de aprobación
@@ -123,6 +366,10 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('sedes');
+    Route::post('/sedes', [SedeController::class, 'store']);
+    Route::put('/sedes/{id}', [SedeController::class, 'update']);
+    Route::post('/componentes', [ComponenteController::class, 'store']);
+    Route::put('/componentes/{id}', [ComponenteController::class, 'update']);
     Route::get('/sedes/create', function () {
         return Inertia::render('Catalogos/SedesForm');
     })->name('sedes.create');
@@ -172,16 +419,18 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'sedes' => Sede::select('ID_Sede', 'Nombre_Sede')->get(),
+            'sedes' => \App\Models\Sede::select('Codigo_Sede', 'Nombre_Sede')->get(),
         ]);
     })->name('facultades');
+    Route::post('/facultades', [FacultadController::class, 'store']);
     Route::get('/facultades/create', function () {
-        $sedes = Sede::select('ID_Sede', 'Nombre_Sede')->get();
+        $sedes = Sede::select('Codigo_Sede', 'Nombre_Sede')->get();
         return Inertia::render('Catalogos/FacultadesForm', [
             'sedes' => $sedes,
         ]);
     })->name('facultades.create');
     Route::get('/facultades/{id}/edit', [FacultadController::class, 'edit']);
+    Route::put('/facultades/{id}', [FacultadController::class, 'update']);
     Route::patch('/facultades/{id}/toggle', [FacultadController::class, 'toggle']);
     Route::delete('/facultades/{id}', [FacultadController::class, 'destroy']);
     
@@ -221,12 +470,13 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('programas');
     Route::get('/programas/create', function () {
-        $facultades = \App\Models\Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get();
+        $facultades = \App\Models\Facultad::select('Codigo_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get();
         return Inertia::render('Catalogos/ProgramasForm', [
             'facultades' => $facultades,
         ]);
     })->name('programas.create');
     Route::get('/programas/{id}/edit', [ProgramaController::class, 'edit']);
+    Route::put('/programas/{id}', [ProgramaController::class, 'update']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
     
     // Catálogos - Normativas
@@ -246,13 +496,38 @@ Route::middleware(['auth'])->group(function () {
         // Ordenamiento
         $sortField = $request->sort_by ?? 'ID_Normativa';
         $sortOrder = $request->sort_order ?? 'asc';
-        $query->orderBy($sortField, $sortOrder);
+        
+        // Validar campos permitidos para ordenamiento (solo columnas reales en BD)
+        $allowedSortFields = ['ID_Normativa', 'Tipo_Normativa', 'Numero_Normativa', 'Anio_Normativa', 'Instancia', 'Esta_Activo'];
+        
+        if (in_array($sortField, $allowedSortFields)) {
+            $query->orderBy($sortField, $sortOrder);
+        } else {
+            $query->orderBy('ID_Normativa', $sortOrder);
+        }
 
         $normativas = $query->paginate(20)->withQueryString();
+        
+        // Mapear datos para incluir Nombre_Programa directamente
+        $normativasData = collect($normativas->items())->map(function ($normativa) {
+            return [
+                'ID_Normativa' => $normativa->ID_Normativa,
+                'ID_Programa' => $normativa->ID_Programa,
+                'Codigo_Programa' => $normativa->Codigo_Programa,
+                'Tipo_Normativa' => $normativa->Tipo_Normativa,
+                'Numero_Normativa' => $normativa->Numero_Normativa,
+                'Anio_Normativa' => $normativa->Anio_Normativa,
+                'Instancia' => $normativa->Instancia,
+                'Descripcion_Normativa' => $normativa->Descripcion_Normativa,
+                'Url_Normativa' => $normativa->Url_Normativa,
+                'Esta_Activo' => $normativa->Esta_Activo,
+                'Nombre_Programa' => $normativa->programa?->Nombre_Programa ?? null,
+            ];
+        });
 
         return Inertia::render('Catalogos/Normativas', [
             'normativas' => [
-                'data' => $normativas->items(),
+                'data' => $normativasData,
                 'meta' => [
                     'current_page' => $normativas->currentPage(),
                     'total' => $normativas->total(),
@@ -262,21 +537,22 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'programas' => Programa::select('ID_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get(),
+            'programas' => Programa::select('ID_Programa', 'Codigo_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get(),
         ]);
     })->name('normativas');
     Route::get('/normativas/create', function () {
-        $programas = Programa::select('ID_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get();
+        $programas = Programa::select('ID_Programa', 'Codigo_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get();
         return Inertia::render('Catalogos/NormativasForm', [
             'programas' => $programas,
         ]);
     })->name('normativas.create');
     Route::get('/normativas/{id}/edit', [NormativaController::class, 'edit']);
+    Route::put('/normativas/{id}', [NormativaController::class, 'update']);
     Route::patch('/normativas/{id}/toggle', [NormativaController::class, 'toggle']);
     
     // Catálogos - Componentes
     Route::get('/componentes', function (Illuminate\Http\Request $request) {
-        $query = \App\Models\Componente::query();
+        $query = Componente::query();
 
         // Búsqueda por nombre
         if ($request->has('search') && $request->search) {
@@ -307,6 +583,10 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/componentes/create', 'Catalogos/ComponentesForm')->name('componentes.create');
     Route::get('/componentes/{id}/edit', [ComponenteController::class, 'edit']);
     Route::patch('/componentes/{id}/toggle', [ComponenteController::class, 'toggle']);
+    Route::post('/asignaturas', [AsignaturaController::class, 'store']);
+    Route::put('/asignaturas/{id}', [AsignaturaController::class, 'update']);
+    Route::post('/usuarios', [UsuarioController::class, 'store']);
+    Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
     
     // Catálogos - Agrupaciones
     Route::get('/agrupaciones', function (Illuminate\Http\Request $request) {
@@ -340,13 +620,14 @@ Route::middleware(['auth'])->group(function () {
     })->name('agrupaciones');
     Route::get('/agrupaciones/create', function () {
         $programas = \App\Models\Programa::select('ID_Programa', 'Nombre_Programa')->get();
-        $componentes = \App\Models\Componente::select('ID_Componente', 'Nombre_Componente')->get();
+        $componentes = Componente::select('ID_Componente', 'Nombre_Componente')->get();
         return Inertia::render('Catalogos/AgrupacionesForm', [
             'programas' => $programas,
             'componentes' => $componentes,
         ]);
     })->name('agrupaciones.create');
     Route::get('/agrupaciones/{id}/edit', [AgrupacionController::class, 'edit']);
+    Route::put('/agrupaciones/{id}', [AgrupacionController::class, 'update']);
     Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
     Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
     
@@ -379,6 +660,8 @@ Route::middleware(['auth'])->group(function () {
                     'total' => $asignaturas->total(),
                     'per_page' => $asignaturas->perPage(),
                     'last_page' => $asignaturas->lastPage(),
+                    'sort_by' => $sortField,
+                    'sort_order' => $sortOrder,
                 ],
             ],
         ]);
@@ -429,7 +712,7 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/cargas', 'Cargas/Cargas')->name('cargas');
 
     Route::get('/mallas', function (Illuminate\Http\Request $request) {
-        $mallas = \App\Models\MallaCurricular::with('programa')
+        $mallas = MallaCurricular::with('programa')
             ->orderBy('ID_Malla', 'desc')
             ->paginate(15);
         
@@ -446,7 +729,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('mallas.index');
 
     Route::get('/mallas/{id}', function ($id) {
-        $malla = \App\Models\MallaCurricular::with([
+        $malla = MallaCurricular::with([
             'programa', 
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
             'agrupaciones.componente'
@@ -458,7 +741,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('mallas.show');
 
     Route::get('/mallas/{id}/grafica', function ($id) {
-        $malla = \App\Models\MallaCurricular::with([
+        $malla = MallaCurricular::with([
             'programa',
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
             'agrupaciones.componente',
