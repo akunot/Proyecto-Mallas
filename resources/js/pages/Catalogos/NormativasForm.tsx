@@ -40,8 +40,12 @@ export default function NormativasForm({ normativa, programas }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditing) put(`/normativas/${normativa.ID_Normativa}`);
-    else post('/normativas');
+
+    if (isEditing) {
+put(`/normativas/${normativa.ID_Normativa}`);
+} else {
+post('/normativas');
+}
   };
 
   return (

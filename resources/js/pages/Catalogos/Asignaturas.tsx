@@ -1,6 +1,6 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
+import MainLayout from '@/Layout/MainLayout';
 
 interface Asignatura {
     ID_Asignatura: number;

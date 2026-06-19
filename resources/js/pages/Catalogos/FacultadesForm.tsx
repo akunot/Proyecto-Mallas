@@ -39,8 +39,12 @@ export default function FacultadesForm({ facultad, sedes }: Props) {
 
     const onSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (isEditing) put(`/facultades/${facultad.ID_Facultad}`);
-        else post('/facultades');
+
+        if (isEditing) {
+put(`/facultades/${facultad.ID_Facultad}`);
+} else {
+post('/facultades');
+}
     };
 
     return (

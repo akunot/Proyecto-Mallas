@@ -1,5 +1,5 @@
-import React from 'react';
 import { Head, Link } from '@inertiajs/react';
+import React from 'react';
 import Layout from '@/Layout/MainLayout';
 
 // --- Interfaces ---

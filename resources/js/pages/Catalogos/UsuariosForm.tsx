@@ -22,6 +22,7 @@ export default function UsuariosForm({ usuario }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (isEditing) {
       put(`/usuarios/${usuario.ID_Usuario}`);
     } else {

@@ -60,7 +60,16 @@ Route::prefix('v1/public')->group(function () {
     
     // Ver programas por facultad (público)
     Route::get('/facultades/{id}/programas', [ProgramaController::class, 'index']);
-    
+
+    // Ver malla de un programa con la misma estructura que usa el Visualizador (público)
+    Route::get('/programas/{id}/malla-visualizador', [MallaController::class, 'publicVisualizer']);
+
+    // Catálogo público de electivas/libre elección (sin autenticación)
+    Route::get('/electivas', [AsignaturaController::class, 'catalogo']);
+
+    // Optativas públicas de una malla (sin autenticación)
+    Route::get('/mallas/{mallaId}/optativas', [MallaController::class, 'optativas']);
+
     // Test endpoint - probar si la API responde
     Route::get('/test', function() {
         return response()->json(['message' => 'API funcionando', 'status' => 'ok']);

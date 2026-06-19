@@ -111,26 +111,13 @@ Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
 Route::get('/malla-publica/{id_programa}', function ($id_programa) {
     $programa = Programa::with('facultad')->findOrFail($id_programa);
 
-    // Buscar la malla activa para este programa
-    // Cargar la malla activa con sus agrupaciones y asignaturas
-    // Las agrupaciones ya pertenecen a esta malla (ID_Malla),
-    // y las asignaturas vienen a través de la relación BelongsToMany
-    $malla = MallaCurricular::with([
-        'normativa',
-        'agrupaciones' => function ($query) {
-            $query->orderBy('Nombre_Agrupacion');
-        },
-        'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-        'agrupaciones.componente',
-        'agrupaciones.slots',
-    ])
-    ->where('ID_Programa', $id_programa)
-    ->whereIn('Estado', ['activa', 'ACTIVO'])
-    ->orderBy('Fecha_Vigencia', 'desc')
-    ->first();
+    // Construir la malla con exactamente la misma estructura de "agrupaciones"
+    // que utiliza el Visualizador (MallaController::buildPublicVisualizerPayload),
+    // evitando duplicar la lógica de consulta/transformación en el frontend público.
+    $mallaEstructurada = \App\Http\Controllers\Api\MallaController::buildPublicVisualizerPayload((int) $id_programa);
 
     // Si no hay malla activa, retornar estado de no disponible
-    if (!$malla) {
+    if (!$mallaEstructurada) {
         return Inertia::render('Mallas/DetallePublico', [
             'disponible' => false,
             'programa'   => [
@@ -141,112 +128,6 @@ Route::get('/malla-publica/{id_programa}', function ($id_programa) {
             ],
         ]);
     }
-
-    // Construir semestres con asignaturas y slots
-    $semestres = collect();
-    $maxSemestre = $programa->Duracion_Semestres ?? 10;
-
-    foreach ($malla->agrupaciones as $agrupacion) {
-        // En la vista pública solo se renderizan como tarjetas las asignaturas
-        // de tipo 'obligatoria'. Las de tipo 'optativa' se acceden a través del
-        // catálogo de los slots (placeholder). También se muestran asignaturas
-        // de agrupaciones no obligatorias sin slots (ej. INGLES).
-        $mostrarAgrupacion = $agrupacion->Es_Obligatoria || $agrupacion->slots->isEmpty();
-        if ($mostrarAgrupacion) {
-            foreach ($agrupacion->asignaturas as $asignatura) {
-                // Solo mostrar asignaturas marcadas como 'obligatoria' en el pivot
-                $tipo = $asignatura->pivot->Tipo_Asignatura ?? '';
-                if ($tipo !== 'obligatoria') {
-                    continue;
-                }
-                $semestre = $asignatura->pivot->Semestre_Sugerido ?? 1;
-                if ($semestre > $maxSemestre) $semestre = $maxSemestre;
-                
-                if (!$semestres->has($semestre)) {
-                    $semestres->put($semestre, collect(['asignaturas' => collect(), 'slots' => collect()]));
-                }
-                
-                $semestres->get($semestre)['asignaturas']->push([
-                    'ID_Asignatura'      => $asignatura->ID_Asignatura,
-                    'Nombre_Asignatura'  => $asignatura->Nombre_Asignatura,
-                    'Codigo_Asignatura'  => $asignatura->Codigo_Asignatura,
-                    'Creditos_Asignatura' => $asignatura->Creditos_Asignatura,
-                    'Horas_Presencial'   => $asignatura->Horas_Presencial ?? 0,
-                    'Horas_Estudiante'   => $asignatura->Horas_Estudiante ?? 0,
-                    'Tipo_Asignatura'    => $asignatura->pivot->Tipo_Asignatura ?? 'obligatoria',
-                    'Nombre_Agrupacion'  => $agrupacion->Nombre_Agrupacion,
-                    'ID_Componente'      => $agrupacion->ID_Componente,
-                    'Nombre_Componente'  => $agrupacion->componente->Nombre_Componente ?? 'General',
-                    'Tipo_Agrupacion'    => $agrupacion->Tipo_Agrupacion,
-                    'Orden'              => $asignatura->pivot->Orden ?? 0,
-                    // Incluir requisitos si existen
-                    'requisitos'         => $asignatura->requisitos->map(fn($r) => [
-                        'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
-                        'Tipo_Requisito'          => $r->Tipo_Requisito,
-                        'Descripcion_Requisito'   => $r->Descripcion_Requisito,
-                        'asignatura_requerida'    => $r->asignaturaRequerida ? [
-                            'Nombre_Asignatura' => $r->asignaturaRequerida->Nombre_Asignatura,
-                            'Codigo_Asignatura' => $r->asignaturaRequerida->Codigo_Asignatura,
-                        ] : null,
-                    ])->toArray(),
-                ]);
-            }
-        }
-
-        // Agregar slots
-        foreach ($agrupacion->slots as $slot) {
-            $semestre = $slot->Semestre ?? 1;
-            if ($semestre > $maxSemestre) $semestre = $maxSemestre;
-            
-            if (!$semestres->has($semestre)) {
-                $semestres->put($semestre, collect(['asignaturas' => collect(), 'slots' => collect()]));
-            }
-            
-            $semestres->get($semestre)['slots']->push([
-                'ID_Slot'           => $slot->ID_Slot,
-                'ID_Agrupacion'     => $slot->ID_Agrupacion,
-                'Nombre_Slot'       => $slot->Nombre_Slot,
-                'Tipo_Slot'         => $slot->Tipo_Slot,
-                'Semestre'          => $slot->Semestre,
-                'Orden'             => $slot->Orden,
-                'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
-                'ID_Componente'     => $agrupacion->ID_Componente,
-            ]);
-        }
-    }
-
-    // Llenar semestres vacíos
-    for ($i = 1; $i <= $maxSemestre; $i++) {
-        if (!$semestres->has($i)) {
-            $semestres->put($i, collect(['asignaturas' => collect(), 'slots' => collect()]));
-        }
-    }
-
-    // Ordenar y estructurar
-    $semestres = $semestres->sortKeys()->map(function ($data, $semestre) {
-        return [
-            'semestre'    => $semestre,
-            'asignaturas' => $data['asignaturas']->sortBy('Nombre_Asignatura')->values(),
-            'slots'       => $data['slots']->sortBy('Orden')->values(),
-        ];
-    })->values();
-
-    // Resumen de créditos por agrupación
-    $resumenCreditos = $malla->agrupaciones->map(function ($agrupacion) {
-        $totalCreditos = $agrupacion->asignaturas->sum('Creditos_Asignatura');
-        $totalHorasP = $agrupacion->asignaturas->sum('Horas_Presencial');
-        $totalHorasE = $agrupacion->asignaturas->sum('Horas_Estudiante');
-        return [
-            'Nombre_Agrupacion'  => $agrupacion->Nombre_Agrupacion,
-            'Tipo_Agrupacion'    => $agrupacion->Tipo_Agrupacion,
-            'Creditos_Requeridos' => $agrupacion->Creditos_Requeridos,
-            'Total_Creditos'     => $totalCreditos,
-            'Total_Horas_P'      => $totalHorasP,
-            'Total_Horas_E'      => $totalHorasE,
-            'Es_Obligatoria'     => $agrupacion->Es_Obligatoria,
-            'Nombre_Componente'  => $agrupacion->componente->Nombre_Componente ?? 'General',
-        ];
-    });
 
     return Inertia::render('Mallas/DetallePublico', [
         'disponible' => true,
@@ -260,21 +141,7 @@ Route::get('/malla-publica/{id_programa}', function ($id_programa) {
             'Titulo_Otorgado'    => $programa->Titulo_Otorgado,
             'Facultad'           => $programa->facultad->Nombre_Facultad ?? '',
         ],
-        'malla' => [
-            'ID_Malla'          => $malla->ID_Malla,
-            'Version_Etiqueta'  => $malla->Version_Etiqueta,
-            'Version_Numero'    => $malla->Version_Numero,
-            'Fecha_Vigencia'    => $malla->Fecha_Vigencia,
-            'Estado'            => $malla->Estado,
-            'Normativa'         => $malla->normativa ? [
-                'Tipo_Normativa'   => $malla->normativa->Tipo_Normativa,
-                'Numero_Normativa' => $malla->normativa->Numero_Normativa,
-                'Instancia'        => $malla->normativa->Instancia,
-                'Anio_Normativa'   => $malla->normativa->Anio_Normativa,
-            ] : null,
-        ],
-        'semestres'      => $semestres,
-        'resumenCreditos' => $resumenCreditos,
+        'malla' => $mallaEstructurada,
     ]);
 })->name('malla.publica');
 
@@ -476,8 +343,10 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('programas.create');
     Route::get('/programas/{id}/edit', [ProgramaController::class, 'edit']);
+    Route::post('/programas', [ProgramaController::class, 'store']);
     Route::put('/programas/{id}', [ProgramaController::class, 'update']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
+    Route::delete('/programas/{id}', [ProgramaController::class, 'destroy']);
     
     // Catálogos - Normativas
     Route::get('/normativas', function (Illuminate\Http\Request $request) {
@@ -547,8 +416,10 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('normativas.create');
     Route::get('/normativas/{id}/edit', [NormativaController::class, 'edit']);
+    Route::post('/normativas', [NormativaController::class, 'store']);
     Route::put('/normativas/{id}', [NormativaController::class, 'update']);
     Route::patch('/normativas/{id}/toggle', [NormativaController::class, 'toggle']);
+    Route::delete('/normativas/{id}', [NormativaController::class, 'destroy']);
     
     // Catálogos - Componentes
     Route::get('/componentes', function (Illuminate\Http\Request $request) {
@@ -628,6 +499,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('agrupaciones.create');
     Route::get('/agrupaciones/{id}/edit', [AgrupacionController::class, 'edit']);
     Route::put('/agrupaciones/{id}', [AgrupacionController::class, 'update']);
+    Route::post('/agrupaciones', [AgrupacionController::class, 'store']);
     Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
     Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
     

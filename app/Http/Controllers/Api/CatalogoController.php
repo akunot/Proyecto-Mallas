@@ -203,7 +203,7 @@ class CatalogoController extends Controller
      */
     public function edit(int $id)
     {
-        $record = $this->model->newQuery()->with('programa')->findOrFail($id);
+        $record = $this->model->newQuery()->findOrFail($id);
         
         $relatedData = $this->getRelatedData();
         

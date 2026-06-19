@@ -1,5 +1,5 @@
-import { useMemo } from 'react';
 import { Head, Link } from '@inertiajs/react';
+import { useMemo } from 'react';
 import Layout from '@/Layout/MainLayout';
 
 interface Asignatura {
@@ -38,6 +38,7 @@ const getTipoBadge = (tipo: string) => {
         libre:       { bg: 'bg-gray-50',  text: 'text-gray-600' },
     };
     const c = config[tipo.toLowerCase()] ?? { bg: 'bg-gray-50', text: 'text-gray-600' };
+
     return (
         <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-medium ${c.bg} ${c.text}`}>
             {tipo}
@@ -53,6 +54,7 @@ const StatusPill = ({ tipo }: { tipo: string }) => {
         libre: "bg-slate-100 text-slate-600 border-slate-200",
     };
     const style = config[tipo.toLowerCase()] || config.libre;
+
     return <span className={`type-pill ${style}`}>{tipo}</span>;
 };
 
@@ -65,6 +67,7 @@ export default function MallaShow({ malla }: Props) {
             totalMaterias += ag.asignaturas.length;
             ag.asignaturas.forEach(as => totalCreditos += as.Creditos_Asignatura);
         });
+
         return { totalCreditos, totalMaterias };
     }, [malla]);
 
@@ -134,6 +137,7 @@ export default function MallaShow({ malla }: Props) {
                         .filter((agrup) => agrup.asignaturas.length > 0)
                         .map((agrup) => {
                             const areaCreditos = agrup.asignaturas.reduce((s, a) => s + a.Creditos_Asignatura, 0);
+
                             return (
                                 <section key={agrup.ID_Agrupacion} className="component-card">
                                     {/* Cabecera del Componente */}

@@ -126,6 +126,7 @@ class ApiClient {
     private async handleError(response: Response): Promise<Error> {
         try {
             const data = await response.json();
+
             return new Error(data.message || data.errors || 'Error en la solicitud');
         } catch {
             return new Error(`Error ${response.status}: ${response.statusText}`);

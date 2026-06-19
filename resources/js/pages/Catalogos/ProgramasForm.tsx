@@ -54,8 +54,12 @@ export default function ProgramasForm({ programa, facultades }: Props) {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditing) put(`/programas/${programa.ID_Programa}`);
-    else post('/programas');
+
+    if (isEditing) {
+put(`/programas/${programa.ID_Programa}`);
+} else {
+post('/programas');
+}
   };
 
   return (

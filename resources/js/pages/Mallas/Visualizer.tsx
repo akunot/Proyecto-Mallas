@@ -1,14 +1,24 @@
-import React, { useMemo, useState, useCallback } from 'react';
 import { Head, Link } from '@inertiajs/react';
+import React, { useMemo, useState, useCallback } from 'react';
 import Layout from '@/Layout/MainLayout';
 
 const PLACEHOLDER_RE = /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i;
 
 const formatTipoRequisito = (tipo: string): string => {
     const t = (tipo ?? '').toLowerCase();
-    if (t.includes('pre') || t === 'opcional' || t.includes('obligatorio')) return 'Prerrequisito';
-    if (t.includes('co')) return 'Correquisito';
-    if (t.includes('credito') || t.includes('crédito')) return 'Req. créditos';
+
+    if (t.includes('pre') || t === 'opcional' || t.includes('obligatorio')) {
+return 'Prerrequisito';
+}
+
+    if (t.includes('co')) {
+return 'Correquisito';
+}
+
+    if (t.includes('credito') || t.includes('crédito')) {
+return 'Req. créditos';
+}
+
     return tipo;
 };
 
@@ -127,11 +137,13 @@ export default function MallaGrafica({ malla }: Props) {
         setErrorElectivas(false);
         setElectivas([]);
         setSearchElectivas('');
+
         try {
             const res = await fetch(`/api/v1/electivas`, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
+
             if (res.ok) {
                 const data = await res.json();
                 setElectivas(data.data ?? []);
@@ -149,17 +161,20 @@ export default function MallaGrafica({ malla }: Props) {
         if (slot) {
             setSelectedOptativaSlot(slot);
         }
+
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
         setSearchOptativas('');
         setExpandedOptativa(null);
+
         try {
             const url = `/api/v1/mallas/${malla.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
             const res = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
+
             if (res.ok) {
                 const data = await res.json();
                 setOptativas(data.data ?? []);
@@ -174,11 +189,18 @@ export default function MallaGrafica({ malla }: Props) {
     };
 
     const selectedAsigData = useMemo(() => {
-        if (!selectedAsig) return null;
+        if (!selectedAsig) {
+return null;
+}
+
         for (const agrup of malla.agrupaciones) {
             const found = agrup.asignaturas.find(a => a.ID_Asignatura == selectedAsig);
-            if (found) return found;
+
+            if (found) {
+return found;
+}
         }
+
         return null;
     }, [selectedAsig, malla]);
 
@@ -186,17 +208,28 @@ export default function MallaGrafica({ malla }: Props) {
         const g: Record<number, GridItem[]> = {};
         src.agrupaciones.forEach(agrup => {
             agrup.asignaturas.forEach(asig => {
-                if (PLACEHOLDER_RE.test(asig.Codigo_Asignatura)) return;
+                if (PLACEHOLDER_RE.test(asig.Codigo_Asignatura)) {
+return;
+}
+
                 const item: GridItem = { ...asig, ID_Componente: agrup.ID_Componente, isSlot: false };
                 const sem = asig.pivot.Semestre_Sugerido || 0;
-                if (!g[sem]) g[sem] = [];
+
+                if (!g[sem]) {
+g[sem] = [];
+}
+
                 if (!g[sem].find(a => !a.isSlot && (a as Asignatura).ID_Asignatura === asig.ID_Asignatura)) {
                     g[sem].push(item);
                 }
             });
             (agrup.slots || []).forEach(slot => {
                 const sem = slot.Semestre || 0;
-                if (!g[sem]) g[sem] = [];
+
+                if (!g[sem]) {
+g[sem] = [];
+}
+
                 g[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente, Nombre_Agrupacion: agrup.Nombre_Agrupacion });
             });
         });
@@ -204,9 +237,11 @@ export default function MallaGrafica({ malla }: Props) {
             g[Number(sem)].sort((a, b) => {
                 const oa = a.isSlot ? ((a as Slot).Orden ?? 999) : ((a as Asignatura).pivot.Orden || 0);
                 const ob = b.isSlot ? ((b as Slot).Orden ?? 999) : ((b as Asignatura).pivot.Orden || 0);
+
                 return oa - ob;
             });
         });
+
         return g;
     }, []);
 
@@ -232,6 +267,7 @@ export default function MallaGrafica({ malla }: Props) {
         e.stopPropagation();
         const rect = (e.currentTarget as HTMLElement).getBoundingClientRect();
         const isUpperHalf = e.clientY < rect.top + rect.height / 2;
+
         if (isUpperHalf) {
             setDragOver({ sem, beforeKey: key });
         } else {
@@ -244,26 +280,44 @@ export default function MallaGrafica({ malla }: Props) {
 
     const handleDrop = (e: React.DragEvent, toSem: number) => {
         e.preventDefault();
-        if (!draggingKey) return;
+
+        if (!draggingKey) {
+return;
+}
 
         const isSlotKey = draggingKey.startsWith('slot-');
         const dragId    = parseInt(draggingKey.split('-')[1]);
 
         let dragItem: GridItem | null = null;
         let fromSem = -1;
+
         for (const [semStr, items] of Object.entries(semestres)) {
             const found = items.find(i =>
                 isSlotKey
                     ? i.isSlot  && (i as Slot).ID_Slot          === dragId
                     : !i.isSlot && (i as Asignatura).ID_Asignatura === dragId
             );
-            if (found) { dragItem = found; fromSem = Number(semStr); break; }
+
+            if (found) {
+ dragItem = found; fromSem = Number(semStr); break; 
+}
         }
-        if (!dragItem) { setDraggingKey(null); setDragOver(null); return; }
+
+        if (!dragItem) {
+ setDraggingKey(null); setDragOver(null);
+
+ return; 
+}
 
         const newGrid: Record<number, GridItem[]> = {};
-        for (const [s, items] of Object.entries(semestres)) newGrid[Number(s)] = [...items];
-        if (!newGrid[toSem]) newGrid[toSem] = [];
+
+        for (const [s, items] of Object.entries(semestres)) {
+newGrid[Number(s)] = [...items];
+}
+
+        if (!newGrid[toSem]) {
+newGrid[toSem] = [];
+}
 
         newGrid[fromSem] = newGrid[fromSem].filter(i =>
             isSlotKey
@@ -277,10 +331,12 @@ export default function MallaGrafica({ malla }: Props) {
                 pivot: { ...(dragItem as Asignatura).pivot, Semestre_Sugerido: toSem } };
 
         const insertBeforeKey = dragOver?.sem === toSem ? dragOver.beforeKey : null;
+
         if (insertBeforeKey === null) {
             newGrid[toSem] = [...newGrid[toSem], updatedItem];
         } else {
             const insertIdx = newGrid[toSem].findIndex(i => itemKey(i) === insertBeforeKey);
+
             if (insertIdx === -1) {
                 newGrid[toSem] = [...newGrid[toSem], updatedItem];
             } else {
@@ -299,7 +355,10 @@ export default function MallaGrafica({ malla }: Props) {
                     : { ...item, pivot: { ...(item as Asignatura).pivot, Orden: idx + 1 } }
             ) as GridItem[];
         newGrid[fromSem] = recalc(newGrid[fromSem]);
-        if (fromSem !== toSem) newGrid[toSem] = recalc(newGrid[toSem]);
+
+        if (fromSem !== toSem) {
+newGrid[toSem] = recalc(newGrid[toSem]);
+}
 
         setSemestres(newGrid);
         setDraggingKey(null);
@@ -336,22 +395,42 @@ export default function MallaGrafica({ malla }: Props) {
             4: 'bg-yellow-100 border-yellow-500',
             5: 'bg-red-100 border-red-500',
         };
+
         return colors[id] || 'bg-gray-100 border-gray-400';
     };
 
     const isRelated = (asigId: number, type: 'any' | 'pre' | 'co' = 'any') => {
-        if (!selectedAsig || !selectedAsigData) return false;
-        if (type === 'any' && selectedAsig == asigId) return true;
+        if (!selectedAsig || !selectedAsigData) {
+return false;
+}
+
+        if (type === 'any' && selectedAsig == asigId) {
+return true;
+}
 
         const reqs = selectedAsigData.requisitos || [];
         const matchesReq = reqs.some(r => {
-            if (r.ID_Asignatura_Requerida != asigId) return false;
+            if (r.ID_Asignatura_Requerida != asigId) {
+return false;
+}
+
             const reqType = r.Tipo_Requisito?.toLowerCase() || '';
-            if (type === 'pre') return reqType.includes('pre') || reqType.includes('obligatorio') || reqType === 'opcional';
-            if (type === 'co') return reqType.includes('co');
+
+            if (type === 'pre') {
+return reqType.includes('pre') || reqType.includes('obligatorio') || reqType === 'opcional';
+}
+
+            if (type === 'co') {
+return reqType.includes('co');
+}
+
             return true;
         });
-        if (matchesReq) return true;
+
+        if (matchesReq) {
+return true;
+}
+
         return false;
     };
 
@@ -436,10 +515,15 @@ export default function MallaGrafica({ malla }: Props) {
                                 ].join(' ')}
                                 onDragOver={e => {
                                     e.preventDefault();
-                                    if (!dragOver || dragOver.sem !== sem) setDragOver({ sem, beforeKey: null });
+
+                                    if (!dragOver || dragOver.sem !== sem) {
+setDragOver({ sem, beforeKey: null });
+}
                                 }}
                                 onDragLeave={e => {
-                                    if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragOver(null);
+                                    if (!e.currentTarget.contains(e.relatedTarget as Node)) {
+setDragOver(null);
+}
                                 }}
                                 onDrop={e => handleDrop(e, sem)}
                             >
@@ -461,6 +545,7 @@ export default function MallaGrafica({ malla }: Props) {
                                             const isLibre    = slot.Tipo_Slot === 'libre';
                                             const isOptativa = slot.Tipo_Slot === 'optativa';
                                             const isDragging = draggingKey === key;
+
                                             return (
                                                 <React.Fragment key={key}>
                                                     {showIndicator && <div className="h-1 bg-blue-500 rounded-full" />}
@@ -470,8 +555,12 @@ export default function MallaGrafica({ malla }: Props) {
                                                         onDragEnd={handleDragEnd}
                                                         onDragOver={e => handleItemDragOver(e, sem, key)}
                                                         onClick={
-                                                            isLibre    ? () => { setSelectedOptativaSlot(null); setShowElectivasModal(true);  fetchElectivas();  } :
-                                                            isOptativa ? () => { setShowOptativasModal(true); fetchOptativas(slot); } :
+                                                            isLibre    ? () => {
+ setSelectedOptativaSlot(null); setShowElectivasModal(true);  fetchElectivas();  
+} :
+                                                            isOptativa ? () => {
+ setShowOptativasModal(true); fetchOptativas(slot); 
+} :
                                                             undefined
                                                         }
                                                         className={[
@@ -614,6 +703,7 @@ export default function MallaGrafica({ malla }: Props) {
                                         {selectedAsigData.requisitos.map((req, i) => {
                                             const t = (req.Tipo_Requisito ?? '').toLowerCase();
                                             const isPre = t.includes('pre') || t.includes('obligatorio') || t === 'opcional';
+
                                             return (
                                                 <li key={i} className="flex items-start gap-2 text-xs bg-slate-50 p-2 rounded-lg border border-slate-100">
                                                     <span className={`px-1.5 py-0.5 rounded text-[9px] font-black uppercase shrink-0 ${isPre ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}`}>
@@ -646,6 +736,7 @@ export default function MallaGrafica({ malla }: Props) {
                         String(e.Codigo_Asignatura).toLowerCase().includes(q)
                       )
                     : electivas;
+
                 return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
@@ -751,6 +842,7 @@ export default function MallaGrafica({ malla }: Props) {
                     .filter(group => group.asignaturas.length > 0);
                 const totalOptativas = optativas.reduce((sum, group) => sum + group.asignaturas.length, 0);
                 const visibleOptativas = filteredGroups.reduce((sum, group) => sum + group.asignaturas.length, 0);
+
                 return (
                 <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 px-4">
                     <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
@@ -767,7 +859,9 @@ export default function MallaGrafica({ malla }: Props) {
                                 )}
                             </div>
                             <button
-                                onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }}
+                                onClick={() => {
+ setShowOptativasModal(false); setSelectedOptativaSlot(null); 
+}}
                                 className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors"
                             >
                                 <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -833,6 +927,7 @@ export default function MallaGrafica({ malla }: Props) {
                                                 {group.asignaturas.map((e) => {
                                                     const reqs = e.requisitos ?? [];
                                                     const isOpen = expandedOptativa === e.ID_Asignatura;
+
                                                     return (
                                                         <React.Fragment key={e.ID_Asignatura}>
                                                             <tr onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)} className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none">
@@ -888,7 +983,9 @@ export default function MallaGrafica({ malla }: Props) {
                             {!loadingOptativas && !errorOptativas && totalOptativas > 0 && (
                                 <span className="text-xs text-gray-400">{q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias</span>
                             )}
-                            <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
+                            <button onClick={() => {
+ setShowOptativasModal(false); setSelectedOptativaSlot(null); 
+}} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
                         </div>
                     </div>
                 </div>

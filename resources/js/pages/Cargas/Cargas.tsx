@@ -1,5 +1,5 @@
-import { useState, useEffect, useMemo } from 'react';
 import { Head } from '@inertiajs/react';
+import { useState, useEffect, useMemo } from 'react';
 import MainLayout from '../../Layout/MainLayout';
 
 // ─── Tipos ────────────────────────────────────────────────────────────────────
@@ -115,10 +115,14 @@ export default function Cargas() {
     // ── Polling ────────────────────────────────────────────────────────────────
 
     useEffect(() => {
-        if (pollingIds.size === 0) return;
+        if (pollingIds.size === 0) {
+return;
+}
+
         const interval = setInterval(() => {
             pollingIds.forEach((id) => fetchEstado(id));
         }, 3000);
+
         return () => clearInterval(interval);
     }, [pollingIds]);
 
@@ -128,6 +132,7 @@ export default function Cargas() {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
                 credentials: 'same-origin',
             });
+
             if (res.ok) {
                 const data = await res.json();
                 setCargas(data.data ?? []);
@@ -145,11 +150,17 @@ export default function Cargas() {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
                 credentials: 'same-origin',
             });
+
             if (res.ok) {
                 const data = await res.json();
                 const estado: string = data.data?.Estado_Carga ?? data.data?.estado ?? '';
+
                 if (ESTADOS_TERMINALES.includes(estado)) {
-                    setPollingIds((prev) => { const next = new Set(prev); next.delete(id); return next; });
+                    setPollingIds((prev) => {
+ const next = new Set(prev); next.delete(id);
+
+ return next; 
+});
                     fetchCargas();
                 }
             }
@@ -161,11 +172,13 @@ export default function Cargas() {
     const fetchErrores = async (cargaId: number) => {
         setLoadingErrores(true);
         setErrores([]);
+
         try {
             const res = await fetch(`${apiUrl}/api/v1/cargas/${cargaId}/errores`, {
                 headers: { 'Content-Type': 'application/json', Accept: 'application/json', 'X-CSRF-TOKEN': getCsrf() },
                 credentials: 'same-origin',
             });
+
             if (res.ok) {
                 const data = await res.json();
                 setErrores(data.data ?? []);
@@ -184,10 +197,12 @@ export default function Cargas() {
 
         if (!selectedTipo || !selectedFile) {
             alert('Seleccione el tipo de archivo y un archivo Excel.');
+
             return;
         }
 
         setUploading(true);
+
         try {
             // 1. Crear la carga
             const createRes = await fetch(`${apiUrl}/api/v1/cargas`, {
@@ -205,11 +220,13 @@ export default function Cargas() {
             });
 
             const createData = await createRes.json();
+
             if (!createRes.ok) {
                 const msgs = createData.errors
                     ? Object.values(createData.errors).flat().join('\n')
                     : createData.message ?? 'Error al crear la carga';
                 alert(msgs);
+
                 return;
             }
 
@@ -228,17 +245,20 @@ export default function Cargas() {
             });
 
             const uploadData = await uploadRes.json();
+
             if (!uploadRes.ok) {
                 const msgs = uploadData.errors
                     ? Object.values(uploadData.errors).flat().join('\n')
                     : uploadData.message ?? 'Error al subir el archivo';
                 alert(msgs);
+
                 return;
             }
 
             handleCloseModal();
 
             const estadoActual: string = uploadData.data?.estado_carga_actual ?? '';
+
             if (estadoActual === 'listo_para_procesar' || estadoActual === 'iniciado') {
                 setPollingIds((prev) => new Set(prev).add(cargaId));
             }
@@ -264,11 +284,14 @@ export default function Cargas() {
                 },
                 credentials: 'same-origin',
             });
+
             if (!res.ok) {
                 const data = await res.json();
                 alert(data.message ?? 'Error al procesar.');
+
                 return;
             }
+
             setPollingIds((prev) => new Set(prev).add(cargaId));
             fetchCargas();
         } catch (e) {
@@ -298,6 +321,7 @@ export default function Cargas() {
             const matchSearch = !filtroBusqueda || 
                 c.usuario?.Nombre_Usuario?.toLowerCase().includes(searchLower) ||
                 c.normativa?.Numero_Normativa?.includes(searchLower);
+
             return matchTipo && matchEstado && matchSearch;
         });
     }, [cargas, filtroTipo, filtroEstado, filtroBusqueda]);
@@ -460,7 +484,9 @@ export default function Cargas() {
                             <p className="mt-4 text-slate-400 font-medium">No se encontraron registros de carga.</p>
                             {(filtroTipo || filtroBusqueda) && (
                                 <button
-                                    onClick={() => { setFiltroTipo(''); setFiltroBusqueda(''); }}
+                                    onClick={() => {
+ setFiltroTipo(''); setFiltroBusqueda(''); 
+}}
                                     className="mt-2 text-blue-600 text-sm font-semibold hover:underline"
                                 >
                                     Limpiar filtros
@@ -561,7 +587,9 @@ export default function Cargas() {
                                 </p>
                             </div>
                             <button
-                                onClick={() => { setErrorModal(null); setErrores([]); }}
+                                onClick={() => {
+ setErrorModal(null); setErrores([]); 
+}}
                                 className="w-8 h-8 flex items-center justify-center rounded-full hover:bg-[var(--unal-surface-container-high)] transition-colors"
                                 style={{ color: 'var(--unal-on-surface-variant)' }}
                             >
@@ -627,7 +655,9 @@ export default function Cargas() {
                         {/* Footer */}
                         <div className="flex justify-end px-6 py-4" style={{ borderTop: '1px solid var(--unal-outline-variant)' }}>
                             <button
-                                onClick={() => { setErrorModal(null); setErrores([]); }}
+                                onClick={() => {
+ setErrorModal(null); setErrores([]); 
+}}
                                 className="px-4 py-2 rounded-lg text-sm transition-colors"
                                 style={{ border: '1px solid var(--unal-outline)', color: 'var(--unal-on-surface-variant)' }}
                             >

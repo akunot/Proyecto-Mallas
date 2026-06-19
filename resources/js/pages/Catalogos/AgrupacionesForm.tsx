@@ -40,8 +40,12 @@ export default function AgrupacionesForm({ agrupacion, programas = [], component
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (isEditing) put(`/agrupaciones/${agrupacion.ID_Plantilla_Agrupacion}`);
-        else post('/agrupaciones');
+
+        if (isEditing) {
+put(`/agrupaciones/${agrupacion.ID_Plantilla_Agrupacion}`);
+} else {
+post('/agrupaciones');
+}
     };
 
     return (
@@ -106,14 +110,25 @@ export default function AgrupacionesForm({ agrupacion, programas = [], component
                                     />
                                 </div>
                                 <div className="space-y-2">
-                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Tipo de Agrupación</label>
-                                    <input 
-                                        type="text" 
-                                        value={data.Tipo_Agrupacion} 
+                                    <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Tipo de Agrupación *</label>
+                                    <select
+                                        value={data.Tipo_Agrupacion}
                                         onChange={e => setData('Tipo_Agrupacion', e.target.value)}
-                                        className="w-full px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500 transition-all"
-                                        placeholder="Ej: Obligatoria"
-                                    />
+                                        className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl focus:ring-4 focus:ring-blue-100 transition-all ${errors.Tipo_Agrupacion ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
+                                    >
+                                        <option value="">Seleccionar tipo...</option>
+                                        <option value="Obligatoria">Obligatoria</option>
+                                        <option value="Optativa">Optativa</option>
+                                        <option value="Libre Eleccion">Libre Elección</option>
+                                        <option value="Ingles">Inglés</option>
+                                        <option value="Nivelatorio">Nivelatorio</option>
+                                    </select>
+                                    {errors.Tipo_Agrupacion && <p className="text-rose-600 text-[10px] font-bold mt-1 ml-1">{errors.Tipo_Agrupacion}</p>}
+                                    <p className="text-[11px] text-slate-400 ml-1 mt-1 leading-tight">
+                                        Define la <strong>clasificación académica</strong> del grupo de asignaturas. 
+                                        El switch "<strong>¿Es de carácter obligatorio?</strong>" del bloque de abajo determina si TODA la agrupación es obligatoria u optativa, 
+                                        independientemente de su tipo.
+                                    </p>
                                 </div>
                             </div>
                         </div>

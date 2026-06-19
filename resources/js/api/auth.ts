@@ -48,6 +48,7 @@ export const authApi = {
         
         if (!response.ok) {
             const error = await response.json();
+
             throw new Error(error.message || 'Error al solicitar OTP');
         }
         
@@ -71,6 +72,7 @@ export const authApi = {
         
         if (!response.ok) {
             const error = await response.json();
+
             throw new Error(error.message || 'Error al verificar OTP');
         }
         

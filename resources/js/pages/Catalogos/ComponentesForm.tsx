@@ -22,6 +22,7 @@ export default function ComponentesForm({ componente }: Props) {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+
     if (isEditing) {
       put(`/componentes/${componente.ID_Componente}`);
     } else {

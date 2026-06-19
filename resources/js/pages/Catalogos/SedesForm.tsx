@@ -30,8 +30,12 @@ export default function SedesForm({ sede }: Props) {
 
     const onSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        if (isEditing) put(`/sedes/${sede.ID_Sede}`);
-        else post('/sedes');
+
+        if (isEditing) {
+put(`/sedes/${sede.ID_Sede}`);
+} else {
+post('/sedes');
+}
     };
 
     return (

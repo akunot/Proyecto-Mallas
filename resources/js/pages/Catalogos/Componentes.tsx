@@ -1,6 +1,6 @@
 import { Head, router, usePage } from '@inertiajs/react';
-import MainLayout from '@/Layout/MainLayout';
 import DataTable from '@/components/DataTable';
+import MainLayout from '@/Layout/MainLayout';
 
 interface Componente {
     ID_Componente: number;
@@ -41,8 +41,15 @@ export default function Componentes({ componentes }: Props) {
 
     const handleSearch = (search: string, page: number = 1) => {
         const params = new URLSearchParams();
-        if (search) params.set('search', search);
-        if (page > 1) params.set('page', page.toString());
+
+        if (search) {
+params.set('search', search);
+}
+
+        if (page > 1) {
+params.set('page', page.toString());
+}
+
         params.set('sort_by', sortBy);
         params.set('sort_order', sortOrder);
 
@@ -63,7 +70,11 @@ export default function Componentes({ componentes }: Props) {
         const newDirection = (column === sortBy && sortOrder === 'asc') ? 'desc' : 'asc';
 
         const params = new URLSearchParams();
-        if (currentSearch) params.set('search', currentSearch);
+
+        if (currentSearch) {
+params.set('search', currentSearch);
+}
+
         params.set('sort_by', column);
         params.set('sort_order', newDirection);
         params.set('page', '1');

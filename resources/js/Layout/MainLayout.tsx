@@ -1,11 +1,15 @@
-import { ReactNode, useState, useRef, useEffect } from 'react';
 import { Link, usePage } from '@inertiajs/react';
+import type { ReactNode} from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 // --- Subcomponentes Refactorizados ---
 
 const Tooltip = ({ text, children, isCollapsed }: { text: string; children: ReactNode; isCollapsed: boolean }) => {
-    if (!isCollapsed) return <>{children}</>;
+    if (!isCollapsed) {
+return <>{children}</>;
+}
+
     return (
         <div className="group relative">
             {children}
@@ -29,10 +33,14 @@ export default function Layout({ children }: { children: ReactNode }) {
         const checkMobile = () => {
             const mobile = window.innerWidth < 1024;
             setIsMobile(mobile);
-            if (mobile) setSidebarOpen(false);
+
+            if (mobile) {
+setSidebarOpen(false);
+}
         };
         checkMobile();
         window.addEventListener('resize', checkMobile);
+
         return () => window.removeEventListener('resize', checkMobile);
     }, []);
 
@@ -83,6 +91,7 @@ export default function Layout({ children }: { children: ReactNode }) {
         const label = /^\d+$/.test(segment)
             ? `#${segment}`
             : (routeNames[segment.toLowerCase()] ?? segment.replace(/-/g, ' '));
+
         return { label, href };
     });
 

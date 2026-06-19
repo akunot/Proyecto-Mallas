@@ -11,6 +11,7 @@ const appName = import.meta.env.VITE_APP_NAME || 'Mallas UNAL';
 // Configurar el router de Inertia para incluir el token Bearer en todas las navegaciones
 router.on('start', (event: any) => {
     const token = getAuthToken();
+
     if (token && event.detail?.options) {
         event.detail.options.headers = {
             ...event.detail.options.headers,

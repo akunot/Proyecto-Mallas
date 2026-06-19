@@ -9,6 +9,7 @@ class AgrupacionController extends CatalogoController
 {
     protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'agrupacion';
+    protected string $routeBase = 'agrupaciones';
 
     public function __construct()
     {
@@ -47,7 +48,7 @@ class AgrupacionController extends CatalogoController
 
         // Validación adicional: si es obligatoria, debe tener créditos requeridos
         if ($operation === 'create' || $operation === 'update') {
-            $rules['Creditos_Requeridos'] .= 'required_if:Es_Obligatoria,true';
+            $rules['Creditos_Requeridos'] .= '|required_if:Es_Obligatoria,true';
         }
 
         return $rules;

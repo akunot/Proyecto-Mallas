@@ -50,9 +50,13 @@ const imagesPorPrograma: Record<string, string> = {
 
 const getImageForPrograma = (nombre: string): string => {
     const upper = nombre.toUpperCase().trim();
+
     for (const [key, url] of Object.entries(imagesPorPrograma)) {
-        if (upper.includes(key)) return url;
+        if (upper.includes(key)) {
+return url;
+}
     }
+
     // Imagen genérica para carreras no listadas
     return 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80';
 };
@@ -72,6 +76,7 @@ export default function ProgramasActivos({ facultades }: Props) {
     useEffect(() => {
         const handleScroll = () => setScrolled(window.scrollY > 100);
         window.addEventListener('scroll', handleScroll);
+
         return () => window.removeEventListener('scroll', handleScroll);
     }, []);
 

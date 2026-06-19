@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import MainLayout from '../../Layout/MainLayout';
 import apiClient from '../../api/client';
+import MainLayout from '../../Layout/MainLayout';
 
 interface CargaMalla {
     ID_Carga: number;
@@ -60,12 +60,18 @@ export default function AprobacionPage({ pendientes: initialPendientes, misCarga
             ]);
             setPendientes((pRes.data || []).filter(c => c.programa?.ID_Programa));
             setMisCargas((mRes.data || []).filter(c => c.programa?.ID_Programa));
-        } catch (error) { console.error(error); }
+        } catch (error) {
+ console.error(error); 
+}
     };
 
     const handleEnviarRevision = async () => {
-        if (!selectedCarga) return;
+        if (!selectedCarga) {
+return;
+}
+
         setLoading(true);
+
         try {
             await apiClient.post(`/aprobacion/cargas/${selectedCarga.ID_Carga}/enviar-revision`);
             setSelectedCarga(null);
@@ -78,8 +84,12 @@ export default function AprobacionPage({ pendientes: initialPendientes, misCarga
     };
 
     const handleRevisar = async () => {
-        if (!selectedCarga) return;
+        if (!selectedCarga) {
+return;
+}
+
         setLoading(true);
+
         try {
             await apiClient.patch(`/aprobacion/cargas/${selectedCarga.ID_Carga}/revisar`, {
                 accion: reviewForm.accion,
@@ -104,6 +114,7 @@ export default function AprobacionPage({ pendientes: initialPendientes, misCarga
             'validando': 'bg-amber-100 text-amber-700 ring-amber-200',
         };
         const style = config[estado] || 'bg-slate-100 text-slate-600 ring-slate-200';
+
         return (
             <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ring-1 ring-inset ${style}`}>
                 <span className="h-1.5 w-1.5 rounded-full bg-current" />

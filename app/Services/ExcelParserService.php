@@ -252,18 +252,19 @@ class ExcelParserService
             $data = $rows[$i];
 
             $codigoOriginal = $this->cleanCodeCell($data[0] ?? null);
-            $nombre = $this->cleanCell($data[1] ?? '');
+            $nombreRaw = $this->cleanCell($data[1] ?? '');
+            $nombre = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
             $creditos = !empty($data[2]) ? (int)$data[2] : 0;
             $horasPresencial = !empty($data[3]) ? (int)$data[3] : null;
             $horasEstudiante = !empty($data[4]) ? (int)$data[4] : null;
 
             if (empty($codigoOriginal) || empty($nombre)) {
-                if (!empty($nombre)) {
+                if (!empty($nombreRaw)) {
                     $this->recordError(
                         $i + 1,
                         'Asignaturas',
                         'Fila incompleta en archivo de asignaturas. Código o nombre inexistente.',
-                        $nombre,
+                        $nombreRaw,
                         'error'
                     );
                 }
@@ -339,16 +340,17 @@ class ExcelParserService
             $data = $rows[$i];
 
             $codigoOriginal = $this->cleanCodeCell($data[0] ?? null);
-            $nombre         = $this->cleanCell($data[1] ?? '');
+            $nombreRaw      = $this->cleanCell($data[1] ?? '');
+            $nombre         = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
             $creditos       = !empty($data[2]) ? (int)$data[2] : 0;
 
             if (empty($codigoOriginal) || empty($nombre)) {
-                if (!empty($nombre)) {
+                if (!empty($nombreRaw)) {
                     $this->recordError(
                         $i + 1,
                         'Electivas',
                         'Fila incompleta en archivo de electivas. Código o nombre inexistente.',
-                        $nombre,
+                        $nombreRaw,
                         'error'
                     );
                 }
@@ -443,7 +445,8 @@ class ExcelParserService
             $componenteId   = !empty($data[1]) ? (int)$data[1] : null;
             $plantillaId    = !empty($data[2]) ? (int)$data[2] : null;
             $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
-            $nombre         = $this->cleanCell($data[4] ?? '');
+            $nombreRaw      = $this->cleanCell($data[4] ?? '');
+            $nombre         = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
             $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
 
             if (empty($codigoOriginal) || empty($nombre)) {
@@ -1395,6 +1398,67 @@ class ExcelParserService
                 'advertencia'
             );
         }
+    }
+
+    /**
+     * Normaliza el nombre de una asignatura a formato título.
+     * Ej: "BASES DE DATOS II" → "Base de Datos II"
+     * - Primera letra de cada palabra en mayúscula (excepto artículos/preposiciones cortas)
+     * - Números romanos (I, II, III, IV, V, VI, etc.) se mantienen en mayúsculas
+     * - Palabras como "DE", "DEL", "LA", "LAS", "LOS", "Y", "E", "O", "A", "EN", "AL", "POR", "PARA", "CON", "SIN" en minúscula (excepto si son la primera palabra)
+     */
+    private function normalizeNombreAsignatura(string $nombre): string
+    {
+        $nombre = trim($nombre);
+        if (empty($nombre)) {
+            return $nombre;
+        }
+
+        // Palabras que deben ir en minúscula (excepto si son la primera)
+        $lowercaseWords = [
+            'de', 'del', 'la', 'las', 'los', 'el', 'lo',
+            'y', 'e', 'o', 'a', 'en', 'al', 'por', 'para',
+            'con', 'sin', 'su', 'un', 'una', 'que', 'es',
+        ];
+
+        // Números romanos que deben mantenerse en mayúscula
+        $romanNumerals = [
+            'I', 'II', 'III', 'IV', 'V', 'VI', 'VII', 'VIII', 'IX', 'X',
+            'XI', 'XII', 'XIII', 'XIV', 'XV', 'XVI', 'XVII', 'XVIII', 'XIX', 'XX',
+        ];
+        $romanSet = array_flip(array_map('strtoupper', $romanNumerals));
+
+        // Dividir en palabras
+        $words = explode(' ', $nombre);
+        $result = [];
+
+        foreach ($words as $index => $word) {
+            $upperWord = mb_strtoupper($word);
+            $lowerWord = mb_strtolower($word);
+
+            // Si es un número romano, mantenerlo en mayúsculas
+            if (isset($romanSet[$upperWord])) {
+                $result[] = $upperWord;
+                continue;
+            }
+
+            // Si es la primera palabra, capitalizar
+            if ($index === 0) {
+                $result[] = mb_convert_case($lowerWord, MB_CASE_TITLE, 'UTF-8');
+                continue;
+            }
+
+            // Si es una palabra que debe ir en minúscula
+            if (in_array($lowerWord, $lowercaseWords)) {
+                $result[] = $lowerWord;
+                continue;
+            }
+
+            // Para el resto, capitalizar primera letra
+            $result[] = mb_convert_case($lowerWord, MB_CASE_TITLE, 'UTF-8');
+        }
+
+        return implode(' ', $result);
     }
 
     private function cleanCell($value): ?string

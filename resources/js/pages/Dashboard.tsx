@@ -1,7 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
-import MainLayout from '../Layout/MainLayout';
 import apiClient from '../api/client';
+import MainLayout from '../Layout/MainLayout';
 
 interface CargaMalla {
     ID_Carga: number;
@@ -86,6 +86,7 @@ const getEstadoColor = (estado: string) => {
         'rechazado': 'bg-rose-100 text-rose-700',
         'con_errores': 'bg-rose-100 text-rose-700',
     };
+
     return colors[estado] || 'bg-slate-100 text-slate-700';
 };
 
@@ -103,6 +104,7 @@ const getEstadoDot = (estado: string) => {
         'rechazado': '#dc2626',
         'con_errores': '#dc2626',
     };
+
     return dots[estado] || '#64748b';
 };
 
@@ -113,7 +115,9 @@ export default function Dashboard({
     const [cargasRecientes, setCargasRecientes] = useState<CargaMalla[]>([]);
     const [loading, setLoading] = useState(true);
 
-    useEffect(() => { fetchCargasRecientes(); }, []);
+    useEffect(() => {
+ fetchCargasRecientes(); 
+}, []);
 
     const fetchCargasRecientes = async () => {
         try {

@@ -1,5 +1,6 @@
-import { useState, FormEvent } from 'react';
 import { Head, router } from '@inertiajs/react';
+import type { FormEvent } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 
 export default function Login() {
@@ -16,6 +17,7 @@ export default function Login() {
         e.preventDefault();
         setError('');
         setIsLoading(true);
+
         try {
             await requestOtp(email);
             setStep('otp');
@@ -31,6 +33,7 @@ export default function Login() {
         e.preventDefault();
         setError('');
         setIsLoading(true);
+
         try {
             await login(email, otp);
             router.visit('/dashboard');
@@ -160,7 +163,9 @@ export default function Login() {
                                 
                                 <button
                                     type="button"
-                                    onClick={() => { setStep('email'); setOtp(''); }}
+                                    onClick={() => {
+ setStep('email'); setOtp(''); 
+}}
                                     className="w-full py-4 text-slate-400 hover:text-slate-800 font-bold text-xs uppercase tracking-widest transition-colors"
                                 >
                                     Corregir correo electrónico

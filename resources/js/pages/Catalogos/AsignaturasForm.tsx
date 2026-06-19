@@ -30,8 +30,12 @@ export default function AsignaturasForm({ asignatura }: Props) {
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (isEditing) put(`/asignaturas/${asignatura.ID_Asignatura}`);
-    else post('/asignaturas');
+
+    if (isEditing) {
+put(`/asignaturas/${asignatura.ID_Asignatura}`);
+} else {
+post('/asignaturas');
+}
   };
 
   return (

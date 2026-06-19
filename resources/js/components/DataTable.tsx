@@ -50,16 +50,24 @@ export default function DataTable({
   useEffect(() => {
     if (isInitialMount.current) {
         isInitialMount.current = false;
+
         return;
     }
+
     const timer = setTimeout(() => {
-      if (onSearch) onSearch(search);
+      if (onSearch) {
+onSearch(search);
+}
     }, 400);
+
     return () => clearTimeout(timer);
   }, [search, onSearch]);
 
   const toggleSort = (key: string) => {
-    if (!onSort) return;
+    if (!onSort) {
+return;
+}
+
     const direction = (sortBy === key && sortOrder === 'asc') ? 'desc' : 'asc';
     onSort(key, direction);
   };
@@ -189,6 +197,7 @@ export default function DataTable({
             {/* Simple range logic */}
             {[...Array(meta.last_page)].map((_, i) => {
                 const p = i + 1;
+
                 // Mostrar solo páginas cercanas a la actual para no romper el layout
                 if (p === 1 || p === meta.last_page || (p >= meta.current_page - 1 && p <= meta.current_page + 1)) {
                     return (
@@ -201,9 +210,11 @@ export default function DataTable({
                         </button>
                     );
                 }
+
                 if (p === meta.current_page - 2 || p === meta.current_page + 2) {
                     return <span key={p} className="text-slate-300 text-xs">...</span>;
                 }
+
                 return null;
             })}
 
