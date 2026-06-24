@@ -624,6 +624,22 @@ Route::middleware(['auth'])->group(function () {
             'malla' => $malla
         ]);
     })->name('mallas.visualizer');
+
+    // Gestión de optativas por agrupación (admin)
+    Route::get('/mallas/{id}/optativas-asignacion', function ($id) {
+        $malla = MallaCurricular::with('programa')->findOrFail($id);
+        
+        return Inertia::render('Mallas/OptativasAsignacion', [
+            'malla' => [
+                'ID_Malla' => $malla->ID_Malla,
+                'Codigo_Plan' => $malla->Codigo_Plan,
+                'programa' => [
+                    'ID_Programa' => $malla->programa->ID_Programa,
+                    'Nombre_Programa' => $malla->programa->Nombre_Programa,
+                ],
+            ],
+        ]);
+    })->name('mallas.optativas-asignacion');
     
     // Auditoría y Aprobación (módulos nuevos)
     Route::get('/auditoria', function (\Illuminate\Http\Request $request) {

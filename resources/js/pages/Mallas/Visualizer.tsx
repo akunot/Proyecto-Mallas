@@ -162,6 +162,7 @@ export default function MallaGrafica({ malla }: Props) {
             setSelectedOptativaSlot(slot);
         }
 
+        setShowOptativasModal(true);
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
@@ -227,10 +228,17 @@ g[sem] = [];
                 const sem = slot.Semestre || 0;
 
                 if (!g[sem]) {
-g[sem] = [];
-}
+                    g[sem] = [];
+                }
 
-                g[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente, Nombre_Agrupacion: agrup.Nombre_Agrupacion });
+                const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
+                g[sem].push({
+                    ...slot,
+                    Tipo_Slot: tipoSlot === 'libre' || tipoSlot === 'optativa' || tipoSlot === 'nivelatorio' ? tipoSlot : 'libre',
+                    isSlot: true,
+                    ID_Componente: agrup.ID_Componente,
+                    Nombre_Agrupacion: agrup.Nombre_Agrupacion,
+                });
             });
         });
         Object.keys(g).forEach(sem => {
@@ -542,8 +550,9 @@ setDragOver(null);
 
                                         if (item.isSlot) {
                                             const slot       = item as Slot & { isSlot: true; ID_Componente: number };
-                                            const isLibre    = slot.Tipo_Slot === 'libre';
-                                            const isOptativa = slot.Tipo_Slot === 'optativa';
+                                            const tipoSlot   = String(slot.Tipo_Slot ?? '').toLowerCase();
+                                            const isLibre    = tipoSlot === 'libre';
+                                            const isOptativa = tipoSlot === 'optativa';
                                             const isDragging = draggingKey === key;
 
                                             return (
@@ -555,13 +564,11 @@ setDragOver(null);
                                                         onDragEnd={handleDragEnd}
                                                         onDragOver={e => handleItemDragOver(e, sem, key)}
                                                         onClick={
-                                                            isLibre    ? () => {
- setSelectedOptativaSlot(null); setShowElectivasModal(true);  fetchElectivas();  
-} :
-                                                            isOptativa ? () => {
- setShowOptativasModal(true); fetchOptativas(slot); 
-} :
-                                                            undefined
+                                                            isLibre ? () => {
+                                                                setSelectedOptativaSlot(null);
+                                                                setShowElectivasModal(true);
+                                                                fetchElectivas();
+                                                            } : isOptativa ? () => fetchOptativas(slot) : undefined
                                                         }
                                                         className={[
                                                             'border-dashed border-2 p-2 h-[120px] flex flex-col items-center justify-center',

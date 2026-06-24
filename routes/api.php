@@ -159,6 +159,15 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         // Mallas - reordenación de bloques en el visualizador
         Route::patch('/mallas/{mallaId}/reordenar', [MallaController::class, 'reordenar']);
         Route::get('/mallas/{mallaId}/optativas', [MallaController::class, 'optativas']);
+        
+        // Gestión administrativa de optativas por agrupación
+        Route::get('/mallas/{mallaId}/optativas-sin-agrupacion', [MallaController::class, 'optativasSinAgrupacion']);
+        Route::post('/mallas/{mallaId}/optativas/asignar', [MallaController::class, 'asignarOptativaAgrupacion']);
+        Route::post('/mallas/{mallaId}/optativas/remover', [MallaController::class, 'removerOptativaAgrupacion']);
+        Route::post('/mallas/{mallaId}/optativas/asignar-batch', [MallaController::class, 'asignarOptativasBatch']);
+        Route::post('/mallas/{mallaId}/optativas/remover-batch', [MallaController::class, 'removerOptativasBatch']);
+        Route::get('/mallas/{mallaId}/optativas-por-agrupacion', [MallaController::class, 'optativasPorAgrupacion']);
+        Route::get('/mallas/{mallaId}/agrupaciones', [MallaController::class, 'agrupacionesDeMalla']);
 
         // Mallas y cargas (Fase 3+)
         Route::get('/cargas', [CargaController::class, 'index']);

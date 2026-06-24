@@ -2100,3 +2100,25 @@ body {
 .component-border-disciplinar { border-left-color: #22c55e; }    /* Verde */
 .component-border-libre { border-left-color: #3b82f6; }           /* Azul */
 .component-border-idiomas { border-left-color: #ec4899; }         /* Rosa */
+
+/* Estilos para Transferencia de Datos */
+.transfer-card {
+    @apply bg-white rounded-[2rem] border border-slate-200 shadow-xl overflow-hidden flex flex-col h-[700px];
+}
+
+.transfer-header {
+    @apply p-6 shrink-0 border-b flex items-center justify-between;
+}
+
+.selection-bar {
+    @apply fixed bottom-8 left-1/2 -translate-x-1/2 bg-slate-900 text-white px-8 py-4 rounded-3xl 
+           shadow-2xl z-[100] flex items-center gap-6 animate-in slide-in-from-bottom-10 duration-300;
+}
+
+.item-row {
+    @apply px-4 py-3 flex items-center gap-3 transition-all hover:bg-slate-50 cursor-default;
+}
+
+.item-row-selected {
+    @apply bg-blue-50/50 ring-1 ring-inset ring-blue-100;
+}

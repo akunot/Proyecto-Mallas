@@ -165,6 +165,7 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
 
     // Modal de Optativas
     const [showOptativasModal, setShowOptativasModal] = useState(false);
+    const [selectedOptativaSlot, setSelectedOptativaSlot] = useState<Slot | null>(null);
     const [optativas, setOptativas] = useState<OptativaGroup[]>([]);
     const [loadingOptativas, setLoadingOptativas] = useState(false);
     const [errorOptativas, setErrorOptativas] = useState(false);
@@ -205,7 +206,10 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
         }
     };
 
-    const fetchOptativas = async () => {
+    const fetchOptativas = async (slot?: Slot) => {
+        if (slot) {
+            setSelectedOptativaSlot(slot);
+        }
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
@@ -213,7 +217,8 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
         setExpandedOptativa(null);
 
         try {
-            const res = await fetch(`/api/v1/public/mallas/${malla?.ID_Malla}/optativas`, {
+            const url = `/api/v1/public/mallas/${malla?.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
+            const res = await fetch(url, {
                 headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
                 credentials: 'same-origin',
             });
@@ -264,7 +269,14 @@ g[sem] = [];
 g[sem] = [];
 }
 
-                g[sem].push({ ...slot, isSlot: true, ID_Componente: agrup.ID_Componente, Nombre_Agrupacion: agrup.Nombre_Agrupacion });
+                const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
+                g[sem].push({
+                    ...slot,
+                    Tipo_Slot: tipoSlot === 'libre' || tipoSlot === 'optativa' || tipoSlot === 'nivelatorio' ? tipoSlot : 'libre',
+                    isSlot: true,
+                    ID_Componente: agrup.ID_Componente,
+                    Nombre_Agrupacion: agrup.Nombre_Agrupacion,
+                });
             });
         });
         Object.keys(g).forEach(sem => {
@@ -480,8 +492,9 @@ max = count;
                                         // SLOT
                                         if (item.isSlot) {
                                             const slot = item as Slot & { isSlot: true; ID_Componente: number };
-                                            const isLibre = slot.Tipo_Slot === 'libre';
-                                            const isOptativa = slot.Tipo_Slot === 'optativa';
+                                            const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
+                                            const isLibre = tipoSlot === 'libre';
+                                            const isOptativa = tipoSlot === 'optativa';
 
                                             return (
                                                 <div
@@ -494,13 +507,18 @@ max = count;
                                                                 : 'border-yellow-300 bg-yellow-50/60 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-500'
                                                         }`}
                                                     onClick={
-                                                        isLibre ? () => {
- setShowElectivasModal(true); fetchElectivas(); 
-} :
-                                                        isOptativa ? () => {
- setShowOptativasModal(true); fetchOptativas(); 
-} :
-                                                        undefined
+                                                        isLibre
+                                                            ? () => {
+                                                                  setShowElectivasModal(true);
+                                                                  fetchElectivas();
+                                                              }
+                                                            : isOptativa
+                                                            ? () => {
+                                                                  setSelectedOptativaSlot(slot);
+                                                                  setShowOptativasModal(true);
+                                                                  fetchOptativas(slot);
+                                                              }
+                                                            : undefined
                                                     }
                                                 >
                                                     <span className="material-symbols-outlined !text-base mb-0.5 opacity-60">add_circle</span>
@@ -1002,11 +1020,16 @@ return null;
                             <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
                                 <div>
                                     <h2 className="text-base font-semibold text-gray-900">Catálogo de Optativas</h2>
-                                    <p className="text-xs text-gray-500 mt-0.5">{programa.Nombre_Programa}</p>
+                                    {selectedOptativaSlot?.Nombre_Agrupacion ? (
+                                        <p className="text-xs text-gray-500 mt-0.5">Agrupación: {selectedOptativaSlot.Nombre_Agrupacion}</p>
+                                    ) : (
+                                        <p className="text-xs text-gray-500 mt-0.5">{programa.Nombre_Programa}</p>
+                                    )}
+                                    {selectedOptativaSlot?.Nombre_Slot && (
+                                        <p className="text-xs text-gray-500">Slot: {selectedOptativaSlot.Nombre_Slot}</p>
+                                    )}
                                 </div>
-                                <button onClick={() => {
- setShowOptativasModal(false); 
-}} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
+                                <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
                                     <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                                     </svg>
@@ -1130,9 +1153,7 @@ return null;
                                 {!loadingOptativas && !errorOptativas && totalOptativas > 0 && (
                                     <span className="text-xs text-gray-400">{q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias</span>
                                 )}
-                                <button onClick={() => {
- setShowOptativasModal(false); 
-}} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
+                                <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
                             </div>
                         </div>
                     </div>

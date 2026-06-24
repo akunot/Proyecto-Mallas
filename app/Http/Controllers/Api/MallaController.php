@@ -4,7 +4,6 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Agrupacion;
 use App\Models\AgrupacionAsignatura;
-use App\Models\Componente;
 use App\Models\MallaCurricular;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
@@ -115,10 +114,12 @@ class MallaController extends Controller
                         ];
                     })->values(),
                     'slots' => $agrupacion->slots->map(function ($slot) use ($agrupacion) {
+                        $tipoSlot = strtolower((string) ($slot->Tipo_Slot ?? ''));
+
                         return [
                             'ID_Slot'           => $slot->ID_Slot,
                             'Nombre_Slot'       => $slot->Nombre_Slot,
-                            'Tipo_Slot'         => $slot->Tipo_Slot,
+                            'Tipo_Slot'         => in_array($tipoSlot, ['optativa', 'libre', 'nivelatorio'], true) ? $tipoSlot : 'libre',
                             'Semestre'          => $slot->Semestre,
                             'Orden'             => $slot->Orden,
                             'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
@@ -185,14 +186,6 @@ class MallaController extends Controller
         $fallbackGroupName = $slot?->agrupacion?->Nombre_Agrupacion ?? 'Optativas';
         $fallbackGroupId = $slot?->agrupacion?->ID_Agrupacion ?? $slot?->ID_Agrupacion;
 
-        $optativaAsignaturaIds = ProgramaElectiva::where('ID_Programa', $malla->ID_Programa)
-            ->pluck('ID_Asignatura')
-            ->all();
-
-        if (!empty($optativaAsignaturaIds)) {
-            $this->ensureOptativasLinkedToMalla($malla, $slot, $optativaAsignaturaIds);
-        }
-
         $query = ProgramaElectiva::query()
             ->where('programa_electivas.ID_Programa', $malla->ID_Programa)
             ->join('asignaturas', 'programa_electivas.ID_Asignatura', '=', 'asignaturas.ID_Asignatura')
@@ -210,7 +203,7 @@ class MallaController extends Controller
             })
             ->where(function ($query) {
                 $query->whereNull('agrupacion_asignatura.Tipo_Asignatura')
-                    ->orWhereIn('agrupacion_asignatura.Tipo_Asignatura', ['electiva', 'optativa']);
+                    ->orWhereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['electiva', 'optativa']);
             });
 
         if ($slot && $slot->agrupacion) {
@@ -264,61 +257,197 @@ class MallaController extends Controller
         ]);
     }
 
-    private function ensureOptativasLinkedToMalla(MallaCurricular $malla, ?SlotAgrupacion $slot, array $asignaturaIds): void
+    /**
+     * Endpoint administrativo: Retorna las optativas de un programa que NO están
+     * vinculadas a ninguna agrupación (para asignación manual).
+     */
+    public function optativasSinAgrupacion(Request $request, int $mallaId): JsonResponse
     {
-        if (empty($asignaturaIds)) {
-            return;
-        }
+        $malla = MallaCurricular::findOrFail($mallaId);
 
-        $agrupacionId = null;
-        if ($slot?->agrupacion) {
-            $agrupacionId = $slot->agrupacion->ID_Agrupacion;
-        } else {
-            $componente = Componente::firstOrCreate(['Nombre_Componente' => 'Libre Elección']);
-            $agrupacion = Agrupacion::firstOrCreate(
-                [
-                    'ID_Malla' => $malla->ID_Malla,
-                    'ID_Componente' => $componente->ID_Componente,
-                    'Nombre_Agrupacion' => 'Optativas',
-                ],
-                [
-                    'Creditos_Requeridos' => null,
-                    'Creditos_Maximos' => null,
-                    'Es_Obligatoria' => 0,
-                ]
-            );
-            $agrupacionId = $agrupacion->ID_Agrupacion;
-        }
-
-        if (!$agrupacionId) {
-            return;
-        }
-
-        $existingAsignaturas = AgrupacionAsignatura::where('ID_Malla', $malla->ID_Malla)
-            ->where('ID_Agrupacion', $agrupacionId)
-            ->whereIn('ID_Asignatura', $asignaturaIds)
+        // Optativas registradas para el programa pero sin enlace en agrupacion_asignatura
+        $optativasIds = ProgramaElectiva::where('ID_Programa', $malla->ID_Programa)
             ->pluck('ID_Asignatura')
             ->all();
 
-        $missingAsignaturas = array_diff($asignaturaIds, $existingAsignaturas);
-        if (empty($missingAsignaturas)) {
-            return;
+        $vinculadasIds = AgrupacionAsignatura::where('ID_Malla', $mallaId)
+            ->whereIn('ID_Asignatura', $optativasIds)
+            ->pluck('ID_Asignatura')
+            ->all();
+
+        $noVinculadas = array_diff($optativasIds, $vinculadasIds);
+
+        $asignaturas = \App\Models\Asignatura::whereIn('ID_Asignatura', $noVinculadas)
+            ->get(['ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura']);
+
+        return response()->json(['data' => $asignaturas]);
+    }
+
+    /**
+     * Endpoint administrativo: Asigna una optativa a una agrupación específica.
+     */
+    public function asignarOptativaAgrupacion(Request $request, int $mallaId): JsonResponse
+    {
+        $validated = $request->validate([
+            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Asignatura' => 'required|integer|exists:asignaturas,ID_Asignatura',
+        ]);
+
+        $agrupacion = Agrupacion::where('ID_Malla', $mallaId)
+            ->findOrFail($validated['ID_Agrupacion']);
+
+        // Verificar que la asignatura sea optativa del programa
+        $esOptativa = ProgramaElectiva::where('ID_Programa', $agrupacion->malla->ID_Programa)
+            ->where('ID_Asignatura', $validated['ID_Asignatura'])
+            ->exists();
+
+        if (!$esOptativa) {
+            return response()->json([
+                'message' => 'La asignatura no es una optativa registrada para este programa.'
+            ], 422);
+        }
+
+        AgrupacionAsignatura::updateOrCreate(
+            [
+                'ID_Malla' => $mallaId,
+                'ID_Asignatura' => $validated['ID_Asignatura'],
+            ],
+            [
+                'ID_Agrupacion' => $validated['ID_Agrupacion'],
+                'Tipo_Asignatura' => 'optativa',
+            ]
+        );
+
+        return response()->json(['ok' => true, 'message' => 'Optativa asignada correctamente.']);
+    }
+
+    /**
+     * Endpoint administrativo: Asigna múltiples optativas a una agrupación de una sola vez.
+     */
+    public function asignarOptativasBatch(Request $request, int $mallaId): JsonResponse
+    {
+        $validated = $request->validate([
+            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Asignaturas' => 'required|array|min:1',
+            'ID_Asignaturas.*' => 'required|integer|exists:asignaturas,ID_Asignatura',
+        ]);
+
+        $agrupacion = Agrupacion::where('ID_Malla', $mallaId)
+            ->findOrFail($validated['ID_Agrupacion']);
+
+        $programaId = $agrupacion->malla->ID_Programa;
+
+        // Verificar que todas las asignaturas sean optativas del programa
+        $idsValidos = ProgramaElectiva::where('ID_Programa', $programaId)
+            ->whereIn('ID_Asignatura', $validated['ID_Asignaturas'])
+            ->pluck('ID_Asignatura')
+            ->all();
+
+        $idsInvalidos = array_diff($validated['ID_Asignaturas'], $idsValidos);
+        if (!empty($idsInvalidos)) {
+            return response()->json([
+                'message' => 'Algunas asignaturas no son optativas registradas para este programa.',
+                'invalid_ids' => array_values($idsInvalidos),
+            ], 422);
         }
 
         $now = now();
-        $rows = array_map(fn ($id) => [
-            'ID_Malla' => $malla->ID_Malla,
-            'ID_Agrupacion' => $agrupacionId,
+        $rows = array_map(fn($id) => [
+            'ID_Malla' => $mallaId,
+            'ID_Agrupacion' => $validated['ID_Agrupacion'],
             'ID_Asignatura' => $id,
             'Tipo_Asignatura' => 'optativa',
             'created_at' => $now,
             'updated_at' => $now,
-        ], $missingAsignaturas);
+        ], $idsValidos);
 
         DB::table('agrupacion_asignatura')->upsert(
             $rows,
-            ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'],
+            ['ID_Malla', 'ID_Asignatura'],
             ['Tipo_Asignatura', 'updated_at']
         );
+
+        $count = count($idsValidos);
+        return response()->json([
+            'ok' => true,
+            'message' => "{$count} optativas asignadas correctamente a '{$agrupacion->Nombre_Agrupacion}'."
+        ]);
+    }
+
+    /**
+     * Endpoint administrativo: Remueve una optativa de una agrupación.
+     */
+    public function removerOptativaAgrupacion(Request $request, int $mallaId): JsonResponse
+    {
+        $validated = $request->validate([
+            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Asignatura' => 'required|integer|exists:asignaturas,ID_Asignatura',
+        ]);
+
+        AgrupacionAsignatura::where('ID_Malla', $mallaId)
+            ->where('ID_Agrupacion', $validated['ID_Agrupacion'])
+            ->where('ID_Asignatura', $validated['ID_Asignatura'])
+            ->whereRaw('LOWER(Tipo_Asignatura) = ?', ['optativa'])
+            ->delete();
+
+        return response()->json(['ok' => true, 'message' => 'Optativa removida de la agrupación.']);
+    }
+
+    /**
+     * Endpoint administrativo: Remueve múltiples optativas de una agrupación de una sola vez.
+     */
+    public function removerOptativasBatch(Request $request, int $mallaId): JsonResponse
+    {
+        $validated = $request->validate([
+            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Asignaturas' => 'required|array|min:1',
+            'ID_Asignaturas.*' => 'required|integer|exists:asignaturas,ID_Asignatura',
+        ]);
+
+        $deleted = AgrupacionAsignatura::where('ID_Malla', $mallaId)
+            ->where('ID_Agrupacion', $validated['ID_Agrupacion'])
+            ->whereIn('ID_Asignatura', $validated['ID_Asignaturas'])
+            ->whereRaw('LOWER(Tipo_Asignatura) = ?', ['optativa'])
+            ->delete();
+
+        return response()->json([
+            'ok' => true,
+            'message' => "{$deleted} optativas removidas de la agrupación."
+        ]);
+    }
+
+    /**
+     * Endpoint administrativo: Retorna las optativas agrupadas por agrupación para la vista admin.
+     * Solo muestra agrupaciones que TIENEN optativas asignadas (columna derecha del panel).
+     */
+    public function optativasPorAgrupacion(Request $request, int $mallaId): JsonResponse
+    {
+        $malla = MallaCurricular::findOrFail($mallaId);
+
+        $agrupaciones = Agrupacion::where('ID_Malla', $mallaId)
+            ->whereHas('asignaturas', function ($q) {
+                                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva']);
+            })
+            ->with(['asignaturas' => function ($q) {
+                                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva'])
+                  ->orderBy('Nombre_Asignatura');
+            }])
+            ->orderBy('Nombre_Agrupacion')
+            ->get(['ID_Agrupacion', 'Nombre_Agrupacion', 'ID_Componente']);
+
+        return response()->json(['data' => $agrupaciones]);
+    }
+
+    /**
+     * Endpoint administrativo: Retorna TODAS las agrupaciones de la malla
+     * (para el selector de destino en asignación masiva).
+     */
+    public function agrupacionesDeMalla(Request $request, int $mallaId): JsonResponse
+    {
+        $agrupaciones = Agrupacion::where('ID_Malla', $mallaId)
+            ->orderBy('Nombre_Agrupacion')
+            ->get(['ID_Agrupacion', 'Nombre_Agrupacion', 'ID_Componente']);
+
+        return response()->json(['data' => $agrupaciones]);
     }
 }

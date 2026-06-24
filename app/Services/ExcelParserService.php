@@ -659,7 +659,7 @@ class ExcelParserService
             ->get()
             ->keyBy('ID_Plantilla_Agrupacion');
 
-        $rows = [];
+        $rowsByAgrupacion = []; // Agrupar filas por agrupación para mejor control
         $now = now();
 
         foreach ($codigosBase as $codigoBase) {
@@ -670,24 +670,63 @@ class ExcelParserService
 
             $agrupacionId = null;
             $meta = $metaByCodigo[$codigoBase] ?? [];
+            $plantillaId = $meta['ID_Plantilla_Agrupacion'] ?? null;
 
-            if (!empty($meta['ID_Plantilla_Agrupacion']) && isset($plantillasCache[$meta['ID_Plantilla_Agrupacion']])) {
-                $agrupacionId = $this->findOrCreateAgrupacionFromPlantilla(
-                    $malla,
-                    $meta['ID_Componente'] ?? null,
-                    $plantillasCache[$meta['ID_Plantilla_Agrupacion']]
+            if (!empty($plantillaId) && isset($plantillasCache[$plantillaId])) {
+                $plantilla = $plantillasCache[$plantillaId];
+                $componenteId = $meta['ID_Componente'] ?? null;
+
+                if ($componenteId) {
+                    // Buscar si la agrupación ya existe en la malla
+                    $agrupacion = Agrupacion::where('ID_Malla', $malla->ID_Malla)
+                        ->where('ID_Componente', $componenteId)
+                        ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
+                        ->first();
+
+                    if ($agrupacion) {
+                        $agrupacionId = $agrupacion->ID_Agrupacion;
+                    } else {
+                        // La agrupación NO existe aún → registrar advertencia
+                        $this->recordError(
+                            0,
+                            'Optativa',
+                            "La agrupación '{$plantilla->Nombre_Agrupacion}' (componente ID {$componenteId}) no existe en la malla '{$malla->ID_Malla}'. " .
+                            "La asignatura '{$codigoBase}' NO se vinculará automáticamente. " .
+                            "Debes crear la agrupación primero y luego asignarla desde el panel de administración.",
+                            $codigoBase,
+                            'advertencia'
+                        );
+                        continue; // No enlazar a default, solo advertir
+                    }
+                } else {
+                    // No tiene componente → no se puede determinar agrupación
+                    $this->recordError(
+                        0,
+                        'Optativa',
+                        "La optativa '{$codigoBase}' no tiene componente asociado en la plantilla. No se puede vincular automáticamente.",
+                        $codigoBase,
+                        'advertencia'
+                    );
+                    continue;
+                }
+            } else {
+                // No tiene plantilla de agrupación → no se puede determinar destino
+                $this->recordError(
+                    0,
+                    'Optativa',
+                    "La optativa '{$codigoBase}' no tiene plantilla de agrupación asociada. " .
+                    "Debes asignarla manualmente desde el panel de administración.",
+                    $codigoBase,
+                    'advertencia'
                 );
-            }
-
-            if (!$agrupacionId) {
-                $agrupacionId = $this->findOrCreateDefaultOptativaAgrupacion($malla);
-            }
-
-            if (!$agrupacionId) {
                 continue;
             }
 
-            $rows[] = [
+            if (!isset($rowsByAgrupacion[$agrupacionId])) {
+                $rowsByAgrupacion[$agrupacionId] = [];
+            }
+
+            $rowsByAgrupacion[$agrupacionId][] = [
                 'ID_Malla' => $malla->ID_Malla,
                 'ID_Agrupacion' => $agrupacionId,
                 'ID_Asignatura' => $asignaturaId,
@@ -697,9 +736,12 @@ class ExcelParserService
             ];
         }
 
-        if (!empty($rows)) {
-            DB::table('agrupacion_asignatura')
-                ->upsert($rows, ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'], ['Tipo_Asignatura', 'updated_at']);
+        // Insertar por agrupación para mantener consistencia
+        foreach ($rowsByAgrupacion as $agrupacionId => $rows) {
+            if (!empty($rows)) {
+                DB::table('agrupacion_asignatura')
+                    ->upsert($rows, ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'], ['Tipo_Asignatura', 'updated_at']);
+            }
         }
     }
 

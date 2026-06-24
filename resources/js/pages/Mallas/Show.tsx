@@ -100,13 +100,22 @@ export default function MallaShow({ malla }: Props) {
                         </div>
                     </div>
 
-                    <Link
-                        href={`/mallas/${malla.ID_Malla}/grafica`}
-                        className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-blue-900/20"
-                    >
-                        <span className="material-symbols-outlined !text-xl">account_tree</span>
-                        Visualizar Gráfica Malla
-                    </Link>
+                    <div className="flex items-center gap-3">
+                        <Link
+                            href={`/mallas/${malla.ID_Malla}/optativas-asignacion`}
+                            className="flex items-center gap-2 px-6 py-3 bg-amber-50 text-amber-700 rounded-xl font-bold hover:bg-amber-100 hover:scale-[1.02] active:scale-95 transition-all border border-amber-200"
+                        >
+                            <span className="material-symbols-outlined !text-xl">playlist_add_check</span>
+                            Asignar Optativas
+                        </Link>
+                        <Link
+                            href={`/mallas/${malla.ID_Malla}/grafica`}
+                            className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-blue-900/20"
+                        >
+                            <span className="material-symbols-outlined !text-xl">account_tree</span>
+                            Visualizar Gráfica Malla
+                        </Link>
+                    </div>
                 </div>
 
                 {/* 2. Stats Dashboard (Resumen de Malla) */}
