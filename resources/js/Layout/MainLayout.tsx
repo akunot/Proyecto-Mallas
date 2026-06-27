@@ -117,7 +117,7 @@ setSidebarOpen(false);
                         <span className="text-[#00236f] font-black text-sm">UN</span>
                     </div>
                     {sidebarOpen && (
-                        <div className="flex flex-col animate-fade-in">
+                        <div className="flex flex-col animate-in fade-in">
                             <span className="font-bold tracking-tight">Gestion de mallas</span>
                             <span className="text-[10px] text-blue-200 uppercase tracking-widest font-medium">Manizales</span>
                         </div>
@@ -243,7 +243,7 @@ setSidebarOpen(false);
 
                 {/* Main View */}
                 <main className="p-8 overflow-y-auto">
-                    <div className="animate-fade-in">
+                    <div className="animate-in fade-in">
                         {children}
                     </div>
                 </main>

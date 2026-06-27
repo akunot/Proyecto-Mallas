@@ -167,7 +167,7 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
         Route::post('/mallas/{mallaId}/optativas/asignar-batch', [MallaController::class, 'asignarOptativasBatch']);
         Route::post('/mallas/{mallaId}/optativas/remover-batch', [MallaController::class, 'removerOptativasBatch']);
         Route::get('/mallas/{mallaId}/optativas-por-agrupacion', [MallaController::class, 'optativasPorAgrupacion']);
-        Route::get('/mallas/{mallaId}/agrupaciones', [MallaController::class, 'agrupacionesDeMalla']);
+        Route::get('/mallas/{mallaId}/agrupaciones', [MallaController::class, 'agrupacionesDePrograma']);
 
         // Mallas y cargas (Fase 3+)
         Route::get('/cargas', [CargaController::class, 'index']);

@@ -16,8 +16,10 @@ class Agrupacion extends Model
 
     protected $fillable = [
         'ID_Malla',
+        'ID_Programa',
         'ID_Componente',
         'Nombre_Agrupacion',
+        'Tipo_Agrupacion',
         'Creditos_Requeridos',
         'Creditos_Maximos',
         'Es_Obligatoria',

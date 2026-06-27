@@ -686,17 +686,9 @@ class ExcelParserService
                     if ($agrupacion) {
                         $agrupacionId = $agrupacion->ID_Agrupacion;
                     } else {
-                        // La agrupación NO existe aún → registrar advertencia
-                        $this->recordError(
-                            0,
-                            'Optativa',
-                            "La agrupación '{$plantilla->Nombre_Agrupacion}' (componente ID {$componenteId}) no existe en la malla '{$malla->ID_Malla}'. " .
-                            "La asignatura '{$codigoBase}' NO se vinculará automáticamente. " .
-                            "Debes crear la agrupación primero y luego asignarla desde el panel de administración.",
-                            $codigoBase,
-                            'advertencia'
-                        );
-                        continue; // No enlazar a default, solo advertir
+                        // La agrupación NO existe aún → crearla desde la plantilla
+                        $nuevaAgrupacion = $plantilla->generarAgrupacion($malla->ID_Malla);
+                        $agrupacionId = $nuevaAgrupacion->ID_Agrupacion;
                     }
                 } else {
                     // No tiene componente → no se puede determinar agrupación
@@ -769,6 +761,7 @@ class ExcelParserService
                 'Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion,
             ],
             [
+                'Tipo_Agrupacion' => $plantilla->Tipo_Agrupacion,
                 'Creditos_Requeridos' => $plantilla->Creditos_Requeridos,
                 'Creditos_Maximos' => $plantilla->Creditos_Maximos,
                 'Es_Obligatoria' => $plantilla->Es_Obligatoria,
@@ -789,6 +782,7 @@ class ExcelParserService
                 'Nombre_Agrupacion' => 'Optativas',
             ],
             [
+                'ID_Programa' => $malla->ID_Programa,
                 'Creditos_Requeridos' => null,
                 'Creditos_Maximos' => null,
                 'Es_Obligatoria' => 0,
@@ -835,7 +829,8 @@ class ExcelParserService
                 ['Nombre_Componente' => $componenteNombre]
             );
 
-            $esObligatoria = strtoupper($this->cleanCell($data[1] ?? '')) === 'OBLIGATORIA' ? 1 : 0;
+            $tipoAgrupacionRaw = strtoupper($this->cleanCell($data[1] ?? ''));
+            $esObligatoria = $tipoAgrupacionRaw === 'OBLIGATORIA' ? 1 : 0;
             $creditosRequeridos = !empty($data[3]) ? (int) $data[3] : null;
 
             Agrupacion::firstOrCreate(
@@ -846,8 +841,10 @@ class ExcelParserService
                 ],
                 [
                     'ID_Malla' => $this->malla->ID_Malla,
+                    'ID_Programa' => $this->malla->ID_Programa,
                     'ID_Componente' => $componente->ID_Componente,
                     'Nombre_Agrupacion' => $agrupacionNombre,
+                    'Tipo_Agrupacion' => $tipoAgrupacionRaw,
                     'Creditos_Requeridos' => $creditosRequeridos,
                     'Es_Obligatoria' => $esObligatoria,
                 ]
@@ -1096,8 +1093,10 @@ class ExcelParserService
         if (!isset($this->agrupacionesCache[$agrupKey])) {
             $batchAgrupaciones[] = [
                 "ID_Malla" => $this->malla->ID_Malla,
+                "ID_Programa" => $this->malla->ID_Programa,
                 "ID_Componente" => $componenteId,
                 "Nombre_Agrupacion" => $plantilla->Nombre_Agrupacion,
+                "Tipo_Agrupacion" => $plantilla->Tipo_Agrupacion,
                 "Creditos_Requeridos" => $plantilla->Creditos_Requeridos,
                 "Es_Obligatoria" => $plantilla->Es_Obligatoria,
                 "created_at" => now(),
@@ -1244,6 +1243,7 @@ class ExcelParserService
             ],
             [
                 'ID_Malla' => $this->malla->ID_Malla,
+                'ID_Programa' => $this->malla->ID_Programa,
                 'ID_Componente' => $componenteId,
                 'Nombre_Agrupacion' => $this->cleanCell($nombre),
                 'Es_Obligatoria' => 0,

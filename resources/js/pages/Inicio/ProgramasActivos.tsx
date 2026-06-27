@@ -102,7 +102,7 @@ export default function ProgramasActivos({ facultades }: Props) {
                 
                 <div className="relative max-w-7xl mx-auto px-6 text-center lg:text-left grid lg:grid-cols-2 items-center gap-12">
                     <div className="space-y-6">
-                        <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 animate-fade-in">
+                        <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 animate-in fade-in">
                             <span className="w-2 h-2 rounded-full bg-[#77c53f] animate-pulse" />
                             <span className="text-white text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
                         </div>

@@ -8,6 +8,7 @@ use App\Models\MallaCurricular;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
+use App\Models\PlantillaAgrupacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -289,15 +290,20 @@ class MallaController extends Controller
     public function asignarOptativaAgrupacion(Request $request, int $mallaId): JsonResponse
     {
         $validated = $request->validate([
-            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Agrupacion' => 'required|integer',
             'ID_Asignatura' => 'required|integer|exists:asignaturas,ID_Asignatura',
         ]);
 
-        $agrupacion = Agrupacion::where('ID_Malla', $mallaId)
-            ->findOrFail($validated['ID_Agrupacion']);
+        $malla = MallaCurricular::findOrFail($mallaId);
+
+        // Buscar la agrupación real; si no existe, crearla desde la plantilla
+        $agrupacionReal = $this->resolveAgrupacionDestino($malla, (int) $validated['ID_Agrupacion']);
+        if (!$agrupacionReal) {
+            return response()->json(['message' => 'La agrupación destino no es válida.'], 422);
+        }
 
         // Verificar que la asignatura sea optativa del programa
-        $esOptativa = ProgramaElectiva::where('ID_Programa', $agrupacion->malla->ID_Programa)
+        $esOptativa = ProgramaElectiva::where('ID_Programa', $malla->ID_Programa)
             ->where('ID_Asignatura', $validated['ID_Asignatura'])
             ->exists();
 
@@ -313,7 +319,7 @@ class MallaController extends Controller
                 'ID_Asignatura' => $validated['ID_Asignatura'],
             ],
             [
-                'ID_Agrupacion' => $validated['ID_Agrupacion'],
+                'ID_Agrupacion' => $agrupacionReal->ID_Agrupacion,
                 'Tipo_Asignatura' => 'optativa',
             ]
         );
@@ -327,18 +333,21 @@ class MallaController extends Controller
     public function asignarOptativasBatch(Request $request, int $mallaId): JsonResponse
     {
         $validated = $request->validate([
-            'ID_Agrupacion' => 'required|integer|exists:agrupaciones,ID_Agrupacion',
+            'ID_Agrupacion' => 'required|integer',
             'ID_Asignaturas' => 'required|array|min:1',
             'ID_Asignaturas.*' => 'required|integer|exists:asignaturas,ID_Asignatura',
         ]);
 
-        $agrupacion = Agrupacion::where('ID_Malla', $mallaId)
-            ->findOrFail($validated['ID_Agrupacion']);
+        $malla = MallaCurricular::findOrFail($mallaId);
 
-        $programaId = $agrupacion->malla->ID_Programa;
+        // Buscar la agrupación real; si no existe, crearla desde la plantilla
+        $agrupacionReal = $this->resolveAgrupacionDestino($malla, (int) $validated['ID_Agrupacion']);
+        if (!$agrupacionReal) {
+            return response()->json(['message' => 'La agrupación destino no es válida.'], 422);
+        }
 
         // Verificar que todas las asignaturas sean optativas del programa
-        $idsValidos = ProgramaElectiva::where('ID_Programa', $programaId)
+        $idsValidos = ProgramaElectiva::where('ID_Programa', $malla->ID_Programa)
             ->whereIn('ID_Asignatura', $validated['ID_Asignaturas'])
             ->pluck('ID_Asignatura')
             ->all();
@@ -354,7 +363,7 @@ class MallaController extends Controller
         $now = now();
         $rows = array_map(fn($id) => [
             'ID_Malla' => $mallaId,
-            'ID_Agrupacion' => $validated['ID_Agrupacion'],
+            'ID_Agrupacion' => $agrupacionReal->ID_Agrupacion,
             'ID_Asignatura' => $id,
             'Tipo_Asignatura' => 'optativa',
             'created_at' => $now,
@@ -370,8 +379,43 @@ class MallaController extends Controller
         $count = count($idsValidos);
         return response()->json([
             'ok' => true,
-            'message' => "{$count} optativas asignadas correctamente a '{$agrupacion->Nombre_Agrupacion}'."
+            'message' => "{$count} optativas asignadas correctamente a '{$agrupacionReal->Nombre_Agrupacion}'."
         ]);
+    }
+
+    /**
+     * Resuelve la agrupación destino: si existe en agrupaciones la retorna,
+     * si no, la crea desde plantillas_agrupacion usando el ID como ID_Plantilla_Agrupacion.
+     */
+    private function resolveAgrupacionDestino(MallaCurricular $malla, int $id): ?Agrupacion
+    {
+        // 1. Buscar por ID directo en agrupaciones de la malla
+        $agrupacion = Agrupacion::where('ID_Agrupacion', $id)
+            ->where('ID_Malla', $malla->ID_Malla)
+            ->first();
+
+        if ($agrupacion) {
+            return $agrupacion;
+        }
+
+        // 2. Obtener la plantilla para conocer nombre y componente
+        $plantilla = PlantillaAgrupacion::find($id);
+        if (!$plantilla || $plantilla->ID_Programa !== $malla->ID_Programa) {
+            return null;
+        }
+
+        // 3. Buscar si ya existe una agrupación con mismo nombre+componente en la malla
+        $agrupacionExistente = Agrupacion::where('ID_Malla', $malla->ID_Malla)
+            ->where('ID_Componente', $plantilla->ID_Componente)
+            ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
+            ->first();
+
+        if ($agrupacionExistente) {
+            return $agrupacionExistente;
+        }
+
+        // 4. No existe en absoluto → crearla desde la plantilla
+        return $plantilla->generarAgrupacion($malla->ID_Malla);
     }
 
     /**
@@ -442,11 +486,19 @@ class MallaController extends Controller
      * Endpoint administrativo: Retorna TODAS las agrupaciones de la malla
      * (para el selector de destino en asignación masiva).
      */
-    public function agrupacionesDeMalla(Request $request, int $mallaId): JsonResponse
+    public function agrupacionesDePrograma(Request $request, int $mallaId): JsonResponse
     {
-        $agrupaciones = Agrupacion::where('ID_Malla', $mallaId)
+        $malla = MallaCurricular::findOrFail($mallaId);
+
+        $agrupaciones = PlantillaAgrupacion::where('ID_Programa', $malla->ID_Programa)
+            ->where('Tipo_Agrupacion', 'OPTATIVA')
             ->orderBy('Nombre_Agrupacion')
-            ->get(['ID_Agrupacion', 'Nombre_Agrupacion', 'ID_Componente']);
+            ->get()
+            ->map(fn ($p) => [
+                'ID_Agrupacion' => $p->ID_Plantilla_Agrupacion,
+                'Nombre_Agrupacion' => $p->Nombre_Agrupacion,
+                'ID_Componente' => $p->ID_Componente,
+            ]);
 
         return response()->json(['data' => $agrupaciones]);
     }

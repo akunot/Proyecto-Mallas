@@ -94,6 +94,26 @@ class NormativaSeeder extends Seeder
                 'Esta_Activo' => 1,
                 'Descripcion_Normativa' => 'Por el cual se unifica en un solo Acuerdo las modificaciones del Plan de Estudios del programa de Administración de Empresas adoptadas por el Consejo de la Facultad de Administración mediante Resolución CFA 022 de 2010; Acuerdo 11 de 2012, Oficio SFA-C-525 de 2015 y Acuerdo 85 de 201',
             ],
+            [
+                'Tipo_Normativa' => 'Acuerdo',
+                'Numero_Normativa' => '5',
+                'Anio_Normativa' => 2022,
+                'Instancia' => 'Consejo de Facultad de Administración',
+                'Codigo_Programa' => 4027,
+                'Url_Normativa' => 'https://legal.unal.edu.co/rlunal/home/doc.jsp?d_i=100808',
+                'Esta_Activo' => 1,
+                'Descripcion_Normativa' => 'Por el cual se unifica en un solo Acuerdo las modificaciones del Plan de Estudios del programa de Administración de Empresas adoptadas por el Consejo de la Facultad de Administración mediante Resolución CFA 022 de 2010; Acuerdo 11 de 2012, Oficio SFA-C-525 de 2015 y Acuerdo 85 de 201',
+            ],
+            [
+                'Tipo_Normativa' => 'Acuerdo',
+                'Numero_Normativa' => '5',
+                'Anio_Normativa' => 2022,
+                'Instancia' => 'Consejo de Facultad de Administración',
+                'Codigo_Programa' => 4033,
+                'Url_Normativa' => 'https://legal.unal.edu.co/rlunal/home/doc.jsp?d_i=100808',
+                'Esta_Activo' => 1,
+                'Descripcion_Normativa' => 'Por el cual se unifica en un solo Acuerdo las modificaciones del Plan de Estudios del programa de Administración de Empresas adoptadas por el Consejo de la Facultad de Administración mediante Resolución CFA 022 de 2010; Acuerdo 11 de 2012, Oficio SFA-C-525 de 2015 y Acuerdo 85 de 201',
+            ],
         ];
 
         foreach ($normativas as $normativa) {
