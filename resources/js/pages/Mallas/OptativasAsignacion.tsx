@@ -54,7 +54,9 @@ function ActionBar({
 }) {
     const [agrupacionId, setAgrupacionId] = useState<number | ''>('');
 
-    if (count === 0) return null;
+    if (count === 0) {
+return null;
+}
 
     return (
         <div className="sticky bottom-4 z-20 mx-2">
@@ -105,7 +107,9 @@ function RemoveBar({
     onClear: () => void;
     loading: boolean;
 }) {
-    if (count === 0) return null;
+    if (count === 0) {
+return null;
+}
 
     return (
         <div className="flex items-center gap-2 bg-rose-50 border border-rose-200 rounded-xl px-3 py-2 mb-3">
@@ -158,6 +162,7 @@ export default function OptativasAsignacion({ malla }: Props) {
     const fetchData = async () => {
         setLoading(true);
         setError(null);
+
         try {
             const [agrupacionesRes, catalogoRes, sinAgrupacionRes, todasAgrupacionesRes] = await Promise.all([
                 fetch(`${apiBase}/optativas-por-agrupacion`, {
@@ -189,7 +194,11 @@ export default function OptativasAsignacion({ malla }: Props) {
                     (group.asignaturas ?? [])
                         .map((asig) => {
                             const id = Number(asig.ID_Asignatura);
-                            if (!Number.isFinite(id) || id <= 0) return null;
+
+                            if (!Number.isFinite(id) || id <= 0) {
+return null;
+}
+
                             return {
                                 ...asig,
                                 ID_Asignatura: id,
@@ -208,6 +217,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                     (data.data ?? [])
                         .map((asig: Asignatura) => {
                             const id = Number(asig.ID_Asignatura);
+
                             return Number.isFinite(id) && id > 0 ? { ...asig, ID_Asignatura: id } : null;
                         })
                         .filter((item: Asignatura | null): item is Asignatura => item !== null)
@@ -225,13 +235,16 @@ export default function OptativasAsignacion({ malla }: Props) {
         }
     };
 
-    useEffect(() => { fetchData(); }, []);
+    useEffect(() => {
+ fetchData(); 
+}, []);
 
     // ── Helpers de selección ──────────────────────────────────────────────────
     const toggleLeft = (id: number) => {
         setSelectedIds(prev => {
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
+
             return next;
         });
     };
@@ -247,8 +260,13 @@ export default function OptativasAsignacion({ malla }: Props) {
             const next = new Map(prev);
             const set = new Set(next.get(agrupacionId) ?? []);
             set.has(asignaturaId) ? set.delete(asignaturaId) : set.add(asignaturaId);
-            if (set.size === 0) next.delete(agrupacionId);
-            else next.set(agrupacionId, set);
+
+            if (set.size === 0) {
+next.delete(agrupacionId);
+} else {
+next.set(agrupacionId, set);
+}
+
             return next;
         });
     };
@@ -257,8 +275,13 @@ export default function OptativasAsignacion({ malla }: Props) {
         setRemoveSelections(prev => {
             const next = new Map(prev);
             const current = next.get(agrupacionId);
-            if (current && current.size === ids.length) next.delete(agrupacionId);
-            else next.set(agrupacionId, new Set(ids));
+
+            if (current && current.size === ids.length) {
+next.delete(agrupacionId);
+} else {
+next.set(agrupacionId, new Set(ids));
+}
+
             return next;
         });
     };
@@ -267,6 +290,7 @@ export default function OptativasAsignacion({ malla }: Props) {
         setRemoveSelections(prev => {
             const next = new Map(prev);
             next.delete(agrupacionId);
+
             return next;
         });
     };
@@ -278,9 +302,13 @@ export default function OptativasAsignacion({ malla }: Props) {
     };
 
     const handleAsignar = async () => {
-        if (!selectedAgrupacion || !selectedAsignatura) return;
+        if (!selectedAgrupacion || !selectedAsignatura) {
+return;
+}
+
         setActionLoading(true);
         setError(null);
+
         try {
             const res = await fetch(`${apiBase}/optativas/asignar`, {
                 method: 'POST',
@@ -288,6 +316,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                 credentials: 'same-origin',
                 body: JSON.stringify({ ID_Agrupacion: Number(selectedAgrupacion), ID_Asignatura: Number(selectedAsignatura) }),
             });
+
             if (res.ok) {
                 showSuccess('Optativa asignada correctamente.');
                 setSelectedAsignatura(null);
@@ -296,15 +325,23 @@ export default function OptativasAsignacion({ malla }: Props) {
                 const err = await res.json();
                 setError(err.message || 'Error al asignar.');
             }
-        } catch { setError('Error de conexión.'); }
-        finally { setActionLoading(false); }
+        } catch {
+ setError('Error de conexión.'); 
+} finally {
+ setActionLoading(false); 
+}
     };
 
     const handleAsignarBatch = async (agrupacionId: number) => {
         const ids = Array.from(selectedIds).filter(id => Number.isFinite(id) && id > 0);
-        if (!agrupacionId || ids.length === 0) return;
+
+        if (!agrupacionId || ids.length === 0) {
+return;
+}
+
         setActionLoading(true);
         setError(null);
+
         try {
             const res = await fetch(`${apiBase}/optativas/asignar-batch`, {
                 method: 'POST',
@@ -312,6 +349,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                 credentials: 'same-origin',
                 body: JSON.stringify({ ID_Agrupacion: agrupacionId, ID_Asignaturas: ids }),
             });
+
             if (res.ok) {
                 const data = await res.json();
                 showSuccess(data.message || `${ids.length} optativas asignadas.`);
@@ -321,14 +359,21 @@ export default function OptativasAsignacion({ malla }: Props) {
                 const err = await res.json();
                 setError(err.message || 'Error al asignar en lote.');
             }
-        } catch { setError('Error de conexión.'); }
-        finally { setActionLoading(false); }
+        } catch {
+ setError('Error de conexión.'); 
+} finally {
+ setActionLoading(false); 
+}
     };
 
     const handleRemover = async (agrupacionId: number, asignaturaId: number) => {
-        if (!confirm('¿Remover esta optativa de la agrupación?')) return;
+        if (!confirm('¿Remover esta optativa de la agrupación?')) {
+return;
+}
+
         setActionLoading(true);
         setError(null);
+
         try {
             const res = await fetch(`${apiBase}/optativas/remover`, {
                 method: 'POST',
@@ -336,18 +381,33 @@ export default function OptativasAsignacion({ malla }: Props) {
                 credentials: 'same-origin',
                 body: JSON.stringify({ ID_Agrupacion: agrupacionId, ID_Asignatura: asignaturaId }),
             });
-            if (res.ok) { showSuccess('Optativa removida.'); fetchData(); }
-            else { const err = await res.json(); setError(err.message || 'Error al remover.'); }
-        } catch { setError('Error de conexión.'); }
-        finally { setActionLoading(false); }
+
+            if (res.ok) {
+ showSuccess('Optativa removida.'); fetchData(); 
+} else {
+ const err = await res.json(); setError(err.message || 'Error al remover.'); 
+}
+        } catch {
+ setError('Error de conexión.'); 
+} finally {
+ setActionLoading(false); 
+}
     };
 
     const handleRemoverBatch = async (agrupacionId: number) => {
         const ids = Array.from(removeSelections.get(agrupacionId) ?? []);
-        if (ids.length === 0) return;
-        if (!confirm(`¿Remover ${ids.length} optativa${ids.length !== 1 ? 's' : ''} de esta agrupación?`)) return;
+
+        if (ids.length === 0) {
+return;
+}
+
+        if (!confirm(`¿Remover ${ids.length} optativa${ids.length !== 1 ? 's' : ''} de esta agrupación?`)) {
+return;
+}
+
         setActionLoading(true);
         setError(null);
+
         try {
             const res = await fetch(`${apiBase}/optativas/remover-batch`, {
                 method: 'POST',
@@ -355,14 +415,20 @@ export default function OptativasAsignacion({ malla }: Props) {
                 credentials: 'same-origin',
                 body: JSON.stringify({ ID_Agrupacion: agrupacionId, ID_Asignaturas: ids }),
             });
+
             if (res.ok) {
                 const data = await res.json();
                 showSuccess(data.message || `${ids.length} optativas removidas.`);
                 clearRemove(agrupacionId);
                 fetchData();
-            } else { const err = await res.json(); setError(err.message || 'Error al remover lote.'); }
-        } catch { setError('Error de conexión.'); }
-        finally { setActionLoading(false); }
+            } else {
+ const err = await res.json(); setError(err.message || 'Error al remover lote.'); 
+}
+        } catch {
+ setError('Error de conexión.'); 
+} finally {
+ setActionLoading(false); 
+}
     };
 
     // ── Filtrado ──────────────────────────────────────────────────────────────

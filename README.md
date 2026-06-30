@@ -1,6 +1,6 @@
 # Sistema de Gestión de Mallas Académicas — UNAL Manizales
 
-> **Nota:** El documento de especificación completo del sistema se encuentra en `requerimientos_mallas_unal_v5.md`. Este README es una referencia rápida para el desarrollo.
+> **Nota:** La documentación técnica completa del sistema se encuentra en `documentacion_tecnica.md`. Este README es una referencia rápida para el desarrollo.
 
 ---
 
@@ -8,42 +8,45 @@
 
 ## Metadatos del proyecto
 
-| **Campo** | **Valor** |
-|---|---|
-| Proyecto | Sistema de Gestión de Mallas Académicas |
-| Cliente | Universidad Nacional de Colombia - Sede Manizales |
-| Stack | Laravel 12 + React 19 + MySQL 8 + Apache 2.4 |
-| Arquitectura | API REST (Laravel) + SPA (React) + Vite |
-| Autenticación | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña) |
-| Tipo de sistema | Panel administrativo cerrado, usuarios contados |
-| Versión actual | 5.0 — Abril 2026 |
+| **Campo**       | **Valor**                                                        |
+| --------------- | ---------------------------------------------------------------- |
+| Proyecto        | Sistema de Gestión de Mallas Académicas                          |
+| Cliente         | Universidad Nacional de Colombia - Sede Manizales                |
+| Stack           | Laravel 12 + React 19 + MySQL 8 + Inertia.js 2.0                 |
+| Arquitectura    | Monolito modular (Laravel + Inertia + React)                     |
+| Autenticación   | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña) |
+| Tipo de sistema | Panel administrativo cerrado, usuarios contados                  |
+| Versión actual  | 5.3 — Junio 2026                                                 |
 
 ---
 
 ## Historial de cambios
 
-| Versión | Fecha | Resumen |
-|---|---|---|
-| 1.0 | Marzo 2026 | Versión inicial |
-| 4.0 | Abril 2026 | `agrupacion` pasa de `ID_Malla` a `ID_Programa`; `agrupacion_asignatura` recibe `ID_Malla`; se añade `Codigo_Facultad` a `facultad`; se añade `Tipo_Agrupacion` a `agrupacion`; nuevas restricciones UNIQUE |
-| 5.0 | Abril 2026 | Carga masiva dividida en tres archivos separados; `carga_malla` reemplaza `ID_Archivo` único por tres FKs; flujo de subida en dos fases (subida progresiva + lanzamiento); nuevos estados `esperando_archivos` y `listo_para_procesar`; API de cargas dividida en tres endpoints |
+| Versión | Fecha      | Resumen                                                                                                                                                                                                                                                                          |
+| ------- | ---------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1.0     | Marzo 2026 | Versión inicial                                                                                                                                                                                                                                                                  |
+| 4.0     | Abril 2026 | `agrupacion` pasa de `ID_Malla` a `ID_Programa`; `agrupacion_asignatura` recibe `ID_Malla`; se añade `Codigo_Facultad` a `facultad`; se añade `Tipo_Agrupacion` a `agrupacion`; nuevas restricciones UNIQUE                                                                      |
+| 5.0     | Abril 2026 | Carga masiva dividida en tres archivos separados; `carga_malla` reemplaza `ID_Archivo` único por tres FKs; flujo de subida en dos fases (subida progresiva + lanzamiento); nuevos estados `esperando_archivos` y `listo_para_procesar`; API de cargas dividida en tres endpoints |
+| 5.2     | Abril 2026 | Integración de archivo OPTATIVA como cuarto paso opcional del Job                                                                                                                                                                                                                |
+| 5.3     | Junio 2026 | Migración a Inertia.js 2.0; catálogos CRUD migrados a vistas Inertia; endpoint público de visualización; mejoras en validación y parser de Excel                                                                                                                                 |
 
 ---
 
 ## Stack técnico
 
-| **Capa** | **Tecnología** | **Versión** |
-|---|---|---|
-| Base de datos | MySQL | 8.0+ |
-| Backend | Laravel | 12.x |
-| Autenticación | Laravel Sanctum | 4.x |
-| Lectura Excel | Laravel Excel (Maatwebsite) | 3.x |
-| Frontend | React | 19.2 |
-| Build tool | Vite | 6.x |
-| Routing frontend | React Router | 7.x |
-| HTTP client | Axios | 1.x |
-| Servidor web | Apache | 2.4.62 (FreeBSD) |
-| PHP | PHP | 8.3.8 (FreeBSD) |
+| **Capa**         | **Tecnología**              | **Versión**      |
+| ---------------- | --------------------------- | ---------------- |
+| Base de datos    | MySQL                       | 8.0+             |
+| Backend          | Laravel                     | 12.x             |
+| Autenticación    | Laravel Sanctum             | 4.x              |
+| Lectura Excel    | Laravel Excel (Maatwebsite) | 3.x              |
+| Frontend         | React                       | 19.2             |
+| Integration      | Inertia.js                  | 2.0              |
+| Build tool       | Vite                        | 6.x              |
+| Routing frontend | React Router                | 7.x              |
+| HTTP client      | Axios                       | 1.x              |
+| Servidor web     | Apache                      | 2.4.62 (FreeBSD) |
+| PHP              | PHP                         | 8.3.8 (FreeBSD)  |
 
 ---
 
@@ -78,13 +81,13 @@ mallas-unal/
 
 Antes de implementar, revisar estos cambios en el documento de requerimientos (sección 3.17):
 
-| **Tabla** | **Cambio** |
-|---|---|
-| `agrupacion` | `ID_Malla` → `ID_Programa` + nuevo campo `Tipo_Agrupacion` |
-| `agrupacion_asignatura` | Nuevo campo `ID_Malla FK` + restricción UNIQUE |
-| `facultad` | Nuevo campo `Codigo_Facultad VARCHAR(20) UNIQUE` |
-| `archivo_excel` | Nuevo campo `Tipo_Archivo VARCHAR(20)` |
-| `carga_malla` | `ID_Archivo` reemplazado por tres FKs + nuevos campos `ID_Programa`, `ID_Normativa` |
+| **Tabla**               | **Cambio**                                                                          |
+| ----------------------- | ----------------------------------------------------------------------------------- |
+| `agrupacion`            | `ID_Malla` → `ID_Programa` + nuevo campo `Tipo_Agrupacion`                          |
+| `agrupacion_asignatura` | Nuevo campo `ID_Malla FK` + restricción UNIQUE                                      |
+| `facultad`              | Nuevo campo `Codigo_Facultad VARCHAR(20) UNIQUE`                                    |
+| `archivo_excel`         | Nuevo campo `Tipo_Archivo VARCHAR(20)`                                              |
+| `carga_malla`           | `ID_Archivo` reemplazado por tres FKs + nuevos campos `ID_Programa`, `ID_Normativa` |
 
 ---
 
@@ -124,4 +127,4 @@ El Job procesa en orden estricto: **asignaturas → electivas → malla**. Ver s
 
 ---
 
-*Para el detalle completo del modelo de BD, requerimientos funcionales, endpoints, plan de fases y convenciones de código, ver `requerimientos_mallas_unal_v5.md`.*
+_Para el detalle completo del modelo de BD, requerimientos funcionales, endpoints, plan de fases y convenciones de código, ver `requerimientos_mallas_unal_v5.md`._

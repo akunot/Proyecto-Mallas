@@ -10,6 +10,7 @@ class PlantillaAgrupacion extends Model
     use HasFactory;
 
     protected $table = 'plantillas_agrupacion';
+
     protected $primaryKey = 'ID_Plantilla_Agrupacion';
 
     protected $fillable = [
@@ -59,15 +60,22 @@ class PlantillaAgrupacion extends Model
     // Método para generar agrupación real a partir de plantilla
     public function generarAgrupacion($idMalla)
     {
-        return Agrupacion::create([
-            'ID_Malla' => $idMalla,
-            'ID_Programa' => $this->ID_Programa,
-            'ID_Componente' => $this->ID_Componente,
-            'Nombre_Agrupacion' => $this->Nombre_Agrupacion,
-            'Tipo_Agrupacion' => $this->Tipo_Agrupacion,
-            'Creditos_Requeridos' => $this->Creditos_Requeridos,
-            'Creditos_Maximos' => $this->Creditos_Maximos,
-            'Es_Obligatoria' => $this->Es_Obligatoria,
-        ]);
+        return Agrupacion::firstOrCreate(
+            [
+                'ID_Malla' => $idMalla,
+                'ID_Componente' => $this->ID_Componente,
+                'Nombre_Agrupacion' => $this->Nombre_Agrupacion,
+            ],
+            [
+                'ID_Malla' => $idMalla,
+                'ID_Programa' => $this->ID_Programa,
+                'ID_Componente' => $this->ID_Componente,
+                'Nombre_Agrupacion' => $this->Nombre_Agrupacion,
+                'Tipo_Agrupacion' => $this->Tipo_Agrupacion,
+                'Creditos_Requeridos' => $this->Creditos_Requeridos,
+                'Creditos_Maximos' => $this->Creditos_Maximos,
+                'Es_Obligatoria' => $this->Es_Obligatoria,
+            ]
+        );
     }
 }

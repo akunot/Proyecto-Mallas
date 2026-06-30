@@ -2,26 +2,26 @@
 
 namespace Database\Seeders;
 
-use Illuminate\Database\Console\Seeds\WithoutModelEvents;
-use Illuminate\Database\Seeder;
-use App\Models\Programa;
 use App\Models\Componente;
 use App\Models\PlantillaAgrupacion;
+use App\Models\Programa;
+use Illuminate\Database\Seeder;
+use Illuminate\Support\Facades\DB;
 
 class PlantillaAgrupacionSeeder extends Seeder
 {
     public function run(): void
     {
-        $this->command->info("Iniciando carga de plantillas de AGRUPACION...");
+        $this->command->info('Iniciando carga de plantillas de AGRUPACION...');
 
         // Limpiar plantillas existentes para evitar conflictos de IDs y nombres duplicados
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=0;');
+        DB::statement('SET FOREIGN_KEY_CHECKS=0;');
         PlantillaAgrupacion::truncate();
-        \Illuminate\Support\Facades\DB::statement('SET FOREIGN_KEY_CHECKS=1;');
+        DB::statement('SET FOREIGN_KEY_CHECKS=1;');
 
         $componenteMap = [
             1 => 'Fundamentacion',
-            2 => 'Disciplinar o Profesional', 
+            2 => 'Disciplinar o Profesional',
             3 => 'Libre Eleccion',
             4 => 'Nivelatorio',
             5 => 'Lengua Extranjera',
@@ -82,8 +82,8 @@ class PlantillaAgrupacionSeeder extends Seeder
                 ['ID_AGRUPACION' => 47, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'Investigación', 'CREDITOS EXIGIDOS' => 6],
                 ['ID_AGRUPACION' => 48, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'Gestión Humana', 'CREDITOS EXIGIDOS' => 5],
                 ['ID_AGRUPACION' => 49, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'Práctica', 'CREDITOS EXIGIDOS' => 15],
-                ['ID_AGRUPACION' => 50, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'Nivelatorio', 'CREDITOS EXIGIDOS' => 8],
-                ['ID_AGRUPACION' => 51, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'Libre Elección', 'CREDITOS EXIGIDOS' => 32],
+                ['ID_AGRUPACION' => 50, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'Nivelatorio', 'CREDITOS EXIGIDOS' => 8],
+                ['ID_AGRUPACION' => 51, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'Libre Elección', 'CREDITOS EXIGIDOS' => 32],
                 ['ID_AGRUPACION' => 52, 'ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'Ingles', 'CREDITOS EXIGIDOS' => 12],
             ],
             4027 => [
@@ -104,8 +104,8 @@ class PlantillaAgrupacionSeeder extends Seeder
                 ['ID_AGRUPACION' => 67, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OPTATIVA', 'AGRUPACION' => 'Investigación', 'CREDITOS EXIGIDOS' => 6],
                 ['ID_AGRUPACION' => 68, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'Gestión Humana', 'CREDITOS EXIGIDOS' => 5],
                 ['ID_AGRUPACION' => 69, 'ID_COMPONENTE' => 2, 'TIPO_AGRUPACION' => 'OBLIGATORIA', 'AGRUPACION' => 'Práctica', 'CREDITOS EXIGIDOS' => 15],
-                ['ID_AGRUPACION' => 70, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'Nivelatorios', 'CREDITOS EXIGIDOS' => 8],
-                ['ID_AGRUPACION' => 71, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'Libre Elección', 'CREDITOS EXIGIDOS' => 32],
+                ['ID_AGRUPACION' => 70, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'Nivelatorios', 'CREDITOS EXIGIDOS' => 8],
+                ['ID_AGRUPACION' => 71, 'ID_COMPONENTE' => 3, 'TIPO_AGRUPACION' => 'LIBRE ELECCIÓN', 'AGRUPACION' => 'Libre Elección', 'CREDITOS EXIGIDOS' => 32],
                 ['ID_AGRUPACION' => 72, 'ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'Ingles', 'CREDITOS EXIGIDOS' => 12],
             ],
             4033 => [
@@ -126,44 +126,47 @@ class PlantillaAgrupacionSeeder extends Seeder
                 ['ID_AGRUPACION' => 87, 'ID_COMPONENTE' => 4, 'TIPO_AGRUPACION' => 'NIVELATORIO', 'AGRUPACION' => 'Nivelatorio', 'CREDITOS EXIGIDOS' => 8],
                 ['ID_AGRUPACION' => 88, 'ID_COMPONENTE' => 5, 'TIPO_AGRUPACION' => 'INGLES', 'AGRUPACION' => 'Ingles', 'CREDITOS EXIGIDOS' => 15],
             ],
-        ];  
+        ];
 
         $creadasTotales = 0;
         $actualizadasTotales = 0;
 
         foreach ($programasData as $codigo => $agrupaciones) {
             $programa = Programa::where('Codigo_Programa', $codigo)->first();
-            
-            if (!$programa) {
+
+            if (! $programa) {
                 $this->command->error("No se encontro el programa con codigo {$codigo}");
+
                 continue;
             }
 
-            $this->command->info("Procesando " . count($agrupaciones) . " plantillas para el programa {$programa->Nombre_Programa}...");
+            $this->command->info('Procesando '.count($agrupaciones)." plantillas para el programa {$programa->Nombre_Programa}...");
 
             $creadas = 0;
             $actualizadas = 0;
 
             foreach ($agrupaciones as $plantillaData) {
                 $nombreComponente = $componenteMap[$plantillaData['ID_COMPONENTE']] ?? null;
-                if (!$nombreComponente) {
+                if (! $nombreComponente) {
                     $this->command->warn("Componente no encontrado para ID {$plantillaData['ID_COMPONENTE']}");
+
                     continue;
                 }
 
                 $componente = Componente::where('Nombre_Componente', $nombreComponente)->first();
-                if (!$componente) {
+                if (! $componente) {
                     $this->command->warn("Componente '{$nombreComponente}' no encontrado en BD");
+
                     continue;
                 }
 
                 $tipoAgrupacionRaw = trim($plantillaData['TIPO_AGRUPACION']);
-                $esObligatoria = match($tipoAgrupacionRaw) {
+                $esObligatoria = match ($tipoAgrupacionRaw) {
                     'OBLIGATORIA' => 1,
                     'OPTATIVA', 'LIBRE ELECCION', 'LIBRE ELECCIÓN', 'NIVELATORIO', 'INGLES' => 0,
                     default => 0,
                 };
-                
+
                 // Modificar el nombre temporalmente si existe el duplicado para el mismo programa
                 // o usar una lógica que permita insertar por ID específico.
                 // Como truncamos la tabla al inicio del seeder, no habrá registros previos.
@@ -180,15 +183,15 @@ class PlantillaAgrupacionSeeder extends Seeder
                 if ($plantilla->wasRecentlyCreated) {
                     $creadas++;
                     $creadasTotales++;
-                    $this->command->info("✓ ID {$plantillaData['ID_AGRUPACION']}: " . trim($plantillaData['AGRUPACION']));
-                } 
+                    $this->command->info("✓ ID {$plantillaData['ID_AGRUPACION']}: ".trim($plantillaData['AGRUPACION']));
+                }
             }
         }
 
-        $this->command->info("");
-        $this->command->info("Resumen general:");
+        $this->command->info('');
+        $this->command->info('Resumen general:');
         $this->command->info("- Plantillas creadas: {$creadasTotales}");
         $this->command->info("- Plantillas actualizadas: {$actualizadasTotales}");
-        $this->command->info("Plantillas listas para generar agrupaciones al procesar la malla.");
+        $this->command->info('Plantillas listas para generar agrupaciones al procesar la malla.');
     }
 }

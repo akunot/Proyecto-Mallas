@@ -2,12 +2,12 @@
 
 namespace App\Services;
 
-use App\Models\MallaCurricular;
 use App\Models\CargaMalla;
 use App\Models\LogActividad;
+use App\Models\MallaCurricular;
 use App\Models\Usuario;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Auth;
 
 class MallaAprobacionService
 {
@@ -19,12 +19,12 @@ class MallaAprobacionService
         // Validar que la malla esté en un estado que permita enviar a revisión
         // Puede ser 'borrador' (procesada sin errores) o 'con_errores' (procesada con errores pero la malla ya fue creada)
         $estadosPermitidos = ['borrador', 'con_errores'];
-        if (!in_array($carga->Estado_Carga, $estadosPermitidos)) {
+        if (! in_array($carga->Estado_Carga, $estadosPermitidos)) {
             throw new \Exception('La carga debe estar en estado borrador para enviar a revisión');
         }
 
         // Validar que exista una malla asociada
-        if (!$carga->ID_Malla) {
+        if (! $carga->ID_Malla) {
             throw new \Exception('No existe una malla asociada a esta carga');
         }
 
@@ -84,7 +84,7 @@ class MallaAprobacionService
             if ($mallaVigenteAnterior) {
                 // Archivar malla anterior
                 $mallaVigenteAnterior->update([
-                    'Es_Vigente' => 0,
+                    'Es_Vigente' => null,
                     'Fecha_Fin_Vigencia' => now(),
                     'Estado' => 'archivada',
                 ]);
@@ -209,7 +209,7 @@ class MallaAprobacionService
     /**
      * Obtiene las mallas que un usuario puede revisar.
      */
-    public function obtenerMallasParaRevisar(Usuario $usuario): \Illuminate\Database\Eloquent\Collection
+    public function obtenerMallasParaRevisar(Usuario $usuario): Collection
     {
         return CargaMalla::with(['malla', 'usuario', 'programa'])
             ->where('Estado_Carga', 'pendiente_aprobacion')
@@ -221,7 +221,7 @@ class MallaAprobacionService
     /**
      * Obtiene las mallas que un usuario ha cargado.
      */
-    public function obtenerMisCargas(Usuario $usuario): \Illuminate\Database\Eloquent\Collection
+    public function obtenerMisCargas(Usuario $usuario): Collection
     {
         return CargaMalla::with(['malla', 'usuarioRevisor', 'programa'])
             ->where('ID_Usuario', $usuario->ID_Usuario)
@@ -234,7 +234,7 @@ class MallaAprobacionService
      */
     public function puedeRevisar(Usuario $usuario, CargaMalla $carga): bool
     {
-        return $carga->Estado_Carga === 'pendiente_aprobacion' && 
+        return $carga->Estado_Carga === 'pendiente_aprobacion' &&
                $carga->ID_Usuario !== $usuario->ID_Usuario;
     }
 
@@ -244,14 +244,15 @@ class MallaAprobacionService
     public function puedeEnviarRevision(Usuario $usuario, CargaMalla $carga): bool
     {
         $estadosPermitidos = ['borrador', 'con_errores'];
-        return in_array($carga->Estado_Carga, $estadosPermitidos) && 
+
+        return in_array($carga->Estado_Carga, $estadosPermitidos) &&
                $carga->ID_Malla !== null;
     }
 
     /**
      * Obtiene el historial de versiones de un programa.
      */
-    public function obtenerHistorialPrograma(int $programaId): \Illuminate\Database\Eloquent\Collection
+    public function obtenerHistorialPrograma(int $programaId): Collection
     {
         return MallaCurricular::where('ID_Programa', $programaId)
             ->with(['normativa', 'carga.usuario', 'carga.usuarioRevisor'])
@@ -264,8 +265,8 @@ class MallaAprobacionService
      */
     public function compararVersiones(MallaCurricular $malla1, MallaCurricular $malla2): array
     {
-        $diffService = new MallaDiffService();
-        
+        $diffService = new MallaDiffService;
+
         // Crear una carga temporal para generar diffs
         $cargaTemporal = new CargaMalla([
             'ID_Carga' => 0, // Temporal
@@ -274,7 +275,7 @@ class MallaAprobacionService
 
         // Generar diffs entre las dos versiones
         $diffService->generarDiffs($malla1, $malla2, $cargaTemporal);
-        
+
         return $diffService->obtenerDiffsAgrupados($cargaTemporal);
     }
 
@@ -317,7 +318,7 @@ class MallaAprobacionService
     /**
      * Calcula el tiempo promedio de aprobación en días.
      */
-    private function calcularTiempoPromedioAprobacion(\Illuminate\Database\Eloquent\Collection $cargas): float
+    private function calcularTiempoPromedioAprobacion(Collection $cargas): float
     {
         $aprobadas = $cargas->where('Estado_Carga', 'aprobado')
             ->whereNotNull('Fecha_Revision')

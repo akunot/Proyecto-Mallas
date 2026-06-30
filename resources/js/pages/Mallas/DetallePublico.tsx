@@ -1,5 +1,9 @@
 import { Head, Link } from '@inertiajs/react';
-import React, { useCallback, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import MallaDiffView from '../../components/MallaDiffView';
+import MallaHistoryModal from '../../components/MallaHistoryModal';
+import SlotSelectorModal from '../../components/SlotSelectorModal';
+import VersionBadge from '../../components/VersionBadge';
 
 // --- Interfaces (adaptadas / copiadas desde Mallas/Visualizer.tsx) ---
 interface Requisito {
@@ -23,7 +27,7 @@ interface Asignatura {
     requisitos: Requisito[];
     ID_Componente?: number;
     pivot: {
-        Semestre_Sugerido: number;
+        Semestre_Sugerido: number | null;
         Tipo_Asignatura: string;
         Orden: number;
     };
@@ -69,16 +73,23 @@ interface Agrupacion {
 
 type GridItem =
     | (Asignatura & { isSlot: false; ID_Componente: number })
-    | (Slot      & { isSlot: true;  ID_Componente: number });
+    | (Slot & { isSlot: true; ID_Componente: number });
 
 // --- Resumen de créditos por agrupación/componente (calculado en el frontend) ---
 interface ResumenAgrupacionRow {
     Nombre_Agrupacion: string;
+    /** Creditos declarados en la normativa del plan para esta agrupacion */
     Creditos_Requeridos: number | null;
+    /** Creditos de asignaturas con Semestre_Sugerido definido (aparecen en el grid) */
+    creditosEnGrid: number;
+    /** Creditos de asignaturas optativas sin semestre fijo (no aparecen en el grid) */
+    creditosOptativos: number;
     Total_Creditos: number;
     Total_Horas_P: number;
     Total_Horas_E: number;
     Es_Obligatoria: boolean;
+    /** true si la agrupación mezcla asignaturas obligatorias y optativas (por pivot.Tipo_Asignatura) */
+    Es_Mixta: boolean;
 }
 
 interface NormativaInfo {
@@ -110,6 +121,61 @@ interface MallaData {
     agrupaciones: Agrupacion[];
 }
 
+interface MallaVersion {
+    ID_Malla: number;
+    Version_Numero: number;
+    Version_Etiqueta: string | null;
+    Estado: string;
+    Es_Vigente: number | null;
+    Fecha_Vigencia: string;
+    Fecha_Fin_Vigencia: string | null;
+    created_at: string;
+}
+
+interface CambioItem {
+    ID_Asignatura: number;
+    ID_Agrupacion: number;
+    Codigo_Asignatura: string;
+    Nombre_Asignatura: string;
+    Creditos_Asignatura: number;
+    Semestre_Sugerido: number | null;
+    Tipo_Asignatura: string;
+    Nombre_Agrupacion: string;
+    ID_Componente: number;
+    Nombre_Componente: string;
+}
+
+interface CambioModificado {
+    old: CambioItem;
+    new: CambioItem;
+}
+
+interface DiffResponse {
+    malla1: {
+        ID_Malla: number;
+        Version_Numero: number;
+        Estado: string;
+        Fecha_Vigencia: string;
+    };
+    malla2: {
+        ID_Malla: number;
+        Version_Numero: number;
+        Estado: string;
+        Fecha_Vigencia: string;
+    };
+    resumen: {
+        agregadas: number;
+        eliminadas: number;
+        modificadas: number;
+        sin_cambios: number;
+    };
+    cambios: {
+        agregadas: CambioItem[];
+        eliminadas: CambioItem[];
+        modificadas: CambioModificado[];
+    };
+}
+
 interface Props {
     disponible: boolean;
     programa: ProgramaInfo;
@@ -117,63 +183,127 @@ interface Props {
 }
 
 // --- Config Visual ---
-const COMPONENT_STYLES: Record<number, { border: string, bg: string, text: string, dot: string }> = {
-    1: { border: 'border-l-[#f9a825]', bg: 'bg-[#fff8e1]', text: 'text-[#f9a825]', dot: 'bg-[#f9a825]' }, // Fundamentación
-    2: { border: 'border-l-[#8bc34a]', bg: 'bg-[#f1f8e9]', text: 'text-[#8bc34a]', dot: 'bg-[#8bc34a]' }, // Disciplinar
-    3: { border: 'border-l-[#4fc3f7]', bg: 'bg-[#e1f5fe]', text: 'text-[#4fc3f7]', dot: 'bg-[#4fc3f7]' }, // Libre Elección
-    4: { border: 'border-l-[#f06292]', bg: 'bg-[#fce4ec]', text: 'text-[#f06292]', dot: 'bg-[#f06292]' }, // Idiomas
+const COMPONENT_STYLES: Record<
+    number,
+    { border: string; bg: string; text: string; dot: string }
+> = {
+    1: {
+        border: 'border-l-[#f9a825]',
+        bg: 'bg-[#fff8e1]',
+        text: 'text-[#f9a825]',
+        dot: 'bg-[#f9a825]',
+    },
+    2: {
+        border: 'border-l-[#8bc34a]',
+        bg: 'bg-[#f1f8e9]',
+        text: 'text-[#8bc34a]',
+        dot: 'bg-[#8bc34a]',
+    },
+    3: {
+        border: 'border-l-[#4fc3f7]',
+        bg: 'bg-[#e1f5fe]',
+        text: 'text-[#4fc3f7]',
+        dot: 'bg-[#4fc3f7]',
+    },
+    4: {
+        border: 'border-l-[#f06292]',
+        bg: 'bg-[#fce4ec]',
+        text: 'text-[#f06292]',
+        dot: 'bg-[#f06292]',
+    },
+    5: {
+        border: 'border-l-[#9c27b0]',
+        bg: 'bg-[#f3e5f5]',
+        text: 'text-[#9c27b0]',
+        dot: 'bg-[#9c27b0]',
+    },
 };
 
-const getComponentColor = (id: number) => COMPONENT_STYLES[id] || { border: 'border-l-gray-400', bg: 'bg-gray-100', text: 'text-gray-400', dot: 'bg-gray-400' };
+const getComponentColor = (id: number) =>
+    COMPONENT_STYLES[id] || {
+        border: 'border-l-gray-400',
+        bg: 'bg-gray-100',
+        text: 'text-gray-400',
+        dot: 'bg-gray-400',
+    };
 
 const ROMAN: Record<number, string> = {
-    1: 'I', 2: 'II', 3: 'III', 4: 'IV', 5: 'V',
-    6: 'VI', 7: 'VII', 8: 'VIII', 9: 'IX', 10: 'X',
-    11: 'XI', 12: 'XII', 13: 'XIII', 14: 'XIV', 15: 'XV',
-    16: 'XVI', 17: 'XVII', 18: 'XVIII', 19: 'XIX', 20: 'XX',
+    1: 'I',
+    2: 'II',
+    3: 'III',
+    4: 'IV',
+    5: 'V',
+    6: 'VI',
+    7: 'VII',
+    8: 'VIII',
+    9: 'IX',
+    10: 'X',
+    11: 'XI',
+    12: 'XII',
+    13: 'XIII',
+    14: 'XIV',
+    15: 'XV',
+    16: 'XVI',
+    17: 'XVII',
+    18: 'XVIII',
+    19: 'XIX',
+    20: 'XX',
 };
 
 const PLACEHOLDER_RE = /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i;
-
-const formatTipoRequisito = (tipo: string): string => {
-    const t = (tipo ?? '').toLowerCase();
-
-    if (t.includes('pre') || t === 'opcional' || t.includes('obligatorio')) {
-return 'Prerrequisito';
-}
-
-    if (t.includes('co')) {
-return 'Correquisito';
-}
-
-    if (t.includes('credito') || t.includes('crédito')) {
-return 'Req. créditos';
-}
-
-    return tipo;
-};
-
-export default function DetallePublico({ disponible, programa, malla }: Props) {
+export default function DetallePublico({
+    disponible,
+    programa,
+    malla: mallaProp,
+}: Props) {
     const [selectedAsig, setSelectedAsig] = useState<number | null>(null);
+    const [activeMalla, setActiveMalla] = useState<MallaData | undefined>(
+        mallaProp,
+    );
+    const [currentVersionId, setCurrentVersionId] = useState<number | null>(
+        mallaProp?.ID_Malla ?? null,
+    );
+
+    // --- Historial de versiones ---
+    const [versiones, setVersiones] = useState<MallaVersion[]>([]);
+    const [showHistoryModal, setShowHistoryModal] = useState(false);
+    const [selectedForDiff, setSelectedForDiff] = useState<Set<number>>(
+        () => new Set<number>(),
+    );
+    const [showDiffModal, setShowDiffModal] = useState(false);
+    const [diffData, setDiffData] = useState<DiffResponse | null>(null);
+    const [loadingDiff, setLoadingDiff] = useState(false);
+    const [loadingVersion, setLoadingVersion] = useState(false);
 
     // Modal de Libre Elección
     const [showElectivasModal, setShowElectivasModal] = useState(false);
     const [electivas, setElectivas] = useState<Electiva[]>([]);
     const [loadingElectivas, setLoadingElectivas] = useState(false);
     const [errorElectivas, setErrorElectivas] = useState(false);
-    const [searchElectivas, setSearchElectivas] = useState('');
 
     // Modal de Optativas
     const [showOptativasModal, setShowOptativasModal] = useState(false);
-    const [selectedOptativaSlot, setSelectedOptativaSlot] = useState<Slot | null>(null);
+    const [selectedOptativaSlot, setSelectedOptativaSlot] =
+        useState<Slot | null>(null);
     const [optativas, setOptativas] = useState<OptativaGroup[]>([]);
     const [loadingOptativas, setLoadingOptativas] = useState(false);
     const [errorOptativas, setErrorOptativas] = useState(false);
-    const [searchOptativas, setSearchOptativas] = useState('');
-    const [expandedOptativa, setExpandedOptativa] = useState<number | null>(null);
+
+    const flatOptativas = useMemo(
+        () => optativas.flatMap((g) => g.asignaturas),
+        [optativas],
+    );
+    const electivasErrorMsg = errorElectivas
+        ? 'No se pudieron cargar las electivas. Intenta de nuevo.'
+        : null;
+    const optativasErrorMsg = errorOptativas
+        ? 'No se pudieron cargar las optativas. Intenta de nuevo.'
+        : null;
 
     // Panel de componentes (Fundamentación, Disciplinar, etc.)
-    const [activeComponentPanel, setActiveComponentPanel] = useState<number | null>(null);
+    const [activeComponentPanel, setActiveComponentPanel] = useState<
+        number | null
+    >(null);
 
     // Acordeones de información
     const [openAccordion, setOpenAccordion] = useState<string | null>(null);
@@ -181,15 +311,128 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
     // Modal de guía visual
     const [showGuideModal, setShowGuideModal] = useState(false);
 
+    // --- Historial y comparación de versiones ---
+    const fetchVersiones = async () => {
+        try {
+            const res = await fetch(
+                `/api/v1/public/programas/${programa.ID_Programa}/historial`,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                },
+            );
+
+            if (res.ok) {
+                const data = await res.json();
+                setVersiones(data.data ?? []);
+            }
+        } catch {
+            // ignore
+        }
+    };
+
+    useEffect(() => {
+        if (activeMalla) {
+            fetchVersiones();
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const handleSelectVersion = async (versionId: number) => {
+        if (versionId === currentVersionId) {
+            return;
+        }
+
+        setLoadingVersion(true);
+
+        try {
+            const res = await fetch(`/api/v1/public/mallas/${versionId}`, {
+                headers: { Accept: 'application/json' },
+                credentials: 'same-origin',
+            });
+
+            if (res.ok) {
+                const mallaData = await res.json();
+
+                if (mallaData.ID_Malla) {
+                    setActiveMalla(mallaData);
+                    setCurrentVersionId(versionId);
+                }
+            }
+        } catch {
+            // ignore
+        } finally {
+            setLoadingVersion(false);
+        }
+    };
+
+    const handleToggleDiffSelection = (id: number) => {
+        setSelectedForDiff((prev) => {
+            const next = new Set(prev);
+
+            if (next.has(id)) {
+                next.delete(id);
+                return next;
+            }
+
+            if (next.size >= 2) {
+                const first = next.values().next().value;
+                if (first !== undefined) {
+                    next.delete(first);
+                }
+            }
+
+            next.add(id);
+            return next;
+        });
+    };
+
+    const handleCompare = async () => {
+        if (selectedForDiff.size !== 2) {
+            return;
+        }
+
+        setLoadingDiff(true);
+        setShowDiffModal(true);
+        setDiffData(null);
+
+        try {
+            const [id1, id2] = Array.from(selectedForDiff);
+            const res = await fetch(
+                `/api/v1/public/mallas/${id1}/diff/${id2}`,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                },
+            );
+
+            if (res.ok) {
+                const data = await res.json();
+                setDiffData(data.data ?? null);
+            }
+        } catch {
+            // ignore
+        } finally {
+            setLoadingDiff(false);
+        }
+    };
+
+    const handleOpenHistory = () => {
+        fetchVersiones();
+        setSelectedForDiff(new Set<number>());
+        setShowHistoryModal(true);
+    };
+
     const fetchElectivas = async () => {
         setLoadingElectivas(true);
         setErrorElectivas(false);
         setElectivas([]);
-        setSearchElectivas('');
-
         try {
             const res = await fetch(`/api/v1/public/electivas`, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 credentials: 'same-origin',
             });
 
@@ -210,16 +453,17 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
         if (slot) {
             setSelectedOptativaSlot(slot);
         }
+
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
-        setSearchOptativas('');
-        setExpandedOptativa(null);
-
         try {
-            const url = `/api/v1/public/mallas/${malla?.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
+            const url = `/api/v1/public/mallas/${activeMalla?.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
             const res = await fetch(url, {
-                headers: { Accept: 'application/json', 'X-Requested-With': 'XMLHttpRequest' },
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
                 credentials: 'same-origin',
             });
 
@@ -238,150 +482,304 @@ export default function DetallePublico({ disponible, programa, malla }: Props) {
 
     // --- Construir grid de semestres a partir de malla.agrupaciones ---
     // (idéntico a buildGrid en Mallas/Visualizer.tsx, pero sin drag & drop)
-    const buildGrid = useCallback((src?: MallaData): Record<number, GridItem[]> => {
-        const g: Record<number, GridItem[]> = {};
+    const buildGrid = useCallback(
+        (src?: MallaData): Record<number, GridItem[]> => {
+            const g: Record<number, GridItem[]> = {};
 
-        if (!src) {
-            return g;
-        }
+            if (!src) {
+                return g;
+            }
 
-        src.agrupaciones.forEach(agrup => {
-            agrup.asignaturas.forEach(asig => {
-                if (PLACEHOLDER_RE.test(asig.Codigo_Asignatura)) {
-return;
-}
+            src.agrupaciones.forEach((agrup) => {
+                const placeholders: Asignatura[] = [];
 
-                const item: GridItem = { ...asig, ID_Componente: agrup.ID_Componente, isSlot: false };
-                const sem = asig.pivot.Semestre_Sugerido || 0;
+                agrup.asignaturas.forEach((asig) => {
+                    if (PLACEHOLDER_RE.test(asig.Codigo_Asignatura)) {
+                        placeholders.push(asig);
 
-                if (!g[sem]) {
-g[sem] = [];
-}
+                        return;
+                    }
 
-                if (!g[sem].find(a => !a.isSlot && (a as Asignatura).ID_Asignatura === asig.ID_Asignatura)) {
-                    g[sem].push(item);
-                }
-            });
-            (agrup.slots || []).forEach(slot => {
-                const sem = slot.Semestre || 0;
+                    const item: GridItem = {
+                        ...asig,
+                        ID_Componente: agrup.ID_Componente,
+                        isSlot: false,
+                    };
+                    const sem = asig.pivot.Semestre_Sugerido || 0;
 
-                if (!g[sem]) {
-g[sem] = [];
-}
+                    if (!g[sem]) {
+                        g[sem] = [];
+                    }
 
-                const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
-                g[sem].push({
-                    ...slot,
-                    Tipo_Slot: tipoSlot === 'libre' || tipoSlot === 'optativa' || tipoSlot === 'nivelatorio' ? tipoSlot : 'libre',
-                    isSlot: true,
-                    ID_Componente: agrup.ID_Componente,
-                    Nombre_Agrupacion: agrup.Nombre_Agrupacion,
+                    if (
+                        !g[sem].find(
+                            (a) =>
+                                !a.isSlot &&
+                                (a as Asignatura).ID_Asignatura ===
+                                    asig.ID_Asignatura,
+                        )
+                    ) {
+                        g[sem].push(item);
+                    }
+                });
+
+                const slotsSource =
+                    (agrup.slots || []).length > 0
+                        ? agrup.slots
+                        : placeholders.map((p) => {
+                              const codigo = p.Codigo_Asignatura.toUpperCase();
+                              let tipoSlot:
+                                  | 'libre'
+                                  | 'optativa'
+                                  | 'nivelatorio' = 'libre';
+
+                              if (codigo.includes('OPTATIVA')) {
+                                  tipoSlot = 'optativa';
+                              } else if (codigo.includes('NIVELATORIO')) {
+                                  tipoSlot = 'nivelatorio';
+                              }
+
+                              return {
+                                  ID_Slot: -p.ID_Asignatura,
+                                  Nombre_Slot: p.Codigo_Asignatura,
+                                  Tipo_Slot: tipoSlot,
+                                  Semestre: p.pivot.Semestre_Sugerido,
+                                  Orden: p.pivot.Orden ?? 999,
+                                  Nombre_Agrupacion: agrup.Nombre_Agrupacion,
+                              } as Slot;
+                          });
+
+                slotsSource.forEach((slot) => {
+                    const sem = slot.Semestre || 0;
+
+                    if (!g[sem]) {
+                        g[sem] = [];
+                    }
+
+                    const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
+                    g[sem].push({
+                        ...slot,
+                        Tipo_Slot:
+                            tipoSlot === 'libre' ||
+                            tipoSlot === 'optativa' ||
+                            tipoSlot === 'nivelatorio'
+                                ? tipoSlot
+                                : 'libre',
+                        isSlot: true,
+                        ID_Componente: agrup.ID_Componente,
+                        Nombre_Agrupacion: agrup.Nombre_Agrupacion,
+                    });
                 });
             });
-        });
-        Object.keys(g).forEach(sem => {
-            g[Number(sem)].sort((a, b) => {
-                const oa = a.isSlot ? ((a as Slot).Orden ?? 999) : ((a as Asignatura).pivot.Orden || 0);
-                const ob = b.isSlot ? ((b as Slot).Orden ?? 999) : ((b as Asignatura).pivot.Orden || 0);
+            Object.keys(g).forEach((sem) => {
+                g[Number(sem)].sort((a, b) => {
+                    const oa = a.isSlot
+                        ? ((a as Slot).Orden ?? 999)
+                        : (a as Asignatura).pivot.Orden || 0;
+                    const ob = b.isSlot
+                        ? ((b as Slot).Orden ?? 999)
+                        : (b as Asignatura).pivot.Orden || 0;
 
-                return oa - ob;
+                    return oa - ob;
+                });
             });
-        });
 
-        return g;
-    }, []);
+            return g;
+        },
+        [],
+    );
 
-    const [semestres] = useState<Record<number, GridItem[]>>(() => buildGrid(malla));
+    const semestres = useMemo<Record<number, GridItem[]>>(
+        () => buildGrid(activeMalla),
+        [activeMalla, buildGrid],
+    );
 
-    // --- Materia seleccionada (buscada dentro de malla.agrupaciones, igual que Visualizer.tsx) ---
+    // --- Materia seleccionada (buscada dentro de activeMalla.agrupaciones) ---
     const selectedAsigData = useMemo(() => {
-        if (!selectedAsig || !malla) {
-return null;
-}
+        if (!selectedAsig || !activeMalla) {
+            return null;
+        }
 
-        for (const agrup of malla.agrupaciones) {
-            const found = agrup.asignaturas.find(a => a.ID_Asignatura === selectedAsig);
+        for (const agrup of activeMalla.agrupaciones) {
+            const found = agrup.asignaturas.find(
+                (a) => a.ID_Asignatura === selectedAsig,
+            );
 
             if (found) {
-return found;
-}
+                return found;
+            }
         }
 
         return null;
-    }, [selectedAsig, malla]);
+    }, [selectedAsig, activeMalla]);
 
     // --- Lógica de Highlighter para prerrequisitos ---
     const activeRelations = useMemo(() => {
         const pre = new Set<number>();
         const co = new Set<number>();
 
-        (selectedAsigData?.requisitos || []).forEach(r => {
+        (selectedAsigData?.requisitos || []).forEach((r) => {
             if (r.ID_Asignatura_Requerida) {
                 const tipo = (r.Tipo_Requisito || '').toLowerCase();
 
-                if (tipo.includes('pre') || tipo.includes('obligatorio') || tipo === 'opcional') {
-pre.add(r.ID_Asignatura_Requerida);
-} else if (tipo.includes('co')) {
-co.add(r.ID_Asignatura_Requerida);
-}
+                if (
+                    tipo.includes('pre') ||
+                    tipo.includes('obligatorio') ||
+                    tipo === 'opcional'
+                ) {
+                    pre.add(r.ID_Asignatura_Requerida);
+                } else if (tipo.includes('co')) {
+                    co.add(r.ID_Asignatura_Requerida);
+                }
             }
         });
 
         return { pre, co };
     }, [selectedAsigData]);
 
-    // --- Resumen de créditos por componente, calculado en el frontend a partir de malla.agrupaciones ---
+    // --- Resumen de creditos por componente ---
     const creditosPorComponente = useMemo(() => {
-        const map: Record<string, { agrupaciones: ResumenAgrupacionRow[]; totalOblig: number; totalOpt: number; total: number }> = {};
+        const map: Record<
+            number,
+            {
+                agrupaciones: ResumenAgrupacionRow[];
+                totalOblig: number;
+                totalOpt: number;
+                total: number;
+                totalGrid: number;
+                totalCreditosOptativos: number;
+            }
+        > = {};
 
-        if (!malla) {
+        if (!activeMalla) {
             return map;
         }
 
-        malla.agrupaciones.forEach(agrup => {
-            const totalCreditos = agrup.asignaturas.reduce((sum, a) => sum + (a.Creditos_Asignatura || 0), 0);
-            const totalHorasP = agrup.asignaturas.reduce((sum, a) => sum + (a.Horas_Presencial || 0), 0);
-            const totalHorasE = agrup.asignaturas.reduce((sum, a) => sum + (a.Horas_Estudiante || 0), 0);
-            const comp = agrup.componente?.Nombre_Componente || 'Otros';
+        activeMalla.agrupaciones.forEach((agrup) => {
+            const compId = agrup.ID_Componente || 0;
+
+            // Fuente de verdad de "obligatoria vs optativa" SIEMPRE es pivot.Tipo_Asignatura
+            // de cada asignatura (igual que en Mallas/Show.tsx), nunca el flag Es_Obligatoria
+            // de la agrupación completa: una agrupación "obligatoria" puede contener
+            // asignaturas optativas individuales (ver agrupación "Area de Comunicación").
+            const esAsigOptativa = (a: Asignatura) =>
+                (a.pivot?.Tipo_Asignatura || '').toLowerCase() === 'optativa';
+
+            const esPlaceholder = (a: Asignatura) =>
+                PLACEHOLDER_RE.test(a.Codigo_Asignatura);
+
+            const asigReales = agrup.asignaturas.filter(
+                (a) => !esPlaceholder(a),
+            );
+
+            const asigOblig = asigReales.filter((a) => !esAsigOptativa(a));
+            const asigOpt = asigReales.filter((a) => esAsigOptativa(a));
+
+            // Créditos que ocupan celda en el grid: asignaturas obligatorias con semestre fijo.
+            // (Una optativa con semestre sugerido igual se considera "optativa" para el resumen,
+            // aunque visualmente pueda ubicarse en el grid).
+            const asigEnGrid = asigOblig.filter(
+                (a) => a.pivot?.Semestre_Sugerido != null,
+            );
+
+            const creditosEnGrid = asigEnGrid.reduce(
+                (s, a) => s + (a.Creditos_Asignatura || 0),
+                0,
+            );
+            const creditosOptativos = asigOpt.reduce(
+                (s, a) => s + (a.Creditos_Asignatura || 0),
+                0,
+            );
+            const totalCreditos =
+                creditosEnGrid +
+                creditosOptativos +
+                asigOblig
+                    .filter((a) => a.pivot?.Semestre_Sugerido == null)
+                    .reduce((s, a) => s + (a.Creditos_Asignatura || 0), 0);
+
+            const totalHorasP = agrup.asignaturas.reduce(
+                (s, a) => s + (a.Horas_Presencial || 0),
+                0,
+            );
+            const totalHorasE = agrup.asignaturas.reduce(
+                (s, a) => s + (a.Horas_Estudiante || 0),
+                0,
+            );
+
+            // Creditos normativos declarados en el plan (Creditos_Requeridos de la agrupacion)
+            const creditosReq = agrup.Creditos_Requeridos ?? totalCreditos;
+
+            // Naturaleza de la agrupación para el badge: si mezcla asignaturas obligatorias
+            // y optativas reales (por Tipo_Asignatura), es "mixta"; si no, sigue Es_Obligatoria.
             const esObligatoria = !!agrup.Es_Obligatoria;
+            const esMixta = asigOblig.length > 0 && asigOpt.length > 0;
 
-            if (!map[comp]) {
-map[comp] = { agrupaciones: [], totalOblig: 0, totalOpt: 0, total: 0 };
-}
+            if (!map[compId]) {
+                map[compId] = {
+                    agrupaciones: [],
+                    totalOblig: 0,
+                    totalOpt: 0,
+                    total: 0,
+                    totalGrid: 0,
+                    totalCreditosOptativos: 0,
+                };
+            }
 
-            map[comp].agrupaciones.push({
+            map[compId].agrupaciones.push({
                 Nombre_Agrupacion: agrup.Nombre_Agrupacion,
                 Creditos_Requeridos: agrup.Creditos_Requeridos ?? null,
+                creditosEnGrid,
+                creditosOptativos,
                 Total_Creditos: totalCreditos,
                 Total_Horas_P: totalHorasP,
                 Total_Horas_E: totalHorasE,
                 Es_Obligatoria: esObligatoria,
+                Es_Mixta: esMixta,
             });
 
-            if (esObligatoria) {
-map[comp].totalOblig += totalCreditos;
-} else {
-map[comp].totalOpt += totalCreditos;
-}
+            // El total del componente usa los creditos normativos (Creditos_Requeridos),
+            // repartidos según si la agrupación tiene solo obligatorias, solo optativas, o mixta.
+            // Para agrupaciones mixtas, Creditos_Requeridos es el normativo de TODA la
+            // agrupación (obligatorias + optativas combinadas), así que la porción que va
+            // a "oblig" es ese normativo MENOS la parte optativa, para no contar dos veces
+            // los créditos optativos (antes: totalOblig += creditosReq completo Y
+            // totalOpt += creditosOptativos por separado, duplicando el monto optativo).
+            if (esMixta) {
+                const obligPortion = Math.max(
+                    creditosReq - creditosOptativos,
+                    0,
+                );
+                map[compId].totalOblig += obligPortion;
+                map[compId].totalOpt += creditosOptativos;
+            } else if (esObligatoria) {
+                map[compId].totalOblig += creditosReq;
+            } else {
+                map[compId].totalOpt += creditosReq;
+            }
 
-            map[comp].total += totalCreditos;
+            map[compId].total += creditosReq;
+            map[compId].totalGrid += creditosEnGrid;
+            map[compId].totalCreditosOptativos += creditosOptativos;
         });
 
         return map;
-    }, [malla]);
+    }, [activeMalla]);
 
     const numSemestres = programa.Duracion_Semestres ?? 10;
-    const listaSemestres = useMemo(() => Array.from({ length: numSemestres }, (_, i) => i + 1), [numSemestres]);
+    const listaSemestres = useMemo(
+        () => Array.from({ length: numSemestres }, (_, i) => i + 1),
+        [numSemestres],
+    );
 
     // Máximo de items en cualquier semestre → determina el alto de las cards
     const maxItemsPerSemestre = useMemo(() => {
         let max = 1;
-        listaSemestres.forEach(num => {
+        listaSemestres.forEach((num) => {
             const count = (semestres[num] || []).length;
 
             if (count > max) {
-max = count;
-}
+                max = count;
+            }
         });
 
         return max;
@@ -390,14 +788,22 @@ max = count;
     // --- Renderizado: No disponible ---
     if (!disponible) {
         return (
-            <div className="h-screen bg-slate-50 flex items-center justify-center p-6">
-                <div className="max-w-md w-full bg-white rounded-[2.5rem] shadow-2xl p-12 text-center border border-slate-200">
-                    <span className="material-symbols-outlined !text-7xl text-amber-400 mb-4">error_outline</span>
-                    <h1 className="text-2xl font-black text-slate-900">Malla no disponible</h1>
-                    <p className="text-slate-500 mt-2 mb-8">
-                        El programa <strong>{programa.Nombre_Programa}</strong> no tiene una malla activa.
+            <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
+                <div className="w-full max-w-md rounded-[2.5rem] border border-slate-200 bg-white p-12 text-center shadow-2xl">
+                    <span className="material-symbols-outlined mb-4 !text-7xl text-amber-400">
+                        error_outline
+                    </span>
+                    <h1 className="text-2xl font-black text-slate-900">
+                        Malla no disponible
+                    </h1>
+                    <p className="mt-2 mb-8 text-slate-500">
+                        El programa <strong>{programa.Nombre_Programa}</strong>{' '}
+                        no tiene una malla activa.
                     </p>
-                    <Link href="/" className="px-8 py-3 bg-[#00236f] text-white rounded-2xl font-bold transition-all hover:scale-105 active:scale-95">
+                    <Link
+                        href="/"
+                        className="rounded-2xl bg-[#00236f] px-8 py-3 font-bold text-white transition-all hover:scale-105 active:scale-95"
+                    >
                         Volver al inicio
                     </Link>
                 </div>
@@ -406,140 +812,416 @@ max = count;
     }
 
     // Datos estáticos de cada componente de formación
-    const COMPONENT_INFO: Record<number, { nombre: string; descripcion: string; nota: string }> = {
+    const COMPONENT_INFO: Record<
+        number,
+        { nombre: string; descripcion: string; nota: string }
+    > = {
         1: {
             nombre: 'Fundamentación',
-            descripcion: 'Este componente introduce y contextualiza el campo de conocimiento por el que optó el estudiante desde una perspectiva de ciudadanía, humanística, ambiental y cultural. Identifica las relaciones generales que caracterizan los saberes de las distintas disciplinas y profesiones del área, el contexto nacional e internacional de su desarrollo, el contexto institucional y los requisitos indispensables para su formación integral.',
+            descripcion:
+                'Este componente introduce y contextualiza el campo de conocimiento por el que optó el estudiante desde una perspectiva de ciudadanía, humanística, ambiental y cultural. Identifica las relaciones generales que caracterizan los saberes de las distintas disciplinas y profesiones del área, el contexto nacional e internacional de su desarrollo, el contexto institucional y los requisitos indispensables para su formación integral.',
             nota: 'Tomado de ACUERDO 033 DEL CSU "Por el cual se establecen los lineamientos básicos para el proceso de formación de los estudiantes de la Universidad Nacional de Colombia a través de sus programas curriculares"',
         },
         2: {
             nombre: 'Disciplinar o Profesional',
-            descripcion: 'Este componente suministra al estudiante la gramática básica de su profesión o disciplina, las teorías, métodos y prácticas fundamentales, cuyo ejercicio formativo, investigativo y de extensión le permitirá integrarse con una comunidad profesional o disciplinar determinada. El Trabajo de Grado en cualquier modalidad hará parte de este componente.',
+            descripcion:
+                'Este componente suministra al estudiante la gramática básica de su profesión o disciplina, las teorías, métodos y prácticas fundamentales, cuyo ejercicio formativo, investigativo y de extensión le permitirá integrarse con una comunidad profesional o disciplinar determinada. El Trabajo de Grado en cualquier modalidad hará parte de este componente.',
             nota: 'Tomado de ACUERDO 033 DEL CSU "Por el cual se establecen los lineamientos básicos para el proceso de formación de los estudiantes de la Universidad Nacional de Colombia a través de sus programas curriculares"',
         },
         3: {
             nombre: 'Libre Elección',
-            descripcion: 'Este componente permite al estudiante aproximarse, contextualizar y/o profundizar temas de su profesión o disciplina y apropiar herramientas y conocimientos de distintos saberes tendientes a la diversificación, flexibilidad e interdisciplinariedad. Es objetivo de este componente acercar a los estudiantes a las tareas de investigación, extensión, emprendimiento y toma de conciencia de las implicaciones sociales de la generación de conocimiento.',
+            descripcion:
+                'Este componente permite al estudiante aproximarse, contextualizar y/o profundizar temas de su profesión o disciplina y apropiar herramientas y conocimientos de distintos saberes tendientes a la diversificación, flexibilidad e interdisciplinariedad. Es objetivo de este componente acercar a los estudiantes a las tareas de investigación, extensión, emprendimiento y toma de conciencia de las implicaciones sociales de la generación de conocimiento.',
             nota: 'Tomado de ACUERDO 033 DEL CSU "Por el cual se establecen los lineamientos básicos para el proceso de formación de los estudiantes de la Universidad Nacional de Colombia a través de sus programas curriculares"',
         },
         4: {
+            nombre: 'Nivelatorio',
+            descripcion:
+                'Este componente corresponde a asignaturas que atienden las necesidades de nivelación académica de los estudiantes antes de iniciar su formación profesional.',
+            nota: 'Tomado de ACUERDO 033 DEL CSU',
+        },
+        5: {
             nombre: 'Lengua Extranjera',
-            descripcion: 'Todo estudiante deberá tener formación en una de las lenguas extranjeras ofrecidas por las sedes de la Universidad Nacional de Colombia de acuerdo con las necesidades académicas propias de los programas curriculares. Los programas curriculares de pregrado deben incluir en los cuatro primeros semestres de la carrera los niveles de lengua extranjera, correspondientes a los doce (12) créditos que serán adicionales a los estipulados para el programa curricular.',
-            nota: 'Tomado de ACUERDO 033 DEL CSU "Por el cual se establecen los lineamientos básicos para el proceso de formación de los estudiantes de la Universidad Nacional de Colombia a través de sus programas curriculares"',
+            descripcion:
+                'Todo estudiante deberá tener formación en una de las lenguas extranjeras ofrecidas por las sedes de la Universidad Nacional de Colombia de acuerdo con las necesidades académicas propias de los programas curriculares. Los programas curriculares de pregrado deben incluir en los cuatro primeros semestres de la carrera los niveles de lengua extranjera, correspondientes a los doce (12) créditos.',
+            nota: 'Tomado de ACUERDO 033 DEL CSU',
         },
     };
 
     return (
-        <div className="h-screen flex flex-col bg-[#f1f5f9] overflow-y-auto font-sans selection:bg-blue-100">
+        <div className="flex h-screen flex-col overflow-y-auto bg-[#f1f5f9] font-sans selection:bg-blue-100">
             <Head title={`${programa.Nombre_Programa} - Malla Curricular`} />
 
-            {/* 1. HEADER DASHBOARD - Información General */}
-            {/* UX: jerarquía clara (volver → identidad del programa → métricas → CTA),
-                texto mínimo de 11px para legibilidad real, foco visible para teclado. */}
-            <header className="bg-white border-b border-slate-200 px-4 sm:px-8 py-3 shrink-0 shadow-sm z-50">
-                <div className="flex flex-wrap items-center justify-between gap-3 max-w-[1800px] mx-auto">
-                    <div className="flex items-center gap-4 min-w-0">
-                        <Link
-                            href="/"
-                            aria-label="Volver al inicio"
-                            title="Volver al inicio"
-                            className="w-10 h-10 shrink-0 rounded-full bg-slate-100 flex items-center justify-center text-slate-500 hover:bg-[#00236f] hover:text-white focus-visible:ring-2 focus-visible:ring-[#00236f] focus-visible:ring-offset-2 transition-all"
-                        >
-                            <span className="material-symbols-outlined" aria-hidden="true">arrow_back</span>
-                        </Link>
-                        <div className="min-w-0">
-                            <h1 className="text-lg sm:text-xl font-black text-slate-900 tracking-tight leading-tight truncate">
-                                {programa.Nombre_Programa}
-                            </h1>
-                            <p className="text-[11px] font-semibold text-blue-700 mt-0.5 truncate">
-                                {programa.Facultad}
-                                <span className="mx-1.5 text-blue-300">•</span>
-                                Plan {malla?.Codigo_Plan || '—'}
-                            </p>
+            {/* 1. HEADER DASHBOARD — Identidad institucional + Quick Stats */}
+            <header className="z-50 shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
+                {/* Barra superior: navegación + identidad */}
+                <div className="px-4 pt-3 pb-0 sm:px-8">
+                    <div className="mx-auto flex max-w-[1800px] items-start justify-between gap-4">
+                        {/* Izquierda: back + nombre + facultad */}
+                        <div className="flex min-w-0 items-start gap-3">
+                            <Link
+                                href="/"
+                                aria-label="Volver al inicio"
+                                title="Volver al inicio"
+                                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white/80 transition-all duration-200 hover:bg-white hover:text-[#00236f] focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00236f]"
+                            >
+                                <span
+                                    className="material-symbols-outlined !text-[18px]"
+                                    aria-hidden="true"
+                                >
+                                    arrow_back
+                                </span>
+                            </Link>
+
+                            <div className="min-w-0 pt-0.5">
+                                {/* Eyebrow: facultad + plan */}
+                                <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase">
+                                    <span
+                                        className="material-symbols-outlined !text-[11px] opacity-70"
+                                        aria-hidden="true"
+                                    >
+                                        school
+                                    </span>
+                                    {programa.Facultad}
+                                    {activeMalla?.Codigo_Plan && (
+                                        <>
+                                            <span className="mx-0.5 text-blue-400/60">
+                                                ·
+                                            </span>
+                                            <span className="font-mono tracking-wider text-blue-300">
+                                                Plan {activeMalla.Codigo_Plan}
+                                            </span>
+                                        </>
+                                    )}
+                                </p>
+                                {/* Nombre del programa */}
+                                <h1 className="truncate text-base leading-tight font-black tracking-tight text-white sm:text-lg lg:text-xl">
+                                    {programa.Nombre_Programa}
+                                </h1>
+                                {/* Subtítulo: título otorgado + SNIES */}
+                                {(programa.Titulo_Otorgado ||
+                                    programa.Codigo_SNIES) && (
+                                    <p className="mt-0.5 truncate text-[10px] text-blue-200/70">
+                                        {programa.Titulo_Otorgado && (
+                                            <span>
+                                                {programa.Titulo_Otorgado}
+                                            </span>
+                                        )}
+                                        {programa.Titulo_Otorgado &&
+                                            programa.Codigo_SNIES && (
+                                                <span className="mx-1.5 text-blue-400/50">
+                                                    ·
+                                                </span>
+                                            )}
+                                        {programa.Codigo_SNIES && (
+                                            <span className="font-mono">
+                                                SNIES {programa.Codigo_SNIES}
+                                            </span>
+                                        )}
+                                    </p>
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Derecha: acciones */}
+                        <div className="flex shrink-0 items-center gap-2 pt-0.5">
+                            {loadingVersion ? (
+                                <span className="hidden items-center gap-1.5 rounded-lg border border-slate-400/30 bg-slate-500/20 px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-300 uppercase sm:flex">
+                                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+                                    Cargando...
+                                </span>
+                            ) : (
+                                <VersionBadge
+                                    currentVersionId={currentVersionId}
+                                    versiones={versiones}
+                                    onSelectVersion={handleSelectVersion}
+                                    onOpenHistory={handleOpenHistory}
+                                />
+                            )}
+                            <button
+                                onClick={() => setShowGuideModal(true)}
+                                className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold tracking-wider text-white/80 uppercase transition-all duration-200 hover:bg-white hover:text-[#00236f] focus-visible:ring-2 focus-visible:ring-white/60"
+                                aria-label="Abrir guía de lectura de la malla"
+                            >
+                                <span
+                                    className="material-symbols-outlined !text-[14px]"
+                                    aria-hidden="true"
+                                >
+                                    help_outline
+                                </span>
+                                <span className="hidden sm:inline">
+                                    ¿Cómo leer la malla?
+                                </span>
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <div className="flex items-center gap-3">
-                        <div className="flex divide-x divide-slate-200 bg-slate-100 rounded-xl border border-slate-200" role="group" aria-label="Resumen del programa">
-                            <div className="px-4 py-1.5 text-center">
-                                <span className="block text-[10px] font-bold text-slate-500 uppercase">Créditos</span>
-                                <span className="text-sm font-black text-[#00236f]">{programa.Creditos_Totales}</span>
+                {/* Quick Stats bar — separador visual entre identidad y canvas */}
+                <div className="mx-auto mt-3 max-w-[1800px] px-4 sm:px-8">
+                    <div className="flex w-fit items-stretch gap-0 overflow-hidden rounded-t-xl border border-b-0 border-white/10 bg-white/5">
+                        {[
+                            {
+                                icon: 'stars',
+                                label: 'Créditos',
+                                value: programa.Creditos_Totales ?? '—',
+                                unit: 'total',
+                            },
+                            {
+                                icon: 'calendar_month',
+                                label: 'Duración',
+                                value: programa.Duracion_Semestres ?? '—',
+                                unit: 'semestres',
+                            },
+                            {
+                                icon: 'layers',
+                                label: 'Nivel',
+                                value: programa.Nivel_Formacion ?? 'Pregrado',
+                                unit: null,
+                                wide: true,
+                            },
+                        ].map((stat, i, arr) => (
+                            <div
+                                key={stat.label}
+                                className={`flex items-center gap-2.5 px-4 py-2 ${i < arr.length - 1 ? 'border-r border-white/10' : ''}`}
+                            >
+                                <span
+                                    className="material-symbols-outlined shrink-0 !text-[16px] text-blue-300/70"
+                                    aria-hidden="true"
+                                >
+                                    {stat.icon}
+                                </span>
+                                <div>
+                                    <span className="block text-[9px] font-bold tracking-[0.1em] text-blue-300/60 uppercase">
+                                        {stat.label}
+                                    </span>
+                                    <span className="text-sm leading-tight font-black text-white">
+                                        {stat.value}
+                                        {stat.unit && (
+                                            <span className="ml-1 text-[10px] font-medium text-blue-200/60">
+                                                {stat.unit}
+                                            </span>
+                                        )}
+                                    </span>
+                                </div>
                             </div>
-                            <div className="px-4 py-1.5 text-center">
-                                <span className="block text-[10px] font-bold text-slate-500 uppercase">Duración</span>
-                                <span className="text-sm font-black text-[#00236f]">{programa.Duracion_Semestres} Sem</span>
-                            </div>
-                        </div>
+                        ))}
                     </div>
                 </div>
             </header>
 
             {/* 2. SEMESTER CANVAS - Sin scroll, todo visible */}
-            <main className="flex-1 overflow-y-auto p-4" style={{ '--n-sem': numSemestres, '--n-rows': maxItemsPerSemestre } as React.CSSProperties}>
-                <div className="h-full grid gap-3" style={{ gridTemplateColumns: `repeat(${numSemestres}, minmax(0, 1fr))` }}>
-                    {listaSemestres.map(num => {
+            <main
+                className="flex-1 overflow-y-auto p-4"
+                style={
+                    {
+                        '--n-sem': numSemestres,
+                        '--n-rows': maxItemsPerSemestre,
+                    } as React.CSSProperties
+                }
+            >
+                <div
+                    className="grid h-full gap-3"
+                    style={{
+                        gridTemplateColumns: `repeat(${numSemestres}, minmax(0, 1fr))`,
+                    }}
+                >
+                    {listaSemestres.map((num) => {
                         return (
-                            <div key={num} className="flex flex-col h-full min-w-0">
-                                <div className="flex items-center justify-between mb-1.5 px-1 shrink-0">
+                            <div
+                                key={num}
+                                className="flex h-full min-w-0 flex-col"
+                            >
+                                <div className="mb-1.5 flex shrink-0 items-center justify-between px-1">
                                     <div className="flex items-center gap-1">
-                                        <span className="text-[9px] font-black text-slate-400 uppercase tracking-[1px] truncate">Semestre</span>
+                                        <span className="truncate text-[9px] font-black tracking-[1px] text-slate-400 uppercase">
+                                            Semestre
+                                        </span>
                                     </div>
-                                    <span className="text-lg font-black text-slate-200 italic leading-none">{ROMAN[num]}</span>
+                                    <span className="text-lg leading-none font-black text-slate-600 italic">
+                                        {ROMAN[num]}
+                                    </span>
                                 </div>
 
-                                <div className="flex-1 grid gap-1.5 min-h-0" style={{ gridTemplateRows: `repeat(${maxItemsPerSemestre}, minmax(0, 1fr))` }}>
+                                <div
+                                    className="grid min-h-0 flex-1 gap-1.5"
+                                    style={{
+                                        gridTemplateRows: `repeat(${maxItemsPerSemestre}, minmax(0, 1fr))`,
+                                    }}
+                                >
                                     {(semestres[num] || []).map((item) => {
                                         // SLOT
                                         if (item.isSlot) {
-                                            const slot = item as Slot & { isSlot: true; ID_Componente: number };
-                                            const tipoSlot = String(slot.Tipo_Slot ?? '').toLowerCase();
-                                            const isLibre = tipoSlot === 'libre';
-                                            const isOptativa = tipoSlot === 'optativa';
+                                            const slot = item as Slot & {
+                                                isSlot: true;
+                                                ID_Componente: number;
+                                            };
+                                            const tipoSlot = String(
+                                                slot.Tipo_Slot ?? '',
+                                            ).toLowerCase();
+                                            const isLibre =
+                                                tipoSlot === 'libre';
+                                            const isOptativa =
+                                                tipoSlot === 'optativa';
+
+                                            // Paleta alineada con el design system: slate base, acentos UNAL
+                                            const slotTheme = isLibre
+                                                ? {
+                                                      wrapper:
+                                                          'border-[#4fc3f7]/50 bg-[#e1f5fe]/40 hover:bg-[#e1f5fe]/80 hover:border-[#4fc3f7]/80 hover:shadow-sm',
+                                                      icon: 'text-[#4fc3f7]',
+                                                      label: 'text-slate-600',
+                                                      sub: 'text-slate-400',
+                                                      iconName: 'shuffle',
+                                                  }
+                                                : isOptativa
+                                                  ? {
+                                                        wrapper:
+                                                            'border-[#f9a825]/50 bg-[#fff8e1]/40 hover:bg-[#fff8e1]/80 hover:border-[#f9a825]/80 hover:shadow-sm',
+                                                        icon: 'text-[#f9a825]',
+                                                        label: 'text-slate-600',
+                                                        sub: 'text-slate-400',
+                                                        iconName: 'stars',
+                                                    }
+                                                  : {
+                                                        wrapper:
+                                                            'border-slate-200/80 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 hover:shadow-sm',
+                                                        icon: 'text-slate-300',
+                                                        label: 'text-slate-500',
+                                                        sub: 'text-slate-400',
+                                                        iconName: 'pending',
+                                                    };
 
                                             return (
                                                 <div
                                                     key={`slot-${slot.ID_Slot}`}
-                                                    className={`border-2 border-dashed rounded-xl h-full flex flex-col items-center justify-center p-2 text-center transition-all duration-200 cursor-pointer
-                                                        ${isLibre
-                                                            ? 'border-blue-300 bg-blue-50/60 text-blue-700 hover:bg-blue-100 hover:border-blue-500'
+                                                    role={
+                                                        isLibre || isOptativa
+                                                            ? 'button'
+                                                            : undefined
+                                                    }
+                                                    tabIndex={
+                                                        isLibre || isOptativa
+                                                            ? 0
+                                                            : undefined
+                                                    }
+                                                    aria-label={
+                                                        isLibre
+                                                            ? 'Ver catálogo de Libre Elección'
                                                             : isOptativa
-                                                                ? 'border-orange-300 bg-orange-50/60 text-orange-700 hover:bg-orange-100 hover:border-orange-500'
-                                                                : 'border-yellow-300 bg-yellow-50/60 text-yellow-700 hover:bg-yellow-100 hover:border-yellow-500'
-                                                        }`}
+                                                              ? `Ver optativas${slot.Nombre_Agrupacion ? ` de ${slot.Nombre_Agrupacion}` : ''}`
+                                                              : undefined
+                                                    }
+                                                    className={`flex h-full flex-col items-center justify-center rounded-xl border border-dashed p-2 text-center transition-all duration-300 ${isLibre || isOptativa ? 'cursor-pointer' : 'cursor-default'} ${slotTheme.wrapper} `}
                                                     onClick={
                                                         isLibre
                                                             ? () => {
-                                                                  setShowElectivasModal(true);
+                                                                  setShowElectivasModal(
+                                                                      true,
+                                                                  );
                                                                   fetchElectivas();
                                                               }
                                                             : isOptativa
-                                                            ? () => {
-                                                                  setSelectedOptativaSlot(slot);
-                                                                  setShowOptativasModal(true);
-                                                                  fetchOptativas(slot);
+                                                              ? () => {
+                                                                    setSelectedOptativaSlot(
+                                                                        slot,
+                                                                    );
+                                                                    setShowOptativasModal(
+                                                                        true,
+                                                                    );
+                                                                    fetchOptativas(
+                                                                        slot,
+                                                                    );
+                                                                }
+                                                              : undefined
+                                                    }
+                                                    onKeyDown={
+                                                        isLibre || isOptativa
+                                                            ? (e) => {
+                                                                  if (
+                                                                      e.key ===
+                                                                          'Enter' ||
+                                                                      e.key ===
+                                                                          ' '
+                                                                  ) {
+                                                                      e.preventDefault();
+
+                                                                      if (
+                                                                          isLibre
+                                                                      ) {
+                                                                          setShowElectivasModal(
+                                                                              true,
+                                                                          );
+                                                                          fetchElectivas();
+                                                                      } else {
+                                                                          setSelectedOptativaSlot(
+                                                                              slot,
+                                                                          );
+                                                                          setShowOptativasModal(
+                                                                              true,
+                                                                          );
+                                                                          fetchOptativas(
+                                                                              slot,
+                                                                          );
+                                                                      }
+                                                                  }
                                                               }
                                                             : undefined
                                                     }
                                                 >
-                                                    <span className="material-symbols-outlined !text-base mb-0.5 opacity-60">add_circle</span>
-                                                    <span className="text-[9px] font-black uppercase leading-tight">
-                                                        {isLibre ? 'Libre Elección' : isOptativa ? 'Optativa' : 'Nivelatorio'}
+                                                    <span
+                                                        className={`material-symbols-outlined mb-1 !text-[15px] ${slotTheme.icon}`}
+                                                        aria-hidden="true"
+                                                    >
+                                                        {slotTheme.iconName}
+                                                    </span>
+                                                    <span
+                                                        className={`text-[9px] leading-tight font-black tracking-wide uppercase ${slotTheme.label}`}
+                                                    >
+                                                        {isLibre
+                                                            ? 'Libre Elección'
+                                                            : isOptativa
+                                                              ? 'Optativa'
+                                                              : 'Nivelatorio'}
                                                     </span>
                                                     {slot.Nombre_Agrupacion && (
-                                                        <span className="mt-0.5 text-[8px] font-medium opacity-70 line-clamp-2">{slot.Nombre_Agrupacion}</span>
+                                                        <span
+                                                            className={`mt-0.5 line-clamp-2 text-[8px] leading-snug font-medium ${slotTheme.sub}`}
+                                                        >
+                                                            {
+                                                                slot.Nombre_Agrupacion
+                                                            }
+                                                        </span>
                                                     )}
                                                 </div>
                                             );
                                         }
 
                                         // ASIGNATURA
-                                        const asig = item as Asignatura & { isSlot: false; ID_Componente: number };
-                                        const isSelected = selectedAsig === asig.ID_Asignatura;
-                                        const isPre = activeRelations.pre.has(asig.ID_Asignatura);
-                                        const isCo = activeRelations.co.has(asig.ID_Asignatura);
-                                        const isDimmed = selectedAsig !== null && !isSelected && !isPre && !isCo;
-                                        const style = getComponentColor(asig.ID_Componente || 0);
-                                        const oblig = asig.pivot.Tipo_Asignatura.toUpperCase().includes('OBLI');
+                                        const asig = item as Asignatura & {
+                                            isSlot: false;
+                                            ID_Componente: number;
+                                        };
+                                        const isSelected =
+                                            selectedAsig === asig.ID_Asignatura;
+                                        const isPre = activeRelations.pre.has(
+                                            asig.ID_Asignatura,
+                                        );
+                                        const isCo = activeRelations.co.has(
+                                            asig.ID_Asignatura,
+                                        );
+                                        const isDimmed =
+                                            selectedAsig !== null &&
+                                            !isSelected &&
+                                            !isPre &&
+                                            !isCo;
+                                        const style = getComponentColor(
+                                            asig.ID_Componente || 0,
+                                        );
+                                        const oblig =
+                                            asig.pivot.Tipo_Asignatura.toUpperCase().includes(
+                                                'OBLI',
+                                            );
 
                                         return (
                                             <div
@@ -548,70 +1230,139 @@ max = count;
                                                 tabIndex={0}
                                                 aria-pressed={isSelected}
                                                 aria-label={`${asig.Nombre_Asignatura}, ${asig.Creditos_Asignatura} créditos${oblig ? ', obligatoria' : ', optativa'}`}
-                                                onClick={() => setSelectedAsig(isSelected ? null : asig.ID_Asignatura)}
+                                                onClick={() =>
+                                                    setSelectedAsig(
+                                                        isSelected
+                                                            ? null
+                                                            : asig.ID_Asignatura,
+                                                    )
+                                                }
                                                 onKeyDown={(e) => {
-                                                    if (e.key === 'Enter' || e.key === ' ') {
+                                                    if (
+                                                        e.key === 'Enter' ||
+                                                        e.key === ' '
+                                                    ) {
                                                         e.preventDefault();
-                                                        setSelectedAsig(isSelected ? null : asig.ID_Asignatura);
+                                                        setSelectedAsig(
+                                                            isSelected
+                                                                ? null
+                                                                : asig.ID_Asignatura,
+                                                        );
                                                     }
                                                 }}
-                                                className={`
-                                                    group relative bg-white border-l-[5px] rounded-xl shadow-sm cursor-pointer transition-all duration-300 h-full
-                                                    ${style.border} flex flex-col justify-between overflow-hidden
-                                                    focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1
-                                                    ${isSelected ? 'ring-2 ring-blue-600 z-30 shadow-xl' : 'hover:shadow-md hover:-translate-y-0.5'}
-                                                    ${isPre ? 'ring-2 ring-rose-500 bg-rose-50 z-20' : ''}
-                                                    ${isCo ? 'ring-2 ring-amber-400 bg-amber-50 z-20' : ''}
-                                                    ${isDimmed ? 'opacity-30 grayscale-[0.8]' : 'opacity-100'}
-                                                `}
+                                                className={`group relative h-full cursor-pointer rounded-xl border-l-[5px] bg-white shadow-sm transition-all duration-300 ${style.border} flex flex-col justify-between overflow-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:outline-none ${isSelected ? 'z-30 shadow-xl ring-2 ring-blue-600' : 'hover:-translate-y-0.5 hover:shadow-md'} ${isPre ? 'z-20 bg-rose-50 ring-2 ring-rose-500' : ''} ${isCo ? 'z-20 bg-amber-50 ring-2 ring-amber-400' : ''} ${isDimmed ? 'opacity-30 grayscale-[0.8]' : 'opacity-100'} `}
                                             >
                                                 {/* Métricas Top */}
-                                                <div className={`${style.bg} flex justify-around py-0.5 text-[9px] font-black text-slate-600 border-b border-white/50 shrink-0`}>
-                                                    <span>{asig.Creditos_Asignatura} CR</span>
-                                                    <span>{asig.Horas_Presencial} HP</span>
-                                                    <span>{asig.Horas_Estudiante} HE</span>
+                                                <div
+                                                    className={`${style.bg} flex shrink-0 justify-around border-b border-white/50 py-0.5 text-[9px] font-black text-slate-600`}
+                                                >
+                                                    <span>
+                                                        {
+                                                            asig.Creditos_Asignatura
+                                                        }{' '}
+                                                        CR
+                                                    </span>
+                                                    <span>
+                                                        {asig.Horas_Presencial}{' '}
+                                                        HP
+                                                    </span>
+                                                    <span>
+                                                        {asig.Horas_Estudiante}{' '}
+                                                        HE
+                                                    </span>
                                                 </div>
 
                                                 {/* Nombre Central */}
-                                                <div className="flex-1 flex items-center justify-center px-2 py-1 text-center min-h-0">
-                                                    <h4 className="text-[11px] font-bold text-slate-800 leading-tight line-clamp-3">
+                                                <div className="flex min-h-0 flex-1 items-center justify-center px-2 py-1 text-center">
+                                                    <h4 className="line-clamp-3 text-[11px] leading-tight font-bold text-slate-800">
                                                         {asig.Nombre_Asignatura}
                                                     </h4>
                                                 </div>
 
                                                 {/* Footer Info: código + un único indicador de requisitos (evita saturación de íconos) */}
-                                                <div className="px-2 py-1 flex items-center justify-between bg-slate-50/50 shrink-0">
-                                                    <span className="text-[9px] font-mono font-bold text-slate-500 truncate">{asig.Codigo_Asignatura}</span>
+                                                <div className="flex shrink-0 items-center justify-between bg-slate-50/50 px-2 py-1">
+                                                    <span className="truncate font-mono text-[9px] font-bold text-slate-500">
+                                                        {asig.Codigo_Asignatura}
+                                                    </span>
                                                     <div className="flex items-center gap-1">
                                                         {(() => {
-                                                            const hasPre = asig.requisitos?.some(r => {
-                                                                const t = (r.Tipo_Requisito || '').toLowerCase();
+                                                            const hasPre =
+                                                                asig.requisitos?.some(
+                                                                    (r) => {
+                                                                        const t =
+                                                                            (
+                                                                                r.Tipo_Requisito ||
+                                                                                ''
+                                                                            ).toLowerCase();
 
-                                                                return t.includes('pre') || t.includes('obligatorio') || t === 'opcional';
-                                                            });
-                                                            const hasCo = asig.requisitos?.some(r => (r.Tipo_Requisito || '').toLowerCase().includes('co'));
-                                                            const hasCr = asig.requisitos?.some(r => (r.Tipo_Requisito || '').toLowerCase().includes('credito'));
-                                                            const reqCount = asig.requisitos?.length ?? 0;
+                                                                        return (
+                                                                            t.includes(
+                                                                                'pre',
+                                                                            ) ||
+                                                                            t.includes(
+                                                                                'obligatorio',
+                                                                            ) ||
+                                                                            t ===
+                                                                                'opcional'
+                                                                        );
+                                                                    },
+                                                                );
+                                                            const hasCo =
+                                                                asig.requisitos?.some(
+                                                                    (r) =>
+                                                                        (
+                                                                            r.Tipo_Requisito ||
+                                                                            ''
+                                                                        )
+                                                                            .toLowerCase()
+                                                                            .includes(
+                                                                                'co',
+                                                                            ),
+                                                                );
+                                                            const reqCount =
+                                                                asig.requisitos
+                                                                    ?.length ??
+                                                                0;
 
-                                                            if (reqCount === 0) {
-return null;
-}
+                                                            if (
+                                                                reqCount === 0
+                                                            ) {
+                                                                return null;
+                                                            }
 
-                                                            const label = hasPre ? 'Tiene prerrequisitos' : hasCo ? 'Tiene correquisitos' : 'Tiene requisito de créditos';
-                                                            const dotColor = hasPre ? 'bg-rose-500' : hasCo ? 'bg-amber-400' : 'bg-blue-400';
+                                                            const label = hasPre
+                                                                ? 'Tiene prerrequisitos'
+                                                                : hasCo
+                                                                  ? 'Tiene correquisitos'
+                                                                  : 'Tiene requisito de créditos';
+                                                            const dotColor =
+                                                                hasPre
+                                                                    ? 'bg-rose-500'
+                                                                    : hasCo
+                                                                      ? 'bg-amber-400'
+                                                                      : 'bg-blue-400';
 
                                                             return (
                                                                 <span
-                                                                    title={label}
-                                                                    aria-label={label}
-                                                                    className={`inline-flex items-center gap-0.5 ${dotColor} text-white rounded-full px-1.5 h-4 text-[9px] font-bold ring-2 ring-white`}
+                                                                    title={
+                                                                        label
+                                                                    }
+                                                                    aria-label={
+                                                                        label
+                                                                    }
+                                                                    className={`inline-flex items-center gap-0.5 ${dotColor} h-4 rounded-full px-1.5 text-[9px] font-bold text-white ring-2 ring-white`}
                                                                 >
                                                                     {reqCount}
                                                                 </span>
                                                             );
                                                         })()}
-                                                        <span className={`material-symbols-outlined !text-sm ${oblig ? 'text-rose-500' : 'text-blue-500'}`} aria-hidden="true">
-                                                            {oblig ? 'verified' : 'stars'}
+                                                        <span
+                                                            className={`material-symbols-outlined !text-sm ${oblig ? 'text-rose-500' : 'text-blue-500'}`}
+                                                            aria-hidden="true"
+                                                        >
+                                                            {oblig
+                                                                ? 'verified'
+                                                                : 'stars'}
                                                         </span>
                                                     </div>
                                                 </div>
@@ -638,261 +1389,1003 @@ return null;
                     <div
                         role="dialog"
                         aria-label={`Detalle de ${selectedAsigData.Nombre_Asignatura}`}
-                        className="fixed inset-x-0 bottom-0 sm:inset-x-auto sm:right-8 sm:bottom-8 w-full sm:w-80 max-h-[80vh] sm:max-h-[calc(100vh-4rem)] overflow-y-auto bg-white rounded-t-[2rem] sm:rounded-[2.5rem] shadow-[0_20px_50px_rgba(0,0,0,0.2)] border border-slate-200 z-[100] animate-in slide-in-from-bottom sm:slide-in-from-right duration-300"
+                        className="fixed inset-x-0 bottom-0 z-[100] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
                         onClick={(e) => e.stopPropagation()}
                     >
-                    <div className="p-6 bg-[#00236f] text-white">
-                        <div className="flex justify-between items-start mb-4">
-                            <span className="px-2 py-0.5 bg-white/10 rounded text-[9px] font-black uppercase tracking-widest border border-white/20">Expediente Académico</span>
-                            <button onClick={() => setSelectedAsig(null)} aria-label="Cerrar detalle" className="text-white/60 hover:text-white focus-visible:ring-2 focus-visible:ring-white/60 rounded transition-colors">
-                                <span className="material-symbols-outlined" aria-hidden="true">close</span>
-                            </button>
-                        </div>
-                        <h3 className="text-lg font-black leading-tight">{selectedAsigData.Nombre_Asignatura}</h3>
-                        <p className="text-xs text-blue-200 mt-1 font-mono tracking-widest">#{selectedAsigData.Codigo_Asignatura}</p>
-                    </div>
-
-                    <div className="p-8 space-y-6">
-                        <div className="grid grid-cols-2 gap-4">
-                            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <span className="text-[9px] font-black text-slate-400 uppercase block mb-1 tracking-tighter">Horas Directas</span>
-                                <span className="text-lg font-black text-slate-800">{selectedAsigData.Horas_Presencial}h <small className="text-[10px] font-medium text-slate-400">/sem</small></span>
+                        <div className="bg-[#00236f] p-6 text-white">
+                            <div className="mb-4 flex items-start justify-between">
+                                <span className="rounded border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-black tracking-widest uppercase">
+                                    Expediente Académico
+                                </span>
+                                <button
+                                    onClick={() => setSelectedAsig(null)}
+                                    aria-label="Cerrar detalle"
+                                    className="rounded text-white/60 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/60"
+                                >
+                                    <span
+                                        className="material-symbols-outlined"
+                                        aria-hidden="true"
+                                    >
+                                        close
+                                    </span>
+                                </button>
                             </div>
-                            <div className="bg-slate-50 p-3 rounded-2xl border border-slate-100">
-                                <span className="text-[9px] font-black text-slate-400 uppercase block mb-1 tracking-tighter">Trabajo Auto.</span>
-                                <span className="text-lg font-black text-slate-800">{selectedAsigData.Horas_Estudiante}h <small className="text-[10px] font-medium text-slate-400">/sem</small></span>
+                            <h3 className="text-lg leading-tight font-black">
+                                {selectedAsigData.Nombre_Asignatura}
+                            </h3>
+                            <p className="mt-1 font-mono text-xs tracking-widest text-blue-200">
+                                #{selectedAsigData.Codigo_Asignatura}
+                            </p>
+                        </div>
+
+                        <div className="space-y-6 p-8">
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-slate-400 uppercase">
+                                        Horas Directas
+                                    </span>
+                                    <span className="text-lg font-black text-slate-800">
+                                        {selectedAsigData.Horas_Presencial}h{' '}
+                                        <small className="text-[10px] font-medium text-slate-400">
+                                            /sem
+                                        </small>
+                                    </span>
+                                </div>
+                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
+                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-slate-400 uppercase">
+                                        Trabajo Auto.
+                                    </span>
+                                    <span className="text-lg font-black text-slate-800">
+                                        {selectedAsigData.Horas_Estudiante}h{' '}
+                                        <small className="text-[10px] font-medium text-slate-400">
+                                            /sem
+                                        </small>
+                                    </span>
+                                </div>
+                            </div>
+
+                            <div>
+                                <h5 className="mb-3 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 uppercase">
+                                    <span className="h-[1px] w-4 bg-slate-200" />{' '}
+                                    Prerrequisitos de área
+                                </h5>
+                                {selectedAsigData.requisitos &&
+                                selectedAsigData.requisitos.length > 0 ? (
+                                    <ul className="space-y-2">
+                                        {selectedAsigData.requisitos.map(
+                                            (r, i) => {
+                                                const t = (
+                                                    r.Tipo_Requisito ?? ''
+                                                ).toLowerCase();
+                                                const isPre =
+                                                    t.includes('pre') ||
+                                                    t.includes('obligatorio') ||
+                                                    t === 'opcional';
+
+                                                return (
+                                                    <li
+                                                        key={i}
+                                                        className={`flex items-start gap-2 rounded-xl border p-3 text-xs font-bold ${isPre ? 'border-rose-100 bg-rose-50 text-rose-700' : 'border-amber-100 bg-amber-50 text-amber-700'}`}
+                                                    >
+                                                        <span className="material-symbols-outlined !text-sm">
+                                                            {isPre
+                                                                ? 'lock'
+                                                                : 'sync_alt'}
+                                                        </span>
+                                                        {r.asignatura_requerida
+                                                            ? `${r.asignatura_requerida.Nombre_Asignatura} (${r.asignatura_requerida.Codigo_Asignatura})`
+                                                            : r.Descripcion_Requisito ||
+                                                              (r.Valor_Creditos
+                                                                  ? `${r.Valor_Creditos} créditos`
+                                                                  : '—')}
+                                                    </li>
+                                                );
+                                            },
+                                        )}
+                                    </ul>
+                                ) : (
+                                    <p className="py-4 text-center text-xs text-slate-400 italic">
+                                        Materia de libre acceso sin
+                                        prerrequisitos.
+                                    </p>
+                                )}
                             </div>
                         </div>
-
-                        <div>
-                            <h5 className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-3 flex items-center gap-2">
-                                <span className="w-4 h-[1px] bg-slate-200" /> Prerrequisitos de área
-                            </h5>
-                            {selectedAsigData.requisitos && selectedAsigData.requisitos.length > 0 ? (
-                                <ul className="space-y-2">
-                                    {selectedAsigData.requisitos.map((r, i) => {
-                                        const t = (r.Tipo_Requisito ?? '').toLowerCase();
-                                        const isPre = t.includes('pre') || t.includes('obligatorio') || t === 'opcional';
-
-                                        return (
-                                            <li key={i} className={`flex items-start gap-2 p-3 border rounded-xl text-xs font-bold ${isPre ? 'bg-rose-50 border-rose-100 text-rose-700' : 'bg-amber-50 border-amber-100 text-amber-700'}`}>
-                                                <span className="material-symbols-outlined !text-sm">{isPre ? 'lock' : 'sync_alt'}</span>
-                                                {r.asignatura_requerida
-                                                    ? `${r.asignatura_requerida.Nombre_Asignatura} (${r.asignatura_requerida.Codigo_Asignatura})`
-                                                    : r.Descripcion_Requisito || (r.Valor_Creditos ? `${r.Valor_Creditos} créditos` : '—')
-                                                }
-                                            </li>
-                                        );
-                                    })}
-                                </ul>
-                            ) : (
-                                <p className="text-xs italic text-slate-400 text-center py-4">Materia de libre acceso sin prerrequisitos.</p>
-                            )}
-                        </div>
-                    </div>
                     </div>
                 </>
             )}
 
-            {/* 4. FOOTER LEGEND + GUÍA + PANEL DE COMPONENTE */}
-            {/* UX: el contenedor relativo permite que el panel deslizable se ancle con
-                "bottom-full" en lugar de un valor fijo en píxeles (bottom-[52px]),
-                evitando que se desalinee si el footer cambia de alto (p. ej. al envolver en mobile). */}
-            <div className="relative shrink-0 z-10">
-                {/* PANEL DESLIZABLE DE COMPONENTE */}
-                {activeComponentPanel && (() => {
-                    const id = activeComponentPanel;
-                    const info = COMPONENT_INFO[id];
-                    const style = COMPONENT_STYLES[id];
-                    const compName = info?.nombre || '';
-                    const compData = Object.entries(creditosPorComponente).find(([k]) =>
-                        k.toLowerCase().includes(compName.split(' ')[0].toLowerCase())
-                    );
-                    const rows = compData?.[1]?.agrupaciones ?? [];
-                    const totalOblig = compData?.[1]?.totalOblig ?? 0;
-                    const totalOpt = compData?.[1]?.totalOpt ?? 0;
-                    const total = compData?.[1]?.total ?? 0;
-                    const creditosReq = rows[0]?.Creditos_Requeridos ?? total;
+            {/* 4. FOOTER — Panel de distribución de créditos + leyenda */}
+            <div className="relative z-10 shrink-0">
+                {/* PANEL EXPANDIDO DE COMPONENTE */}
+                {activeComponentPanel &&
+                    (() => {
+                        const id = activeComponentPanel;
+                        const info = COMPONENT_INFO[id];
+                        const style = COMPONENT_STYLES[id];
+                        const compData = creditosPorComponente[id];
+                        const rows = compData?.agrupaciones ?? [];
+                        const totalOblig = compData?.totalOblig ?? 0;
+                        const totalOpt = compData?.totalOpt ?? 0;
+                        // total = suma de Creditos_Requeridos normativos (fuente de verdad del plan)
+                        const total = compData?.total ?? 0;
+                        const totalGrid = compData?.totalGrid ?? 0;
+                        const totalCreditosOptativos =
+                            compData?.totalCreditosOptativos ?? 0;
+                        const creditosTotalesProg =
+                            programa.Creditos_Totales ?? 1;
+                        const porcentaje =
+                            creditosTotalesProg > 0
+                                ? Math.round(
+                                      (total / creditosTotalesProg) * 100,
+                                  )
+                                : 0;
+                        // tieneOptativos = hay agrupaciones con asignaturas sin semestre en el grid
+                        const tieneOptativos = rows.some(
+                            (r) => r.creditosOptativos > 0,
+                        );
 
-                    return (
-                        <div className="absolute bottom-full left-0 right-0 z-50 bg-white border-t border-slate-200 shadow-[0_-8px_30px_rgba(0,0,0,0.12)] animate-in slide-in-from-bottom duration-300 max-h-[60vh] overflow-y-auto">
-                            <div className="max-w-5xl mx-auto px-5 sm:px-8 py-5">
-                                <div className="flex flex-col sm:flex-row items-start justify-between gap-5">
-                                    <div className="flex-1 min-w-0 order-1">
-                                        <div className="flex items-center gap-3 mb-2 flex-wrap">
-                                            <span className={`w-3 h-3 rounded-full ${style.dot} shrink-0`} />
-                                            <h3 className="text-sm font-black text-slate-900 uppercase tracking-tight">{info?.nombre}</h3>
-                                            {creditosReq > 0 && (
-                                                <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase ${style.bg} ${style.text}`}>
-                                                    {creditosReq} créditos requeridos
+                        return (
+                            <div className="absolute right-0 bottom-full left-0 z-50 max-h-[58vh] overflow-y-auto border-t border-slate-100 bg-white/95 shadow-[0_-12px_40px_rgba(0,0,0,0.13)] backdrop-blur-md duration-300 animate-in slide-in-from-bottom">
+                                <div className="mx-auto max-w-[1800px] px-5 py-5 sm:px-8">
+                                    {/* Header del panel */}
+                                    <div className="mb-5 flex items-start justify-between gap-4">
+                                        <div className="flex flex-1 items-center gap-3">
+                                            <div
+                                                className={`h-9 w-9 rounded-xl ${style.bg} flex shrink-0 items-center justify-center border border-white shadow-sm`}
+                                            >
+                                                <span
+                                                    className={`h-3 w-3 rounded-full ${style.dot}`}
+                                                    aria-hidden="true"
+                                                />
+                                            </div>
+                                            <div>
+                                                <h3 className="text-sm leading-tight font-black text-slate-900">
+                                                    {info?.nombre}
+                                                </h3>
+                                                <p className="mt-0.5 text-[10px] text-slate-400">
+                                                    {total} créditos requeridos
+                                                    · {porcentaje}% del plan
+                                                </p>
+                                            </div>
+                                        </div>
+                                        <button
+                                            onClick={() =>
+                                                setActiveComponentPanel(null)
+                                            }
+                                            aria-label="Cerrar panel de componente"
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-400"
+                                        >
+                                            <span
+                                                className="material-symbols-outlined !text-[16px]"
+                                                aria-hidden="true"
+                                            >
+                                                close
+                                            </span>
+                                        </button>
+                                    </div>
+
+                                    {/* Distribución Obligatorios vs Optativos — Cards separadas */}
+                                    <div className="mb-5 grid grid-cols-2 gap-3">
+                                        {/* Tarjeta Obligatorios */}
+                                        <div className="rounded-xl border border-rose-100 bg-rose-50/50 p-4">
+                                            <div className="mb-3 flex items-center gap-2">
+                                                <span className="material-symbols-outlined !text-[18px] text-rose-500">
+                                                    verified
                                                 </span>
+                                                <span className="text-[10px] font-bold tracking-wider text-rose-600 uppercase">
+                                                    Obligatorios
+                                                </span>
+                                            </div>
+                                            <div className="mb-2">
+                                                <span className="text-2xl font-black text-rose-600">
+                                                    {Math.round(totalOblig)}
+                                                </span>
+                                                <span className="ml-1 text-[10px] font-medium text-rose-500">
+                                                    créditos
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-rose-200/40">
+                                                <div
+                                                    className="h-1.5 rounded-full bg-rose-500 transition-all duration-500"
+                                                    style={{
+                                                        width:
+                                                            creditosTotalesProg >
+                                                            0
+                                                                ? `${Math.min((totalOblig / creditosTotalesProg) * 100, 100)}%`
+                                                                : '0%',
+                                                    }}
+                                                    role="progressbar"
+                                                />
+                                            </div>
+                                        </div>
+
+                                        {/* Tarjeta Optativos */}
+                                        <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+                                            <div className="mb-3 flex items-center gap-2">
+                                                <span className="material-symbols-outlined !text-[18px] text-blue-500">
+                                                    star
+                                                </span>
+                                                <span className="text-[10px] font-bold tracking-wider text-blue-600 uppercase">
+                                                    Optativos
+                                                </span>
+                                            </div>
+                                            <div className="mb-2">
+                                                <span className="text-2xl font-black text-blue-600">
+                                                    {Math.round(totalOpt)}
+                                                </span>
+                                                <span className="ml-1 text-[10px] font-medium text-blue-500">
+                                                    créditos
+                                                </span>
+                                            </div>
+                                            <div className="h-1.5 w-full overflow-hidden rounded-full bg-blue-200/40">
+                                                <div
+                                                    className="h-1.5 rounded-full bg-blue-500 transition-all duration-500"
+                                                    style={{
+                                                        width:
+                                                            creditosTotalesProg >
+                                                            0
+                                                                ? `${Math.min((totalOpt / creditosTotalesProg) * 100, 100)}%`
+                                                                : '0%',
+                                                    }}
+                                                    role="progressbar"
+                                                />
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Barra de peso global (sobre Creditos_Requeridos normativos) */}
+                                    <div className="mb-6 border-b border-slate-100 pb-5">
+                                        <div className="mb-2 flex justify-between text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                                            <span>
+                                                Peso en el plan de estudios
+                                            </span>
+                                            <span className={style.text}>
+                                                {total} / {creditosTotalesProg}{' '}
+                                                cr.
+                                            </span>
+                                        </div>
+                                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                            <div
+                                                className={`h-2.5 rounded-full ${style.dot} transition-all duration-700`}
+                                                style={{
+                                                    width: `${Math.min(porcentaje, 100)}%`,
+                                                }}
+                                                role="progressbar"
+                                                aria-valuenow={porcentaje}
+                                                aria-valuemin={0}
+                                                aria-valuemax={100}
+                                            />
+                                        </div>
+                                    </div>
+
+                                    {/* Layout 2 columnas: descripción + tabla de agrupaciones */}
+                                    <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                                        {/* Descripción */}
+                                        <div>
+                                            <p className="mb-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                                                Descripción del componente
+                                            </p>
+                                            <p className="text-xs leading-relaxed text-slate-600">
+                                                {info?.descripcion}
+                                            </p>
+                                            {info?.nota && (
+                                                <p className="mt-2 border-l-2 border-slate-200 pl-2 text-[10px] leading-relaxed text-slate-400 italic">
+                                                    {info.nota}
+                                                </p>
                                             )}
                                         </div>
-                                        <p className="text-xs text-slate-600 leading-relaxed line-clamp-3">{info?.descripcion}</p>
-                                        {info?.nota && (
-                                            <p className="text-[10px] text-slate-400 italic mt-1 line-clamp-1">Nota: {info.nota}</p>
+
+                                        {/* Distribución por agrupación — separada en obligatorias y optativas */}
+                                        {rows.length > 0 && (
+                                            <div>
+                                                <p className="mb-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                                                    Distribución por agrupación
+                                                </p>
+                                                {(() => {
+                                                    // Separar filas en tres grupos:
+                                                    // - obligatorias puras (sin optativos internos)
+                                                    // - obligatorias con optativos internos (se muestran en ambos lugares)
+                                                    // - puramente optativas
+                                                    const rowsObligPuras =
+                                                        rows.filter(
+                                                            (r) =>
+                                                                (r.Es_Obligatoria ||
+                                                                    r.Es_Mixta) &&
+                                                                r.creditosOptativos ===
+                                                                    0,
+                                                        );
+                                                    const rowsObligConOpt =
+                                                        rows.filter(
+                                                            (r) =>
+                                                                (r.Es_Obligatoria ||
+                                                                    r.Es_Mixta) &&
+                                                                r.creditosOptativos >
+                                                                    0,
+                                                        );
+                                                    const rowsOpt = rows.filter(
+                                                        (r) =>
+                                                            !r.Es_Obligatoria &&
+                                                            !r.Es_Mixta,
+                                                    );
+
+                                                    const AgrupRow = ({
+                                                        r,
+                                                        i,
+                                                        showAsOptativa,
+                                                    }: {
+                                                        r: ResumenAgrupacionRow;
+                                                        i: number;
+                                                        showAsOptativa?: boolean;
+                                                    }) => {
+                                                        const refCreditos =
+                                                            r.Creditos_Requeridos ??
+                                                            r.Total_Creditos;
+                                                        const rowPct =
+                                                            total > 0
+                                                                ? Math.round(
+                                                                      (refCreditos /
+                                                                          total) *
+                                                                          100,
+                                                                  )
+                                                                : 0;
+                                                        const tieneOptRow =
+                                                            r.creditosOptativos >
+                                                            0;
+
+                                                        // Cuando showAsOptativa es true, mostramos solo el badge de créditos optativos
+                                                        if (
+                                                            showAsOptativa &&
+                                                            tieneOptRow
+                                                        ) {
+                                                            return (
+                                                                <div
+                                                                    key={i}
+                                                                    className="rounded-xl border border-blue-100 bg-blue-50/30 p-3"
+                                                                >
+                                                                    <div className="mb-1.5 flex items-center justify-between">
+                                                                        <span className="min-w-0 truncate pr-2 text-[11px] font-semibold text-slate-700">
+                                                                            {
+                                                                                r.Nombre_Agrupacion
+                                                                            }
+                                                                        </span>
+                                                                        <span className="text-[10px] font-bold text-blue-500">
+                                                                            {Math.round(
+                                                                                r.creditosOptativos,
+                                                                            )}{' '}
+                                                                            <span className="text-[9px] font-medium text-blue-400">
+                                                                                cr.
+                                                                                opt.
+                                                                            </span>
+                                                                        </span>
+                                                                    </div>
+                                                                    <div
+                                                                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                        title={`${Math.round(r.creditosOptativos)} créditos optativos`}
+                                                                    >
+                                                                        <div
+                                                                            className="h-1.5 rounded-full bg-blue-400 transition-all duration-500"
+                                                                            style={{
+                                                                                width: '100%',
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                </div>
+                                                            );
+                                                        }
+
+                                                        return (
+                                                            <div
+                                                                key={i}
+                                                                className="rounded-xl border border-slate-100 bg-white p-3"
+                                                            >
+                                                                <div className="mb-1.5 flex items-center justify-between">
+                                                                    <span className="min-w-0 truncate pr-2 text-[11px] font-semibold text-slate-700">
+                                                                        {
+                                                                            r.Nombre_Agrupacion
+                                                                        }
+                                                                    </span>
+                                                                    <div className="shrink-0 text-right">
+                                                                        <span
+                                                                            className={`text-sm font-black ${style.text}`}
+                                                                        >
+                                                                            {
+                                                                                refCreditos
+                                                                            }
+                                                                            <span className="ml-0.5 text-[10px] font-medium text-slate-400">
+                                                                                cr.
+                                                                            </span>
+                                                                        </span>
+                                                                        {tieneOptRow && (
+                                                                            <div className="mt-1 space-y-1">
+                                                                                <div className="flex h-1 overflow-hidden rounded-full bg-slate-100">
+                                                                                    <div
+                                                                                        className="bg-rose-400"
+                                                                                        style={{
+                                                                                            width: `${Math.max((r.creditosEnGrid / refCreditos) * 100, 0)}%`,
+                                                                                        }}
+                                                                                    />
+                                                                                    {r.Es_Mixta ? (
+                                                                                        <div
+                                                                                            className="bg-gray-300"
+                                                                                            style={{
+                                                                                                width: `${Math.max((r.creditosOptativos / refCreditos) * 100, 0)}%`,
+                                                                                            }}
+                                                                                        />
+                                                                                    ) : (
+                                                                                        <div
+                                                                                            className="bg-blue-400"
+                                                                                            style={{
+                                                                                                width: `${Math.max((r.creditosOptativos / refCreditos) * 100, 0)}%`,
+                                                                                            }}
+                                                                                        />
+                                                                                    )}
+                                                                                </div>
+                                                                                <span className="text-[9px] font-bold text-slate-400 tabular-nums">
+                                                                                    {Math.round(
+                                                                                        r.creditosEnGrid,
+                                                                                    )}{' '}
+                                                                                    oblig
+                                                                                    {r.Es_Mixta ? (
+                                                                                        <span>
+                                                                                            {' '}
+                                                                                            ·{' '}
+                                                                                            {Math.round(
+                                                                                                r.creditosOptativos,
+                                                                                            )}{' '}
+                                                                                            opt
+                                                                                            (interno)
+                                                                                        </span>
+                                                                                    ) : (
+                                                                                        <span>
+                                                                                            {' '}
+                                                                                            ·{' '}
+                                                                                            {Math.round(
+                                                                                                r.creditosOptativos,
+                                                                                            )}{' '}
+                                                                                            opt
+                                                                                        </span>
+                                                                                    )}
+                                                                                </span>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                                <div
+                                                                    className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                    title={`${rowPct}% del componente`}
+                                                                >
+                                                                    <div
+                                                                        className={`h-1.5 rounded-full ${style.dot} transition-all duration-500`}
+                                                                        style={{
+                                                                            width: `${Math.min(rowPct, 100)}%`,
+                                                                        }}
+                                                                    />
+                                                                </div>
+                                                            </div>
+                                                        );
+                                                    };
+
+                                                    return (
+                                                        <div className="space-y-3">
+                                                            {/* Sección: Agrupaciones Obligatorias */}
+                                                            {rowsObligPuras.length >
+                                                                0 && (
+                                                                <div>
+                                                                    <div className="mb-1.5 flex items-center gap-2">
+                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                                                                        <span className="text-[10px] font-black tracking-widest text-rose-500 uppercase">
+                                                                            Agrupaciones
+                                                                            Obligatorias
+                                                                        </span>
+                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                            {Math.round(
+                                                                                totalOblig,
+                                                                            )}{' '}
+                                                                            cr.
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        {rowsObligPuras.map(
+                                                                            (
+                                                                                r,
+                                                                                i,
+                                                                            ) => (
+                                                                                <AgrupRow
+                                                                                    key={
+                                                                                        i
+                                                                                    }
+                                                                                    r={
+                                                                                        r
+                                                                                    }
+                                                                                    i={
+                                                                                        i
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Agrupaciones Obligatorias con Optativos internos — también en sección Optativas */}
+                                                            {rowsObligConOpt.length >
+                                                                0 && (
+                                                                <div>
+                                                                    <div className="mb-1.5 flex items-center gap-2">
+                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
+                                                                        <span className="text-[10px] font-black tracking-widest text-rose-500 uppercase">
+                                                                            Obligatorias
+                                                                            con
+                                                                            Optativos
+                                                                        </span>
+                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                            {Math.round(
+                                                                                rowsObligConOpt.reduce(
+                                                                                    (
+                                                                                        s,
+                                                                                        r,
+                                                                                    ) =>
+                                                                                        s +
+                                                                                        (r.creditosOptativos ||
+                                                                                            0),
+                                                                                    0,
+                                                                                ),
+                                                                            )}{' '}
+                                                                            cr.
+                                                                            opt.
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        {rowsObligConOpt.map(
+                                                                            (
+                                                                                r,
+                                                                                i,
+                                                                            ) => (
+                                                                                <AgrupRow
+                                                                                    key={`obl-opt-${i}`}
+                                                                                    r={
+                                                                                        r
+                                                                                    }
+                                                                                    i={
+                                                                                        i
+                                                                                    }
+                                                                                    showAsOptativa={
+                                                                                        true
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+
+                                                            {/* Separador si hay ambos grupos obligatorios y optativos */}
+                                                            {(rowsObligPuras.length >
+                                                                0 ||
+                                                                rowsObligConOpt.length >
+                                                                    0) &&
+                                                                rowsOpt.length >
+                                                                    0 && (
+                                                                    <div className="border-t border-dashed border-slate-200" />
+                                                                )}
+
+                                                            {/* Separador entre obligatorias puras y obligatorias con optativos internos (si ambos existen) */}
+                                                            {rowsObligPuras.length >
+                                                                0 &&
+                                                                rowsObligConOpt.length >
+                                                                    0 && (
+                                                                    <div className="border-t border-dashed border-slate-200" />
+                                                                )}
+
+                                                            {/* Sección: Agrupaciones Optativas */}
+                                                            {(rowsOpt.length >
+                                                                0 ||
+                                                                rowsObligConOpt.length >
+                                                                    0) && (
+                                                                <div>
+                                                                    <div className="mb-1.5 flex items-center gap-2">
+                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
+                                                                        <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase">
+                                                                            Agrupaciones
+                                                                            Optativas
+                                                                        </span>
+                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                            {Math.round(
+                                                                                rowsOpt.reduce(
+                                                                                    (
+                                                                                        s,
+                                                                                        r,
+                                                                                    ) =>
+                                                                                        s +
+                                                                                        (r.creditosOptativos ||
+                                                                                            0),
+                                                                                    0,
+                                                                                ) +
+                                                                                    rowsObligConOpt.reduce(
+                                                                                        (
+                                                                                            s,
+                                                                                            r,
+                                                                                        ) =>
+                                                                                            s +
+                                                                                            (r.creditosOptativos ||
+                                                                                                0),
+                                                                                        0,
+                                                                                    ),
+                                                                            )}{' '}
+                                                                            cr.
+                                                                        </span>
+                                                                    </div>
+                                                                    <div className="space-y-2">
+                                                                        {rowsOpt.map(
+                                                                            (
+                                                                                r,
+                                                                                i,
+                                                                            ) => (
+                                                                                <AgrupRow
+                                                                                    key={
+                                                                                        i
+                                                                                    }
+                                                                                    r={
+                                                                                        r
+                                                                                    }
+                                                                                    i={
+                                                                                        i
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                        {rowsObligConOpt.map(
+                                                                            (
+                                                                                r,
+                                                                                i,
+                                                                            ) => (
+                                                                                <AgrupRow
+                                                                                    key={`opt-${i}`}
+                                                                                    r={
+                                                                                        r
+                                                                                    }
+                                                                                    i={
+                                                                                        i
+                                                                                    }
+                                                                                    showAsOptativa={
+                                                                                        true
+                                                                                    }
+                                                                                />
+                                                                            ),
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })()}
+
+                                                {/* Fila totales del componente */}
+                                                <div
+                                                    className={`rounded-xl border p-3 ${style.bg} mt-2 flex items-center justify-between border-current/10`}
+                                                >
+                                                    <span className="text-[10px] font-black tracking-wider text-slate-600 uppercase">
+                                                        Total del componente
+                                                    </span>
+                                                    <div className="flex items-center gap-3 text-xs font-black">
+                                                        {totalOblig > 0 && (
+                                                            <span className="text-slate-500">
+                                                                {Math.round(
+                                                                    totalOblig,
+                                                                )}{' '}
+                                                                <span className="font-medium text-slate-400">
+                                                                    oblig.
+                                                                </span>
+                                                            </span>
+                                                        )}
+                                                        {totalOpt > 0 && (
+                                                            <span className="text-slate-500">
+                                                                {Math.round(
+                                                                    totalOpt,
+                                                                )}{' '}
+                                                                <span className="font-medium text-slate-400">
+                                                                    optat.
+                                                                </span>
+                                                            </span>
+                                                        )}
+                                                        <span
+                                                            className={`text-base ${style.text}`}
+                                                        >
+                                                            {total}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
-                                    {rows.length > 0 && (
-                                        <div className="order-2 w-full sm:w-[400px] sm:shrink-0">
-                                            <table className="w-full text-xs">
-                                                <thead>
-                                                    <tr className="border-b border-slate-100">
-                                                        <th className="text-left pb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Agrupación</th>
-                                                        <th className="text-center pb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Oblig.</th>
-                                                        <th className="text-center pb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Optat.</th>
-                                                        <th className="text-center pb-1.5 text-[10px] font-black text-slate-400 uppercase tracking-wider">Total</th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {rows.map((r, i) => (
-                                                        <tr key={i} className="border-b border-slate-50">
-                                                            <td className="py-1 pr-2 font-medium text-slate-700 text-[11px]">{r.Nombre_Agrupacion}</td>
-                                                            <td className="py-1 text-center text-slate-600">{r.Es_Obligatoria ? r.Total_Creditos : 0}</td>
-                                                            <td className="py-1 text-center text-slate-600">{!r.Es_Obligatoria ? r.Total_Creditos : 0}</td>
-                                                            <td className={`py-1 text-center font-black ${style.text}`}>{r.Total_Creditos}</td>
-                                                        </tr>
-                                                    ))}
-                                                    <tr className={`${style.bg}`}>
-                                                        <td className="py-1 pr-2 font-black text-slate-800 text-[11px]">Total</td>
-                                                        <td className="py-1 text-center font-black text-slate-800">{totalOblig}</td>
-                                                        <td className="py-1 text-center font-black text-slate-800">{totalOpt}</td>
-                                                        <td className={`py-1 text-center font-black ${style.text}`}>{total}</td>
-                                                    </tr>
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
-                                    <button
-                                        onClick={() => setActiveComponentPanel(null)}
-                                        aria-label="Cerrar panel de componente"
-                                        className="order-3 sm:order-3 shrink-0 w-7 h-7 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-400 transition-all mt-0.5 self-end sm:self-start"
-                                    >
-                                        <span className="material-symbols-outlined !text-sm" aria-hidden="true">close</span>
-                                    </button>
                                 </div>
                             </div>
+                        );
+                    })()}
+
+                {/* FOOTER BAR — Leyenda de componentes + créditos rápidos */}
+                <footer className="border-t border-slate-100 bg-white/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] backdrop-blur-md">
+                    <div className="mx-auto flex min-h-[44px] max-w-[1800px] items-stretch justify-between gap-2 px-4 py-0 sm:px-6">
+                        {/* Botones de componentes — con crédito integrado */}
+                        <div className="flex items-stretch gap-0">
+                            {(
+                                [
+                                    { id: 1, label: 'Fundamentación' },
+                                    { id: 2, label: 'Disciplinar' },
+                                    { id: 3, label: 'Libre Elección' },
+                                    { id: 4, label: 'Nivelatorio' },
+                                    { id: 5, label: 'Idiomas' },
+                                ] as const
+                            ).map(({ id, label }) => {
+                                const style = COMPONENT_STYLES[id];
+                                const isActive = activeComponentPanel === id;
+                                const compData = creditosPorComponente[id];
+                                // Mostrar si el componente tiene al menos una agrupacion definida en la malla
+                                const hasAgrupaciones =
+                                    compData &&
+                                    compData.agrupaciones.length > 0;
+
+                                if (!hasAgrupaciones) {
+                                    return null;
+                                }
+
+                                // Creditos normativos del componente (suma de Creditos_Requeridos de sus agrupaciones)
+                                const total = compData.total;
+
+                                return (
+                                    <button
+                                        key={id}
+                                        onClick={() =>
+                                            setActiveComponentPanel(
+                                                isActive ? null : id,
+                                            )
+                                        }
+                                        aria-pressed={isActive}
+                                        aria-label={`Ver distribución de ${label}`}
+                                        className={`group relative flex items-center gap-2 border-r border-slate-100 px-3 py-2 transition-all duration-200 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-inset ${isActive ? 'bg-slate-50' : ''} `}
+                                    >
+                                        {/* Indicador activo — borde superior */}
+                                        <span
+                                            className={`absolute inset-x-0 top-0 h-0.5 rounded-b-full transition-all duration-200 ${style.dot} ${isActive ? 'opacity-100' : 'opacity-0 group-hover:opacity-40'}`}
+                                            aria-hidden="true"
+                                        />
+                                        <span
+                                            className={`h-2 w-2 rounded-full ${style.dot} shrink-0`}
+                                            aria-hidden="true"
+                                        />
+                                        <span
+                                            className={`text-[11px] font-bold tracking-tight whitespace-nowrap uppercase transition-colors ${isActive ? 'text-slate-800' : 'text-slate-500 group-hover:text-slate-700'}`}
+                                        >
+                                            {label}
+                                        </span>
+                                        {total > 0 && (
+                                            <span
+                                                className={`text-[10px] font-black tabular-nums transition-colors ${isActive ? style.text : 'text-slate-400'}`}
+                                            >
+                                                {total}
+                                            </span>
+                                        )}
+                                        <span
+                                            className={`material-symbols-outlined !text-[13px] transition-all duration-200 ${isActive ? 'rotate-180 text-slate-500' : 'text-slate-300'}`}
+                                            aria-hidden="true"
+                                        >
+                                            expand_less
+                                        </span>
+                                    </button>
+                                );
+                            })}
                         </div>
-                    );
-                })()}
 
-                <footer className="bg-white border-t border-slate-200 px-4 sm:px-6 py-2.5 flex flex-wrap items-center justify-between gap-2">
-                    <div className="flex flex-wrap items-center gap-1 sm:gap-2">
-                        {([
-                            { id: 1, label: 'Fundamentación' },
-                            { id: 2, label: 'Disciplinar' },
-                            { id: 3, label: 'Libre Elección' },
-                            { id: 4, label: 'Idiomas' },
-                        ] as const).map(({ id, label }) => {
-                            const style = COMPONENT_STYLES[id];
-                            const isActive = activeComponentPanel === id;
-
-                            return (
-                                <button
-                                    key={id}
-                                    onClick={() => setActiveComponentPanel(isActive ? null : id)}
-                                    aria-pressed={isActive}
-                                    aria-label={`Ver información de ${label}`}
-                                    className={`flex items-center gap-1.5 px-2 py-1.5 rounded-lg transition-all hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300 ${isActive ? 'ring-1 ring-slate-300 bg-slate-50' : ''}`}
-                                >
-                                    <span className={`w-2.5 h-2.5 rounded-full ${style.dot} shrink-0`} aria-hidden="true" />
-                                    <span className="text-[11px] font-bold text-slate-600 uppercase tracking-tight whitespace-nowrap">{label}</span>
-                                    <span className="material-symbols-outlined !text-xs text-slate-300" aria-hidden="true">info</span>
-                                </button>
-                            );
-                        })}
-                        <div className="w-px h-4 bg-slate-200 hidden sm:block" />
-                        <button
-                            onClick={() => setShowGuideModal(true)}
-                            className="flex items-center gap-1.5 px-2 py-1.5 rounded-lg text-[11px] font-bold text-[#00236f] uppercase tracking-tight hover:bg-blue-50 focus-visible:ring-2 focus-visible:ring-blue-200 transition-all whitespace-nowrap"
-                        >
-                            <span className="material-symbols-outlined !text-xs" aria-hidden="true">help_outline</span>
-                            ¿Cómo leer la malla?
-                        </button>
-                    </div>
-                    <div className="text-[10px] font-bold text-slate-400 whitespace-nowrap">
-                        SIA • UNAL — 2026
+                        {/* Marca / copyright */}
+                        <div className="flex items-center gap-2 pl-3">
+                            <span className="text-[10px] font-bold tracking-wider whitespace-nowrap text-slate-300">
+                                SIA · UNAL — 2026
+                            </span>
+                        </div>
                     </div>
                 </footer>
             </div>
 
             {/* MODAL: ¿Cómo leer la malla? */}
             {showGuideModal && (
-                <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4" onClick={() => setShowGuideModal(false)}>
-                    <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+                <div
+                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4"
+                    onClick={() => setShowGuideModal(false)}
+                >
+                    <div
+                        className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                        onClick={(e) => e.stopPropagation()}
+                    >
                         <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
                             <div>
-                                <h2 className="text-base font-black text-slate-900 uppercase tracking-tight">¿Cómo leer la malla curricular?</h2>
-                                <p className="text-xs text-slate-500 mt-0.5">{programa.Nombre_Programa}</p>
+                                <h2 className="text-base font-black tracking-tight text-slate-900 uppercase">
+                                    ¿Cómo leer la malla curricular?
+                                </h2>
+                                <p className="mt-0.5 text-xs text-slate-500">
+                                    {programa.Nombre_Programa}
+                                </p>
                             </div>
-                            <button onClick={() => setShowGuideModal(false)} className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-400 hover:bg-slate-200 transition-all">
-                                <span className="material-symbols-outlined !text-sm">close</span>
+                            <button
+                                onClick={() => setShowGuideModal(false)}
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all hover:bg-slate-200"
+                            >
+                                <span className="material-symbols-outlined !text-sm">
+                                    close
+                                </span>
                             </button>
                         </div>
-                        <div className="overflow-y-auto max-h-[75vh]">
+                        <div className="max-h-[75vh] overflow-y-auto">
                             {/* Ejemplo visual de card */}
-                            <div className="px-8 pt-6 pb-5 bg-slate-50 border-b border-slate-100">
-                                <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-4">Ejemplo de tarjeta de asignatura</p>
-                                <div className="flex gap-8 items-start">
-                                    <div className="w-44 shrink-0 bg-white border-l-[5px] border-l-[#8bc34a] rounded-xl shadow-md overflow-hidden">
-                                        <div className="bg-[#f1f8e9] flex justify-around py-1 text-[8px] font-black text-slate-500 border-b border-white/50">
-                                            <span>3 CR</span><span>4 HP</span><span>5 HE</span>
+                            <div className="border-b border-slate-100 bg-slate-50 px-8 pt-6 pb-5">
+                                <p className="mb-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                    Ejemplo de tarjeta de asignatura
+                                </p>
+                                <div className="flex items-start gap-8">
+                                    <div className="w-44 shrink-0 overflow-hidden rounded-xl border-l-[5px] border-l-[#8bc34a] bg-white shadow-md">
+                                        <div className="flex justify-around border-b border-white/50 bg-[#f1f8e9] py-1 text-[8px] font-black text-slate-500">
+                                            <span>3 CR</span>
+                                            <span>4 HP</span>
+                                            <span>5 HE</span>
                                         </div>
-<div className="flex items-center justify-center px-3 py-3 text-center h-14">
-                                        <h4 className="text-[10px] font-bold text-slate-800 leading-tight">Bases de Datos I</h4>
-                                    </div>
-                                        <div className="px-2 py-1 flex items-center justify-between bg-slate-50/50">
-                                            <span className="text-[8px] font-mono font-bold text-slate-400">4100552</span>
+                                        <div className="flex h-14 items-center justify-center px-3 py-3 text-center">
+                                            <h4 className="text-[10px] leading-tight font-bold text-slate-800">
+                                                Bases de Datos I
+                                            </h4>
+                                        </div>
+                                        <div className="flex items-center justify-between bg-slate-50/50 px-2 py-1">
+                                            <span className="font-mono text-[8px] font-bold text-slate-400">
+                                                4100552
+                                            </span>
                                             <div className="flex items-center gap-1">
-                                                <div className="w-3.5 h-3.5 bg-rose-500 rounded-full flex items-center justify-center ring-2 ring-white">
-                                                    <span className="text-[7px] text-white font-bold">P</span>
+                                                <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white">
+                                                    <span className="text-[7px] font-bold text-white">
+                                                        P
+                                                    </span>
                                                 </div>
-                                                <span className="material-symbols-outlined !text-sm text-rose-500">verified</span>
+                                                <span className="material-symbols-outlined !text-sm text-rose-500">
+                                                    verified
+                                                </span>
                                             </div>
                                         </div>
                                     </div>
                                     <div className="flex-1 space-y-3 text-xs text-slate-700">
                                         <div className="flex items-start gap-2.5">
-                                            <div className="w-5 h-5 rounded bg-[#f1f8e9] border-l-4 border-[#8bc34a] shrink-0 mt-0.5" />
-                                            <p><span className="font-bold">Barra de color + fondo</span> — indica el <span className="font-bold">componente de formación</span>. Haz clic en los botones del footer para ver la descripción de cada componente y su tabla de créditos.</p>
+                                            <div className="mt-0.5 h-5 w-5 shrink-0 rounded border-l-4 border-[#8bc34a] bg-[#f1f8e9]" />
+                                            <p>
+                                                <span className="font-bold">
+                                                    Barra de color + fondo
+                                                </span>{' '}
+                                                — indica el{' '}
+                                                <span className="font-bold">
+                                                    componente de formación
+                                                </span>
+                                                . Haz clic en los botones del
+                                                footer para ver la descripción
+                                                de cada componente y su tabla de
+                                                créditos.
+                                            </p>
                                         </div>
                                         <div className="flex items-start gap-2.5">
-                                            <span className="text-[9px] font-black bg-slate-100 rounded px-1.5 py-0.5 shrink-0 mt-0.5 whitespace-nowrap">3 CR / 4 HP / 5 HE</span>
-                                            <p><span className="font-bold">CR</span> = créditos · <span className="font-bold">HP</span> = horas presenciales/semana · <span className="font-bold">HE</span> = horas de trabajo autónomo/semana.</p>
+                                            <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black whitespace-nowrap">
+                                                3 CR / 4 HP / 5 HE
+                                            </span>
+                                            <p>
+                                                <span className="font-bold">
+                                                    CR
+                                                </span>{' '}
+                                                = créditos ·{' '}
+                                                <span className="font-bold">
+                                                    HP
+                                                </span>{' '}
+                                                = horas presenciales/semana ·{' '}
+                                                <span className="font-bold">
+                                                    HE
+                                                </span>{' '}
+                                                = horas de trabajo
+                                                autónomo/semana.
+                                            </p>
                                         </div>
                                         <div className="flex items-start gap-2.5">
-                                            <span className="material-symbols-outlined !text-sm text-rose-500 shrink-0">verified</span>
-                                            <p><span className="font-bold text-rose-600">Birrete rojo</span> = materia obligatoria · <span className="font-bold text-blue-500">Estrella azul</span> = materia optativa.</p>
+                                            <span className="material-symbols-outlined shrink-0 !text-sm text-rose-500">
+                                                verified
+                                            </span>
+                                            <p>
+                                                <span className="font-bold text-rose-600">
+                                                    Birrete rojo
+                                                </span>{' '}
+                                                = materia obligatoria ·{' '}
+                                                <span className="font-bold text-blue-500">
+                                                    Estrella azul
+                                                </span>{' '}
+                                                = materia optativa.
+                                            </p>
                                         </div>
                                         <div className="flex items-start gap-2.5">
-                                            <div className="flex gap-1 shrink-0 mt-0.5">
-                                                <div className="w-4 h-4 bg-rose-500 rounded-full flex items-center justify-center"><span className="text-[7px] text-white font-bold">P</span></div>
-                                                <div className="w-4 h-4 bg-amber-400 rounded-full flex items-center justify-center"><span className="text-[7px] text-white font-bold">C</span></div>
+                                            <div className="mt-0.5 flex shrink-0 gap-1">
+                                                <div className="flex h-4 w-4 items-center justify-center rounded-full bg-rose-500">
+                                                    <span className="text-[7px] font-bold text-white">
+                                                        P
+                                                    </span>
+                                                </div>
+                                                <div className="flex h-4 w-4 items-center justify-center rounded-full bg-amber-400">
+                                                    <span className="text-[7px] font-bold text-white">
+                                                        C
+                                                    </span>
+                                                </div>
                                             </div>
-                                            <p>Punto <span className="font-bold text-rose-600">P</span> = tiene prerrequisitos · Punto <span className="font-bold text-amber-500">C</span> = tiene correquisitos. <span className="font-bold">Haz clic en la tarjeta</span> para resaltarlos en toda la malla.</p>
+                                            <p>
+                                                Punto{' '}
+                                                <span className="font-bold text-rose-600">
+                                                    P
+                                                </span>{' '}
+                                                = tiene prerrequisitos · Punto{' '}
+                                                <span className="font-bold text-amber-500">
+                                                    C
+                                                </span>{' '}
+                                                = tiene correquisitos.{' '}
+                                                <span className="font-bold">
+                                                    Haz clic en la tarjeta
+                                                </span>{' '}
+                                                para resaltarlos en toda la
+                                                malla.
+                                            </p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             {/* Acordeones */}
                             <div className="divide-y divide-slate-100">
-                                {([
-                                    { key: 'plan', title: 'Plan de Estudios', content: 'Un plan de estudios es un conjunto de actividades académicas, organizadas mediante asignaturas reunidas en componentes de formación que un estudiante debe cursar para alcanzar los propósitos de formación de un programa curricular. Tomado del Acuerdo 033 del CSU.' },
-                                    { key: 'malla', title: '¿Qué es una Malla Curricular?', content: 'La malla curricular es una propuesta de visualización de un plan de estudios donde se sugiere la inscripción de asignaturas por periodo académico diferenciándolas por componente de formación. Contiene información de prerrequisitos y correquisitos de cada asignatura y se puede conocer su código, número de créditos, intensidad horaria, horas de trabajo semanal fuera de clase y su respectivo contenido.' },
-                                    { key: 'uso', title: '¿Para qué sirve?', content: 'Las asignaturas se encuentran agrupadas en componentes de formación diferenciados por color. Al seleccionar cada asignatura se resaltan los prerrequisitos o correquisitos necesarios para cursarla. En los campos de Optativas o Libre Elección se listan las asignaturas ofertadas. Haz clic en los botones del footer para explorar la descripción y tabla de créditos de cada componente.' },
-                                    { key: 'contacto', title: 'Información y contacto', content: `Si tienes inquietudes sobre este plan de estudios, puedes comunicarte con la Dirección del Programa Curricular de ${programa.Nombre_Programa} a través de los canales institucionales de la ${programa.Facultad}.` },
-                                ]).map(({ key, title, content }) => (
+                                {[
+                                    {
+                                        key: 'plan',
+                                        title: 'Plan de Estudios',
+                                        content:
+                                            'Un plan de estudios es un conjunto de actividades académicas, organizadas mediante asignaturas reunidas en componentes de formación que un estudiante debe cursar para alcanzar los propósitos de formación de un programa curricular. Tomado del Acuerdo 033 del CSU.',
+                                    },
+                                    {
+                                        key: 'malla',
+                                        title: '¿Qué es una Malla Curricular?',
+                                        content:
+                                            'La malla curricular es una propuesta de visualización de un plan de estudios donde se sugiere la inscripción de asignaturas por periodo académico diferenciándolas por componente de formación. Contiene información de prerrequisitos y correquisitos de cada asignatura y se puede conocer su código, número de créditos, intensidad horaria, horas de trabajo semanal fuera de clase y su respectivo contenido.',
+                                    },
+                                    {
+                                        key: 'uso',
+                                        title: '¿Para qué sirve?',
+                                        content:
+                                            'Las asignaturas se encuentran agrupadas en componentes de formación diferenciados por color. Al seleccionar cada asignatura se resaltan los prerrequisitos o correquisitos necesarios para cursarla. En los campos de Optativas o Libre Elección se listan las asignaturas ofertadas. Haz clic en los botones del footer para explorar la descripción y tabla de créditos de cada componente.',
+                                    },
+                                    {
+                                        key: 'contacto',
+                                        title: 'Información y contacto',
+                                        content: `Si tienes inquietudes sobre este plan de estudios, puedes comunicarte con la Dirección del Programa Curricular de ${programa.Nombre_Programa} a través de los canales institucionales de la ${programa.Facultad}.`,
+                                    },
+                                ].map(({ key, title, content }) => (
                                     <div key={key}>
                                         <button
-                                            className="w-full flex items-center justify-between px-8 py-4 text-left hover:bg-slate-50 transition-colors"
-                                            onClick={() => setOpenAccordion(openAccordion === key ? null : key)}
+                                            className="flex w-full items-center justify-between px-8 py-4 text-left transition-colors hover:bg-slate-50"
+                                            onClick={() =>
+                                                setOpenAccordion(
+                                                    openAccordion === key
+                                                        ? null
+                                                        : key,
+                                                )
+                                            }
                                         >
-                                            <span className="text-sm font-black text-slate-800">{title}</span>
-                                            <span className={`material-symbols-outlined !text-base text-slate-400 transition-transform duration-200 ${openAccordion === key ? 'rotate-180' : ''}`}>expand_more</span>
+                                            <span className="text-sm font-black text-slate-800">
+                                                {title}
+                                            </span>
+                                            <span
+                                                className={`material-symbols-outlined !text-base text-slate-400 transition-transform duration-200 ${openAccordion === key ? 'rotate-180' : ''}`}
+                                            >
+                                                expand_more
+                                            </span>
                                         </button>
                                         {openAccordion === key && (
                                             <div className="px-8 pb-5">
-                                                <p className="text-sm text-slate-600 leading-relaxed">{content}</p>
+                                                <p className="text-sm leading-relaxed text-slate-600">
+                                                    {content}
+                                                </p>
                                             </div>
                                         )}
                                     </div>
@@ -903,262 +2396,55 @@ return null;
                 </div>
             )}
 
-            {/* MODAL: Catálogo de Libre Elección */}
-            {showElectivasModal && (() => {
-                const q = searchElectivas.trim().toLowerCase();
-                const filtered = q
-                    ? electivas.filter(e =>
-                        e.Nombre_Asignatura.toLowerCase().includes(q) ||
-                        String(e.Codigo_Asignatura).toLowerCase().includes(q)
-                      )
-                    : electivas;
+            <SlotSelectorModal
+                open={showElectivasModal}
+                slot={null}
+                items={electivas}
+                loading={loadingElectivas}
+                error={electivasErrorMsg}
+                type="libre"
+                onClose={() => setShowElectivasModal(false)}
+            />
 
-                return (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
-                        <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
-                            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
-                                <div>
-                                    <h2 className="text-base font-semibold text-gray-900">Catálogo de Libre Elección</h2>
-                                    <p className="text-xs text-gray-500 mt-0.5">{programa.Nombre_Programa}</p>
-                                </div>
-                                <button onClick={() => setShowElectivasModal(false)} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
+            <SlotSelectorModal
+                open={showOptativasModal}
+                slot={selectedOptativaSlot}
+                items={flatOptativas}
+                loading={loadingOptativas}
+                error={optativasErrorMsg}
+                type="optativa"
+                onClose={() => {
+                    setShowOptativasModal(false);
+                    setSelectedOptativaSlot(null);
+                }}
+            />
 
-                            {!loadingElectivas && !errorElectivas && electivas.length > 0 && (
-                                <div className="px-6 pt-4 pb-2 shrink-0">
-                                    <div className="relative">
-                                        <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                                        </svg>
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar por nombre o código…"
-                                            value={searchElectivas}
-                                            onChange={e => setSearchElectivas(e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-800 placeholder-gray-400 focus:border-blue-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-blue-400"
-                                        />
-                                        {searchElectivas && (
-                                            <button onClick={() => setSearchElectivas('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
+            <MallaHistoryModal
+                open={showHistoryModal}
+                onClose={() => setShowHistoryModal(false)}
+                versiones={versiones}
+                currentVersionId={currentVersionId ?? 0}
+                onSelectVersion={(id) => {
+                    handleSelectVersion(id);
+                    setShowHistoryModal(false);
+                }}
+                selectedForDiff={selectedForDiff}
+                onToggleDiffSelection={handleToggleDiffSelection}
+                onCompare={() => {
+                    setShowHistoryModal(false);
+                    handleCompare();
+                }}
+            />
 
-                            <div className="overflow-y-auto px-6 py-4 flex-1">
-                                {loadingElectivas ? (
-                                    <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
-                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                                        <span className="text-sm">Cargando catálogo…</span>
-                                    </div>
-                                ) : errorElectivas ? (
-                                    <p className="py-10 text-center text-sm text-red-500">No se pudieron cargar las electivas. Intenta de nuevo.</p>
-                                ) : electivas.length === 0 ? (
-                                    <p className="py-10 text-center text-sm text-gray-500">No hay electivas registradas.</p>
-                                ) : filtered.length === 0 ? (
-                                    <p className="py-10 text-center text-sm text-gray-500">Sin resultados para <span className="font-medium">"{searchElectivas}"</span>.</p>
-                                ) : (
-                                    <table className="min-w-full text-sm">
-                                        <thead>
-                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100">
-                                                <th className="pb-3 pr-4">Código</th>
-                                                <th className="pb-3 pr-4">Nombre</th>
-                                                <th className="pb-3 text-center">Créditos</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-gray-50">
-                                            {filtered.map((e) => (
-                                                <tr key={e.ID_Asignatura} className="hover:bg-gray-50">
-                                                    <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
-                                                    <td className="py-2 pr-4 text-gray-800">{e.Nombre_Asignatura}</td>
-                                                    <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
-                                                </tr>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
-                                {!loadingElectivas && !errorElectivas && electivas.length > 0 && (
-                                    <span className="text-xs text-gray-400">{q ? `${filtered.length} de ${electivas.length}` : electivas.length} materias</span>
-                                )}
-                                <button onClick={() => setShowElectivasModal(false)} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
-
-            {/* MODAL: Catálogo de Optativas */}
-            {showOptativasModal && (() => {
-                const q = searchOptativas.trim().toLowerCase();
-                const filteredGroups = optativas
-                    .map(group => ({
-                        ...group,
-                        asignaturas: q
-                            ? group.asignaturas.filter(e =>
-                                e.Nombre_Asignatura.toLowerCase().includes(q) ||
-                                String(e.Codigo_Asignatura).toLowerCase().includes(q)
-                              )
-                            : group.asignaturas,
-                    }))
-                    .filter(group => group.asignaturas.length > 0);
-                const totalOptativas = optativas.reduce((sum, group) => sum + group.asignaturas.length, 0);
-                const visibleOptativas = filteredGroups.reduce((sum, group) => sum + group.asignaturas.length, 0);
-
-                return (
-                    <div className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4">
-                        <div className="w-full max-w-2xl rounded-xl bg-white shadow-2xl flex flex-col max-h-[85vh]">
-                            <div className="flex items-center justify-between border-b border-gray-100 px-6 py-4 shrink-0">
-                                <div>
-                                    <h2 className="text-base font-semibold text-gray-900">Catálogo de Optativas</h2>
-                                    {selectedOptativaSlot?.Nombre_Agrupacion ? (
-                                        <p className="text-xs text-gray-500 mt-0.5">Agrupación: {selectedOptativaSlot.Nombre_Agrupacion}</p>
-                                    ) : (
-                                        <p className="text-xs text-gray-500 mt-0.5">{programa.Nombre_Programa}</p>
-                                    )}
-                                    {selectedOptativaSlot?.Nombre_Slot && (
-                                        <p className="text-xs text-gray-500">Slot: {selectedOptativaSlot.Nombre_Slot}</p>
-                                    )}
-                                </div>
-                                <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="rounded-lg p-1.5 text-gray-400 hover:bg-gray-100 hover:text-gray-600 transition-colors">
-                                    <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                    </svg>
-                                </button>
-                            </div>
-
-                            {!loadingOptativas && !errorOptativas && optativas.length > 0 && (
-                                <div className="px-6 pt-4 pb-2 shrink-0">
-                                    <div className="relative">
-                                        <svg className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 11A6 6 0 1 1 5 11a6 6 0 0 1 12 0z" />
-                                        </svg>
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar por nombre o código…"
-                                            value={searchOptativas}
-                                            onChange={e => setSearchOptativas(e.target.value)}
-                                            className="w-full rounded-lg border border-gray-200 bg-gray-50 py-2 pl-9 pr-4 text-sm text-gray-800 placeholder-gray-400 focus:border-orange-400 focus:bg-white focus:outline-none focus:ring-1 focus:ring-orange-400"
-                                        />
-                                        {searchOptativas && (
-                                            <button onClick={() => setSearchOptativas('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600">
-                                                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                                                </svg>
-                                            </button>
-                                        )}
-                                    </div>
-                                </div>
-                            )}
-
-                            <div className="overflow-y-auto px-6 py-4 flex-1">
-                                {loadingOptativas ? (
-                                    <div className="flex items-center justify-center gap-3 py-12 text-gray-400">
-                                        <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-gray-600" />
-                                        <span className="text-sm">Cargando catálogo…</span>
-                                    </div>
-                                ) : errorOptativas ? (
-                                    <p className="py-10 text-center text-sm text-red-500">No se pudieron cargar las optativas. Intenta de nuevo.</p>
-                                ) : totalOptativas === 0 ? (
-                                    <p className="py-10 text-center text-sm text-gray-500">No hay optativas registradas para este programa.</p>
-                                ) : visibleOptativas === 0 ? (
-                                    <p className="py-10 text-center text-sm text-gray-500">Sin resultados para <span className="font-medium">"{searchOptativas}"</span>.</p>
-                                ) : (
-                                    <table className="min-w-full text-sm">
-                                        <thead>
-                                            <tr className="text-left text-xs font-semibold uppercase tracking-wide text-gray-500 border-b border-gray-100">
-                                                <th className="pb-3 pr-4">Código</th>
-                                                <th className="pb-3 pr-4">Nombre</th>
-                                                <th className="pb-3 text-center">Créd.</th>
-                                                <th className="pb-3 text-center">Req.</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {filteredGroups.map((group) => (
-                                                <React.Fragment key={`group-${group.ID_Agrupacion}`}>
-                                                    <tr className="bg-gray-50 border-b border-gray-200">
-                                                        <td colSpan={4} className="px-4 py-2 text-xs font-semibold uppercase tracking-wide text-gray-600">
-                                                            {group.Nombre_Agrupacion}
-                                                        </td>
-                                                    </tr>
-                                                    {group.asignaturas.map((e) => {
-                                                        const reqs = e.requisitos ?? [];
-                                                        const isOpen = expandedOptativa === e.ID_Asignatura;
-
-                                                        return (
-                                                            <React.Fragment key={e.ID_Asignatura}>
-                                                                <tr onClick={() => setExpandedOptativa(isOpen ? null : e.ID_Asignatura)} className="border-b border-gray-50 hover:bg-orange-50 cursor-pointer select-none">
-                                                                    <td className="py-2 pr-4 font-mono text-xs text-gray-500">{e.Codigo_Asignatura}</td>
-                                                                    <td className="py-2 pr-4 text-gray-800 font-medium">{e.Nombre_Asignatura}</td>
-                                                                    <td className="py-2 text-center text-gray-600">{e.Creditos_Asignatura}</td>
-                                                                    <td className="py-2 text-center">
-                                                                        {reqs.length > 0 ? (
-                                                                            <span className="inline-flex items-center gap-1 text-orange-600 text-xs font-semibold">
-                                                                                {reqs.length}
-                                                                                <svg className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                                                                                </svg>
-                                                                            </span>
-                                                                        ) : (
-                                                                            <span className="text-gray-300 text-xs">—</span>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                                {isOpen && reqs.length > 0 && (
-                                                                    <tr className="bg-orange-50 border-b border-orange-100">
-                                                                        <td colSpan={4} className="px-4 pb-3 pt-1">
-                                                                            <p className="text-[10px] font-semibold uppercase tracking-wide text-orange-600 mb-1">Requisitos</p>
-                                                                            <ul className="space-y-1">
-                                                                                {reqs.map((r, idx) => {
-                                                                                    const reqType = r.Tipo_Requisito || '';
-
-                                                                                    return (
-                                                                                        <li key={idx} className="flex items-start gap-2 text-xs text-gray-700">
-                                                                                            <span className={`mt-0.5 shrink-0 rounded px-1 py-0.5 text-[9px] font-bold uppercase ${reqType.toLowerCase().includes('pre') || reqType.toLowerCase() === 'opcional' ? 'bg-red-100 text-red-700' : reqType.toLowerCase().includes('co') ? 'bg-yellow-100 text-yellow-700' : 'bg-gray-100 text-gray-600'}`}>
-                                                                                                {formatTipoRequisito(reqType)}
-                                                                                            </span>
-                                                                                            <span>
-                                                                                                {r.asignatura_requerida
-                                                                                                    ? `${r.asignatura_requerida.Nombre_Asignatura} (${r.asignatura_requerida.Codigo_Asignatura})`
-                                                                                                    : r.Descripcion_Requisito || (r.Valor_Creditos ? `${r.Valor_Creditos} créditos` : '—')
-                                                                                                }
-                                                                                            </span>
-                                                                                        </li>
-                                                                                    );
-                                                                                })}
-                                                                            </ul>
-                                                                        </td>
-                                                                    </tr>
-                                                                )}
-                                                            </React.Fragment>
-                                                        );
-                                                    })}
-                                                </React.Fragment>
-                                            ))}
-                                        </tbody>
-                                    </table>
-                                )}
-                            </div>
-
-                            <div className="flex items-center justify-between border-t border-gray-100 px-6 py-4 shrink-0">
-                                {!loadingOptativas && !errorOptativas && totalOptativas > 0 && (
-                                    <span className="text-xs text-gray-400">{q ? `${visibleOptativas} de ${totalOptativas}` : totalOptativas} materias</span>
-                                )}
-                                <button onClick={() => { setShowOptativasModal(false); setSelectedOptativaSlot(null); }} className="ml-auto rounded-lg border border-gray-300 px-4 py-2 text-sm text-gray-700 hover:bg-gray-50 transition-colors">Cerrar</button>
-                            </div>
-                        </div>
-                    </div>
-                );
-            })()}
+            <MallaDiffView
+                open={showDiffModal}
+                onClose={() => {
+                    setShowDiffModal(false);
+                    setDiffData(null);
+                }}
+                diffData={diffData}
+                loading={loadingDiff}
+            />
 
             <style>{`
                 .custom-scrollbar::-webkit-scrollbar { height: 6px; width: 6px; }

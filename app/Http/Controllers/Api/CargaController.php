@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\StoreCargaRequest;
 use App\Http\Requests\UploadCargaArchivoRequest;
 use App\Jobs\ProcesarExcelJob;
+use App\Models\ArchivoExcel;
 use App\Models\CargaMalla;
 use App\Models\ErrorCarga;
+use App\Services\ExcelParserService;
 use App\Services\ExcelUploadService;
 use App\Services\LogActividadService;
 use Illuminate\Http\JsonResponse;
@@ -29,10 +31,10 @@ class CargaController extends Controller
             $request->input('malla_base_id'),
             $request->user()->ID_Usuario,
             $request->input('tipo_carga'),
-            $request->input('programa_id') ? (int)$request->input('programa_id') : null
+            $request->input('programa_id') ? (int) $request->input('programa_id') : null
         );
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return response()->json(
                 $this->sanitizeForJson([
                     'message' => $result['message'] ?? 'Error al crear la carga.',
@@ -79,7 +81,7 @@ class CargaController extends Controller
             $request->user()->ID_Usuario
         );
 
-        if (!$result['success']) {
+        if (! $result['success']) {
             return response()->json(
                 $this->sanitizeForJson([
                     'message' => $result['message'] ?? 'Error al subir el archivo.',
@@ -134,7 +136,7 @@ class CargaController extends Controller
 
         if (app()->isLocal()) {
             $job = new ProcesarExcelJob($id);
-            $job->handle(app(\App\Services\ExcelParserService::class));
+            $job->handle(app(ExcelParserService::class));
         } else {
             ProcesarExcelJob::dispatch($id);
         }
@@ -266,7 +268,7 @@ class CargaController extends Controller
     {
         $carga = CargaMalla::with(['malla', 'mallaBase'])->findOrFail($id);
 
-        if (!$carga->ID_Malla_Base) {
+        if (! $carga->ID_Malla_Base) {
             return response()->json([
                 'data' => [],
                 'message' => 'Esta carga no tiene una malla base para comparar.',
@@ -279,12 +281,76 @@ class CargaController extends Controller
         ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
     }
 
+    public function destroy(int $id, Request $request): JsonResponse
+    {
+        $carga = CargaMalla::with(['malla'])->findOrFail($id);
+
+        $estadosPermitidos = ['esperando_archivos', 'listo_para_procesar', 'con_errores', 'borrador'];
+        if (! in_array($carga->Estado_Carga, $estadosPermitidos)) {
+            return response()->json([
+                'message' => 'No se puede eliminar una carga en estado '.$carga->Estado_Carga.'.',
+            ], 409, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+
+        // Eliminar errores asociados
+        ErrorCarga::where('ID_Carga', $id)->delete();
+
+        // Remover referencias FK antes de eliminar archivos
+        $archivoIds = [];
+        foreach (['ID_Archivo_Malla', 'ID_Archivo_Asignaturas', 'ID_Archivo_Electivas'] as $archivoField) {
+            if ($carga->{$archivoField}) {
+                $archivoIds[] = $carga->{$archivoField};
+            }
+            $carga->{$archivoField} = null;
+        }
+        $carga->save();
+
+        // Eliminar archivos Excel asociados (si no son referenciados por otras cargas)
+        foreach ($archivoIds as $archivoId) {
+            $otrasCargas = CargaMalla::where(function ($q) use ($archivoId) {
+                $q->where('ID_Archivo_Malla', $archivoId)
+                    ->orWhere('ID_Archivo_Asignaturas', $archivoId)
+                    ->orWhere('ID_Archivo_Electivas', $archivoId);
+            })->count();
+            if ($otrasCargas === 0) {
+                ArchivoExcel::find($archivoId)?->delete();
+            }
+        }
+
+        // Eliminar la malla asociada si está en estado borrador o rechazada
+        if ($carga->malla && in_array($carga->malla->Estado, ['borrador', 'rechazada'])) {
+            $carga->ID_Malla = null;
+            $carga->save();
+            $carga->malla->agrupaciones()->each(function ($agrupacion) {
+                $agrupacion->slots()->delete();
+                $agrupacion->asignaturas()->detach();
+                $agrupacion->delete();
+            });
+            $carga->malla->delete();
+        }
+
+        // Registrar log de eliminación
+        LogActividadService::registrar(
+            $request->user(),
+            'DELETE_CARGA',
+            'carga_malla',
+            $id,
+            ['estado_anterior' => $carga->Estado_Carga, 'malla_id' => $carga->ID_Malla]
+        );
+
+        $carga->delete();
+
+        return response()->json([
+            'message' => 'Carga eliminada correctamente.',
+        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+    }
+
     public function enviarRevision(int $id, Request $request): JsonResponse
     {
         $carga = CargaMalla::findOrFail($id);
 
         $estadosPermitidos = ['borrador', 'con_errores'];
-        if (!in_array($carga->Estado_Carga, $estadosPermitidos)) {
+        if (! in_array($carga->Estado_Carga, $estadosPermitidos)) {
             return response()->json([
                 'message' => 'Solo las cargas en estado borrador pueden enviarse a revisión.',
             ], 400, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
@@ -322,7 +388,7 @@ class CargaController extends Controller
             ], 403, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
-        if (!in_array($carga->Estado_Carga, ['pendiente_aprobacion'])) {
+        if (! in_array($carga->Estado_Carga, ['pendiente_aprobacion'])) {
             return response()->json([
                 'message' => 'Solo las cargas pendientes de aprobación pueden ser revisadas.',
             ], 400, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);

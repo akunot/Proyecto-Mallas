@@ -4,11 +4,12 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Agrupacion;
 use App\Models\AgrupacionAsignatura;
+use App\Models\Asignatura;
 use App\Models\MallaCurricular;
+use App\Models\PlantillaAgrupacion;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
-use App\Models\PlantillaAgrupacion;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -25,13 +26,134 @@ class MallaController extends Controller
     {
         $payload = self::buildPublicVisualizerPayload($id);
 
-        if (!$payload) {
+        if (! $payload) {
             return response()->json([
                 'message' => 'No hay una malla activa disponible para este programa.',
             ], 404);
         }
 
         return response()->json($payload);
+    }
+
+    /**
+     * Endpoint público: retorna una versión específica de malla por su ID.
+     */
+    public function publicShow(int $id): JsonResponse
+    {
+        $malla = MallaCurricular::with(self::visualizerEagerLoads())
+            ->whereIn('Estado', ['activa', 'archivada'])
+            ->findOrFail($id);
+
+        return response()->json(self::mallaToVisualizerPayload($malla));
+    }
+
+    /**
+     * Endpoint público: historial de versiones de un programa.
+     */
+    public function publicHistory(int $programaId): JsonResponse
+    {
+        $versiones = MallaCurricular::where('ID_Programa', $programaId)
+            ->whereIn('Estado', ['activa', 'archivada'])
+            ->orderBy('Version_Numero', 'desc')
+            ->get([
+                'ID_Malla', 'Version_Numero', 'Version_Etiqueta',
+                'Estado', 'Es_Vigente', 'Fecha_Vigencia',
+                'Fecha_Fin_Vigencia', 'created_at',
+            ]);
+
+        return response()->json(['data' => $versiones]);
+    }
+
+    /**
+     * Endpoint público: compara dos versiones de malla de un mismo programa.
+     */
+    public function publicDiff(int $malla1Id, int $malla2Id): JsonResponse
+    {
+        $malla1 = MallaCurricular::findOrFail($malla1Id);
+        $malla2 = MallaCurricular::findOrFail($malla2Id);
+
+        if ($malla1->ID_Programa !== $malla2->ID_Programa) {
+            return response()->json([
+                'message' => 'Las mallas deben pertenecer al mismo programa.',
+            ], 400);
+        }
+
+        $asig1 = AgrupacionAsignatura::where('ID_Malla', $malla1Id)
+            ->with(['asignatura', 'agrupacion.componente'])
+            ->get()
+            ->keyBy('ID_Asignatura');
+
+        $asig2 = AgrupacionAsignatura::where('ID_Malla', $malla2Id)
+            ->with(['asignatura', 'agrupacion.componente'])
+            ->get()
+            ->keyBy('ID_Asignatura');
+
+        $mapItem = fn ($a) => [
+            'ID_Asignatura' => $a->ID_Asignatura,
+            'Codigo_Asignatura' => $a->asignatura?->Codigo_Asignatura,
+            'Nombre_Asignatura' => $a->asignatura?->Nombre_Asignatura,
+            'Creditos_Asignatura' => $a->asignatura?->Creditos_Asignatura,
+            'Semestre_Sugerido' => $a->Semestre_Sugerido,
+            'Tipo_Asignatura' => $a->Tipo_Asignatura,
+            'Nombre_Agrupacion' => $a->agrupacion?->Nombre_Agrupacion,
+            'ID_Componente' => $a->agrupacion?->ID_Componente,
+            'Nombre_Componente' => $a->agrupacion?->componente?->Nombre_Componente,
+        ];
+
+        $added = [];
+        $removed = [];
+        $modified = [];
+        $unchanged = [];
+
+        foreach ($asig2 as $id => $a2) {
+            if (! $asig1->has($id)) {
+                $added[] = $mapItem($a2);
+            } else {
+                $a1 = $asig1[$id];
+                $changed = ($a1->Semestre_Sugerido !== $a2->Semestre_Sugerido)
+                    || ($a1->Tipo_Asignatura !== $a2->Tipo_Asignatura)
+                    || ($a1->ID_Agrupacion !== $a2->ID_Agrupacion);
+                if ($changed) {
+                    $modified[] = ['old' => $mapItem($a1), 'new' => $mapItem($a2)];
+                } else {
+                    $unchanged[] = $mapItem($a2);
+                }
+            }
+        }
+
+        foreach ($asig1 as $id => $a1) {
+            if (! $asig2->has($id)) {
+                $removed[] = $mapItem($a1);
+            }
+        }
+
+        return response()->json([
+            'data' => [
+                'malla1' => [
+                    'ID_Malla' => $malla1->ID_Malla,
+                    'Version_Numero' => $malla1->Version_Numero,
+                    'Estado' => $malla1->Estado,
+                    'Fecha_Vigencia' => $malla1->Fecha_Vigencia,
+                ],
+                'malla2' => [
+                    'ID_Malla' => $malla2->ID_Malla,
+                    'Version_Numero' => $malla2->Version_Numero,
+                    'Estado' => $malla2->Estado,
+                    'Fecha_Vigencia' => $malla2->Fecha_Vigencia,
+                ],
+                'resumen' => [
+                    'agregadas' => count($added),
+                    'eliminadas' => count($removed),
+                    'modificadas' => count($modified),
+                    'sin_cambios' => count($unchanged),
+                ],
+                'cambios' => [
+                    'agregadas' => $added,
+                    'eliminadas' => $removed,
+                    'modificadas' => $modified,
+                ],
+            ],
+        ]);
     }
 
     /**
@@ -43,74 +165,84 @@ class MallaController extends Controller
      */
     public static function buildPublicVisualizerPayload(int $idPrograma): ?array
     {
-        $malla = MallaCurricular::with([
-            'programa',
-            'normativa',
-            'agrupaciones' => function ($query) {
-                $query->orderBy('ID_Agrupacion');
-            },
-            'agrupaciones.asignaturas' => function ($query) {
-                $query->orderBy('agrupacion_asignatura.Orden');
-            },
-            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-            'agrupaciones.componente',
-            'agrupaciones.slots',
-        ])
+        $malla = MallaCurricular::with(self::visualizerEagerLoads())
             ->where('ID_Programa', $idPrograma)
             ->whereIn('Estado', ['activa', 'ACTIVO'])
             ->orderBy('Fecha_Vigencia', 'desc')
             ->first();
 
-        if (!$malla) {
+        if (! $malla) {
             return null;
         }
 
+        return self::mallaToVisualizerPayload($malla);
+    }
+
+    private static function visualizerEagerLoads(): array
+    {
         return [
-            'ID_Malla'    => $malla->ID_Malla,
+            'programa',
+            'normativa',
+            'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
+            'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
+            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
+            'agrupaciones.componente',
+            'agrupaciones.slots',
+        ];
+    }
+
+    private static function mallaToVisualizerPayload(MallaCurricular $malla): array
+    {
+        $idPrograma = $malla->programa->ID_Programa ?? 0;
+
+        return [
+            'ID_Malla' => $malla->ID_Malla,
             'Codigo_Plan' => $malla->Codigo_Plan,
-            'programa'    => [
-                'ID_Programa'     => $malla->programa->ID_Programa ?? $idPrograma,
+            'programa' => [
+                'ID_Programa' => $idPrograma,
                 'Nombre_Programa' => $malla->programa->Nombre_Programa ?? '',
             ],
             'normativa' => $malla->normativa ? [
-                'Tipo_Normativa'   => $malla->normativa->Tipo_Normativa,
+                'Tipo_Normativa' => $malla->normativa->Tipo_Normativa,
                 'Numero_Normativa' => $malla->normativa->Numero_Normativa,
-                'Instancia'        => $malla->normativa->Instancia,
-                'Anio_Normativa'   => $malla->normativa->Anio_Normativa,
+                'Instancia' => $malla->normativa->Instancia,
+                'Anio_Normativa' => $malla->normativa->Anio_Normativa,
             ] : null,
-            'agrupaciones' => $malla->agrupaciones->map(function ($agrupacion) {
+            'agrupaciones' => $malla->agrupaciones->map(function ($agrupacion) use ($idPrograma) {
                 return [
-                    'ID_Agrupacion'       => $agrupacion->ID_Agrupacion,
-                    'Nombre_Agrupacion'   => $agrupacion->Nombre_Agrupacion,
-                    'ID_Componente'       => $agrupacion->ID_Componente,
+                    'ID_Agrupacion' => $agrupacion->ID_Agrupacion,
+                    'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
+                    'ID_Componente' => $agrupacion->ID_Componente,
                     'Creditos_Requeridos' => $agrupacion->Creditos_Requeridos,
-                    'Es_Obligatoria'      => (bool) $agrupacion->Es_Obligatoria,
+                    'Es_Obligatoria' => (bool) $agrupacion->Es_Obligatoria,
                     'componente' => $agrupacion->componente ? [
                         'Nombre_Componente' => $agrupacion->componente->Nombre_Componente,
                     ] : null,
-                    'asignaturas' => $agrupacion->asignaturas->map(function ($asignatura) {
+                    'asignaturas' => $agrupacion->asignaturas->map(function ($asignatura) use ($idPrograma) {
                         return [
-                            'ID_Asignatura'       => $asignatura->ID_Asignatura,
-                            'Nombre_Asignatura'   => $asignatura->Nombre_Asignatura,
-                            'Codigo_Asignatura'   => $asignatura->Codigo_Asignatura,
+                            'ID_Asignatura' => $asignatura->ID_Asignatura,
+                            'Nombre_Asignatura' => $asignatura->Nombre_Asignatura,
+                            'Codigo_Asignatura' => $asignatura->Codigo_Asignatura,
                             'Creditos_Asignatura' => $asignatura->Creditos_Asignatura,
-                            'Horas_Presencial'    => $asignatura->Horas_Presencial ?? 0,
-                            'Horas_Estudiante'    => $asignatura->Horas_Estudiante ?? 0,
-                            'requisitos'          => $asignatura->requisitos->map(fn ($r) => [
-                                'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
-                                'Tipo_Requisito'          => $r->Tipo_Requisito,
-                                'Descripcion_Requisito'   => $r->Descripcion_Requisito,
-                                'Valor_Creditos'          => $r->Valor_Creditos,
-                                'asignatura_requerida'    => $r->asignaturaRequerida ? [
-                                    'Nombre_Asignatura' => $r->asignaturaRequerida->Nombre_Asignatura,
-                                    'Codigo_Asignatura' => $r->asignaturaRequerida->Codigo_Asignatura,
-                                ] : null,
-                            ])->values(),
+                            'Horas_Presencial' => $asignatura->Horas_Presencial ?? 0,
+                            'Horas_Estudiante' => $asignatura->Horas_Estudiante ?? 0,
+                            'requisitos' => $asignatura->requisitos
+                                ->where('ID_Programa', $idPrograma)
+                                ->map(fn ($r) => [
+                                    'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
+                                    'Tipo_Requisito' => $r->Tipo_Requisito,
+                                    'Descripcion_Requisito' => $r->Descripcion_Requisito,
+                                    'Valor_Creditos' => $r->Valor_Creditos,
+                                    'asignatura_requerida' => $r->asignaturaRequerida ? [
+                                        'Nombre_Asignatura' => $r->asignaturaRequerida->Nombre_Asignatura,
+                                        'Codigo_Asignatura' => $r->asignaturaRequerida->Codigo_Asignatura,
+                                    ] : null,
+                                ])->values(),
                             'ID_Componente' => $asignatura->ID_Componente ?? null,
                             'pivot' => [
                                 'Semestre_Sugerido' => $asignatura->pivot->Semestre_Sugerido,
-                                'Tipo_Asignatura'   => $asignatura->pivot->Tipo_Asignatura,
-                                'Orden'             => $asignatura->pivot->Orden,
+                                'Tipo_Asignatura' => $asignatura->pivot->Tipo_Asignatura,
+                                'Orden' => $asignatura->pivot->Orden,
                             ],
                         ];
                     })->values(),
@@ -118,11 +250,11 @@ class MallaController extends Controller
                         $tipoSlot = strtolower((string) ($slot->Tipo_Slot ?? ''));
 
                         return [
-                            'ID_Slot'           => $slot->ID_Slot,
-                            'Nombre_Slot'       => $slot->Nombre_Slot,
-                            'Tipo_Slot'         => in_array($tipoSlot, ['optativa', 'libre', 'nivelatorio'], true) ? $tipoSlot : 'libre',
-                            'Semestre'          => $slot->Semestre,
-                            'Orden'             => $slot->Orden,
+                            'ID_Slot' => $slot->ID_Slot,
+                            'Nombre_Slot' => $slot->Nombre_Slot,
+                            'Tipo_Slot' => in_array($tipoSlot, ['optativa', 'libre', 'nivelatorio'], true) ? $tipoSlot : 'libre',
+                            'Semestre' => $slot->Semestre,
+                            'Orden' => $slot->Orden,
                             'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
                         ];
                     })->values(),
@@ -136,14 +268,14 @@ class MallaController extends Controller
         $malla = MallaCurricular::findOrFail($mallaId);
 
         $validated = $request->validate([
-            'cambios'                        => 'sometimes|array',
-            'cambios.*.ID_Asignatura'        => 'required|integer|exists:asignaturas,ID_Asignatura',
-            'cambios.*.Semestre_Sugerido'    => 'required|integer|min:0|max:20',
-            'cambios.*.Orden'                => 'required|integer|min:0',
-            'cambios_slots'                  => 'sometimes|array',
-            'cambios_slots.*.ID_Slot'        => 'required|integer|exists:slots_agrupacion,ID_Slot',
-            'cambios_slots.*.Semestre'       => 'required|integer|min:0|max:20',
-            'cambios_slots.*.Orden'          => 'required|integer|min:0',
+            'cambios' => 'sometimes|array',
+            'cambios.*.ID_Asignatura' => 'required|integer|exists:asignaturas,ID_Asignatura',
+            'cambios.*.Semestre_Sugerido' => 'required|integer|min:0|max:20',
+            'cambios.*.Orden' => 'required|integer|min:0',
+            'cambios_slots' => 'sometimes|array',
+            'cambios_slots.*.ID_Slot' => 'required|integer|exists:slots_agrupacion,ID_Slot',
+            'cambios_slots.*.Semestre' => 'required|integer|min:0|max:20',
+            'cambios_slots.*.Orden' => 'required|integer|min:0',
         ]);
 
         DB::transaction(function () use ($validated, $malla) {
@@ -152,7 +284,7 @@ class MallaController extends Controller
                     ->where('ID_Asignatura', $cambio['ID_Asignatura'])
                     ->update([
                         'Semestre_Sugerido' => $cambio['Semestre_Sugerido'],
-                        'Orden'             => $cambio['Orden'],
+                        'Orden' => $cambio['Orden'],
                     ]);
             }
 
@@ -160,7 +292,7 @@ class MallaController extends Controller
                 SlotAgrupacion::where('ID_Slot', $cambio['ID_Slot'])
                     ->update([
                         'Semestre' => $cambio['Semestre'],
-                        'Orden'    => $cambio['Orden'],
+                        'Orden' => $cambio['Orden'],
                     ]);
             }
         });
@@ -176,7 +308,7 @@ class MallaController extends Controller
         $slot = null;
         if ($slotId !== null) {
             $slot = SlotAgrupacion::with('agrupacion')->find($slotId);
-            if (!$slot) {
+            if (! $slot) {
                 return response()->json([
                     'message' => 'Slot de optativa no encontrado.',
                     'data' => [],
@@ -192,11 +324,11 @@ class MallaController extends Controller
             ->join('asignaturas', 'programa_electivas.ID_Asignatura', '=', 'asignaturas.ID_Asignatura')
             ->leftJoin('agrupacion_asignatura', function ($join) use ($malla) {
                 $join->on('asignaturas.ID_Asignatura', '=', 'agrupacion_asignatura.ID_Asignatura')
-                     ->where('agrupacion_asignatura.ID_Malla', $malla->ID_Malla);
+                    ->where('agrupacion_asignatura.ID_Malla', $malla->ID_Malla);
             })
             ->leftJoin('agrupaciones', function ($join) use ($malla) {
                 $join->on('agrupacion_asignatura.ID_Agrupacion', '=', 'agrupaciones.ID_Agrupacion')
-                     ->where('agrupaciones.ID_Malla', $malla->ID_Malla);
+                    ->where('agrupaciones.ID_Malla', $malla->ID_Malla);
             })
             ->where(function ($query) use ($malla) {
                 $query->whereNull('agrupaciones.ID_Agrupacion')
@@ -278,7 +410,7 @@ class MallaController extends Controller
 
         $noVinculadas = array_diff($optativasIds, $vinculadasIds);
 
-        $asignaturas = \App\Models\Asignatura::whereIn('ID_Asignatura', $noVinculadas)
+        $asignaturas = Asignatura::whereIn('ID_Asignatura', $noVinculadas)
             ->get(['ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura']);
 
         return response()->json(['data' => $asignaturas]);
@@ -298,7 +430,7 @@ class MallaController extends Controller
 
         // Buscar la agrupación real; si no existe, crearla desde la plantilla
         $agrupacionReal = $this->resolveAgrupacionDestino($malla, (int) $validated['ID_Agrupacion']);
-        if (!$agrupacionReal) {
+        if (! $agrupacionReal) {
             return response()->json(['message' => 'La agrupación destino no es válida.'], 422);
         }
 
@@ -307,9 +439,9 @@ class MallaController extends Controller
             ->where('ID_Asignatura', $validated['ID_Asignatura'])
             ->exists();
 
-        if (!$esOptativa) {
+        if (! $esOptativa) {
             return response()->json([
-                'message' => 'La asignatura no es una optativa registrada para este programa.'
+                'message' => 'La asignatura no es una optativa registrada para este programa.',
             ], 422);
         }
 
@@ -342,7 +474,7 @@ class MallaController extends Controller
 
         // Buscar la agrupación real; si no existe, crearla desde la plantilla
         $agrupacionReal = $this->resolveAgrupacionDestino($malla, (int) $validated['ID_Agrupacion']);
-        if (!$agrupacionReal) {
+        if (! $agrupacionReal) {
             return response()->json(['message' => 'La agrupación destino no es válida.'], 422);
         }
 
@@ -353,7 +485,7 @@ class MallaController extends Controller
             ->all();
 
         $idsInvalidos = array_diff($validated['ID_Asignaturas'], $idsValidos);
-        if (!empty($idsInvalidos)) {
+        if (! empty($idsInvalidos)) {
             return response()->json([
                 'message' => 'Algunas asignaturas no son optativas registradas para este programa.',
                 'invalid_ids' => array_values($idsInvalidos),
@@ -361,7 +493,7 @@ class MallaController extends Controller
         }
 
         $now = now();
-        $rows = array_map(fn($id) => [
+        $rows = array_map(fn ($id) => [
             'ID_Malla' => $mallaId,
             'ID_Agrupacion' => $agrupacionReal->ID_Agrupacion,
             'ID_Asignatura' => $id,
@@ -377,9 +509,10 @@ class MallaController extends Controller
         );
 
         $count = count($idsValidos);
+
         return response()->json([
             'ok' => true,
-            'message' => "{$count} optativas asignadas correctamente a '{$agrupacionReal->Nombre_Agrupacion}'."
+            'message' => "{$count} optativas asignadas correctamente a '{$agrupacionReal->Nombre_Agrupacion}'.",
         ]);
     }
 
@@ -400,7 +533,7 @@ class MallaController extends Controller
 
         // 2. Obtener la plantilla para conocer nombre y componente
         $plantilla = PlantillaAgrupacion::find($id);
-        if (!$plantilla || $plantilla->ID_Programa !== $malla->ID_Programa) {
+        if (! $plantilla || $plantilla->ID_Programa !== $malla->ID_Programa) {
             return null;
         }
 
@@ -456,7 +589,7 @@ class MallaController extends Controller
 
         return response()->json([
             'ok' => true,
-            'message' => "{$deleted} optativas removidas de la agrupación."
+            'message' => "{$deleted} optativas removidas de la agrupación.",
         ]);
     }
 
@@ -470,11 +603,11 @@ class MallaController extends Controller
 
         $agrupaciones = Agrupacion::where('ID_Malla', $mallaId)
             ->whereHas('asignaturas', function ($q) {
-                                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva']);
+                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva']);
             })
             ->with(['asignaturas' => function ($q) {
-                                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva'])
-                  ->orderBy('Nombre_Asignatura');
+                $q->whereRaw('LOWER(agrupacion_asignatura.Tipo_Asignatura) IN (?, ?)', ['optativa', 'electiva'])
+                    ->orderBy('Nombre_Asignatura');
             }])
             ->orderBy('Nombre_Agrupacion')
             ->get(['ID_Agrupacion', 'Nombre_Agrupacion', 'ID_Componente']);

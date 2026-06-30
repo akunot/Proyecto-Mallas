@@ -1,29 +1,29 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use Illuminate\Http\Request;
-use Inertia\Inertia;
-use App\Http\Controllers\Api\SedeController;
-use App\Models\Asignatura;
-use App\Models\Usuario;
-use App\Models\LogActividad;
-use App\Models\CargaMalla;
-use App\Models\PlantillaAgrupacion;
-use App\Http\Controllers\Api\FacultadController;
-use App\Http\Controllers\Api\ProgramaController;
-use App\Http\Controllers\Api\NormativaController;
-use App\Http\Controllers\Api\ComponenteController;
 use App\Http\Controllers\Api\AgrupacionController;
 use App\Http\Controllers\Api\AsignaturaController;
-use App\Http\Controllers\Api\UsuarioController;
 use App\Http\Controllers\Api\AuthController;
-use App\Models\Sede;
-use App\Models\Facultad;
-use App\Models\Programa;
-use App\Models\MallaCurricular;
-use App\Models\Agrupacion;
-use App\Models\Normativa;
+use App\Http\Controllers\Api\ComponenteController;
+use App\Http\Controllers\Api\FacultadController;
+use App\Http\Controllers\Api\MallaController;
+use App\Http\Controllers\Api\NormativaController;
+use App\Http\Controllers\Api\ProgramaController;
+use App\Http\Controllers\Api\SedeController;
+use App\Http\Controllers\Api\UsuarioController;
+use App\Models\Asignatura;
+use App\Models\CargaMalla;
 use App\Models\Componente;
+use App\Models\Facultad;
+use App\Models\LogActividad;
+use App\Models\MallaCurricular;
+use App\Models\Normativa;
+use App\Models\PlantillaAgrupacion;
+use App\Models\Programa;
+use App\Models\Sede;
+use App\Models\Usuario;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Route;
+use Inertia\Inertia;
 
 /*
 |--------------------------------------------------------------------------
@@ -45,7 +45,7 @@ use App\Models\Componente;
 $renderProgramasActivos = function () {
     // Obtener todas las facultades activas
     $facultades = Facultad::where('Esta_Activo', 1)->orderBy('Nombre_Facultad')->get();
-    
+
     $data = $facultades->map(function ($facultad) {
         // Programas que pertenecen a esta facultad y tienen al menos una malla ACTIVA
         // Nota: Estado "activa" en minúsculas (valor real en BD)
@@ -61,30 +61,31 @@ $renderProgramasActivos = function () {
             ->get()
             ->map(function ($programa) {
                 $mallaActiva = $programa->mallas->first();
+
                 return [
-                    'ID_Programa'   => $programa->ID_Programa,
+                    'ID_Programa' => $programa->ID_Programa,
                     'Nombre_Programa' => $programa->Nombre_Programa,
                     'Codigo_Programa' => $programa->Codigo_Programa,
                     'Nivel_Formacion' => $programa->Nivel_Formacion,
                     'Creditos_Totales' => $programa->Creditos_Totales,
                     'Duracion_Semestres' => $programa->Duracion_Semestres,
-                    'Codigo_SNIES'    => $programa->Codigo_SNIES,
+                    'Codigo_SNIES' => $programa->Codigo_SNIES,
                     'Titulo_Otorgado' => $programa->Titulo_Otorgado,
-                    'ID_Malla'        => $mallaActiva ? $mallaActiva->ID_Malla : null,
-                    'Estado_Malla'    => $mallaActiva ? $mallaActiva->Estado : null,
+                    'ID_Malla' => $mallaActiva ? $mallaActiva->ID_Malla : null,
+                    'Estado_Malla' => $mallaActiva ? $mallaActiva->Estado : null,
                 ];
             })
-            ->filter(fn($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))
+            ->filter(fn ($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))
             ->values();
 
         return [
-            'ID_Facultad'      => $facultad->ID_Facultad,
-            'Nombre_Facultad'  => $facultad->Nombre_Facultad,
-            'Codigo_Facultad'  => $facultad->Codigo_Facultad,
-            'Url_Facultad'     => $facultad->Url_Facultad,
-            'programas'        => $programas,
+            'ID_Facultad' => $facultad->ID_Facultad,
+            'Nombre_Facultad' => $facultad->Nombre_Facultad,
+            'Codigo_Facultad' => $facultad->Codigo_Facultad,
+            'Url_Facultad' => $facultad->Url_Facultad,
+            'programas' => $programas,
         ];
-    })->filter(fn($f) => $f['programas']->isNotEmpty())->values();
+    })->filter(fn ($f) => $f['programas']->isNotEmpty())->values();
 
     return Inertia::render('Inicio/ProgramasActivos', [
         'facultades' => $data,
@@ -106,22 +107,31 @@ Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
 
 /**
  * Vista de Detalle — Malla Académica por Programa
- * Muestra la estructura completa de la malla activa de un programa.
+ * Muestra la estructura completa de la malla activa (o una versión histórica)
+ * de un programa.
+ *
+ * Query params:
+ *   ?v=ID_Malla  — Carga una versión específica en lugar de la activa.
  */
 Route::get('/malla-publica/{id_programa}', function ($id_programa) {
     $programa = Programa::with('facultad')->findOrFail($id_programa);
 
-    // Construir la malla con exactamente la misma estructura de "agrupaciones"
-    // que utiliza el Visualizador (MallaController::buildPublicVisualizerPayload),
-    // evitando duplicar la lógica de consulta/transformación en el frontend público.
-    $mallaEstructurada = \App\Http\Controllers\Api\MallaController::buildPublicVisualizerPayload((int) $id_programa);
+    $versionId = request()->query('v');
 
-    // Si no hay malla activa, retornar estado de no disponible
-    if (!$mallaEstructurada) {
+    if ($versionId) {
+        $mallaEstructurada = MallaController::publicShow((int) $versionId)->getData(true);
+        if (! isset($mallaEstructurada['ID_Malla'])) {
+            $mallaEstructurada = null;
+        }
+    } else {
+        $mallaEstructurada = MallaController::buildPublicVisualizerPayload((int) $id_programa);
+    }
+
+    if (! $mallaEstructurada) {
         return Inertia::render('Mallas/DetallePublico', [
             'disponible' => false,
-            'programa'   => [
-                'ID_Programa'   => $programa->ID_Programa,
+            'programa' => [
+                'ID_Programa' => $programa->ID_Programa,
                 'Nombre_Programa' => $programa->Nombre_Programa,
                 'Nivel_Formacion' => $programa->Nivel_Formacion,
                 'Duracion_Semestres' => $programa->Duracion_Semestres,
@@ -131,15 +141,15 @@ Route::get('/malla-publica/{id_programa}', function ($id_programa) {
 
     return Inertia::render('Mallas/DetallePublico', [
         'disponible' => true,
-        'programa'   => [
-            'ID_Programa'        => $programa->ID_Programa,
-            'Nombre_Programa'    => $programa->Nombre_Programa,
-            'Nivel_Formacion'    => $programa->Nivel_Formacion,
+        'programa' => [
+            'ID_Programa' => $programa->ID_Programa,
+            'Nombre_Programa' => $programa->Nombre_Programa,
+            'Nivel_Formacion' => $programa->Nivel_Formacion,
             'Duracion_Semestres' => $programa->Duracion_Semestres,
-            'Creditos_Totales'   => $programa->Creditos_Totales,
-            'Codigo_SNIES'       => $programa->Codigo_SNIES,
-            'Titulo_Otorgado'    => $programa->Titulo_Otorgado,
-            'Facultad'           => $programa->facultad->Nombre_Facultad ?? '',
+            'Creditos_Totales' => $programa->Creditos_Totales,
+            'Codigo_SNIES' => $programa->Codigo_SNIES,
+            'Titulo_Otorgado' => $programa->Titulo_Otorgado,
+            'Facultad' => $programa->facultad->Nombre_Facultad ?? '',
         ],
         'malla' => $mallaEstructurada,
     ]);
@@ -152,24 +162,24 @@ Route::get('/malla-publica/{id_programa}', function ($id_programa) {
 Route::middleware(['auth'])->group(function () {
     // Cerrar sesión
     Route::post('/auth/logout', [AuthController::class, 'logout']);
-    
+
     // Dashboard
     Route::get('/dashboard', function () {
         $sedesCount = Sede::count();
         $facultadesCount = Facultad::count();
         $programasCount = Programa::count();
-        $asignaturasCount = \App\Models\Asignatura::count();
+        $asignaturasCount = Asignatura::count();
         $mallasCount = MallaCurricular::count();
-        $usuariosCount = \App\Models\Usuario::count();
-        $normativasCount = \App\Models\Normativa::count();
+        $usuariosCount = Usuario::count();
+        $normativasCount = Normativa::count();
         $componentesCount = Componente::count();
-        $agrupacionesCount = \App\Models\PlantillaAgrupacion::count();
-        
+        $agrupacionesCount = PlantillaAgrupacion::count();
+
         // Cargas pendientes de aprobación
-        $cargasPendientes = \App\Models\CargaMalla::where('Estado_Carga', 'pendiente_aprobacion')->count();
+        $cargasPendientes = CargaMalla::where('Estado_Carga', 'pendiente_aprobacion')->count();
 
         // Cargas recientes
-        $cargasRecientes = \App\Models\CargaMalla::with(['malla', 'usuario', 'programa'])
+        $cargasRecientes = CargaMalla::with(['malla', 'usuario', 'programa'])
             ->orderBy('Creacion_Carga', 'desc')
             ->limit(5)
             ->get()
@@ -183,7 +193,7 @@ Route::middleware(['auth'])->group(function () {
                     'fecha' => $carga->Creacion_Carga->format('d/m/Y H:i'),
                 ];
             });
-        
+
         return Inertia::render('Dashboard', [
             'sedesCount' => $sedesCount,
             'facultadesCount' => $facultadesCount,
@@ -198,17 +208,17 @@ Route::middleware(['auth'])->group(function () {
             'cargasRecientes' => $cargasRecientes,
         ]);
     })->name('dashboard');
-    
+
     // Catálogos - Sedes
-    Route::get('/sedes', function (Illuminate\Http\Request $request) {
+    Route::get('/sedes', function (Request $request) {
         $query = Sede::query();
 
         // Búsqueda por nombre o ciudad
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Nombre_Sede', 'like', '%' . $search . '%')
-                  ->orWhere('Ciudad_Sede', 'like', '%' . $search . '%');
+                $q->where('Nombre_Sede', 'like', '%'.$search.'%')
+                    ->orWhere('Ciudad_Sede', 'like', '%'.$search.'%');
             });
         }
 
@@ -243,14 +253,14 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/sedes/{id}/edit', [SedeController::class, 'edit']);
     Route::patch('/sedes/{id}/toggle', [SedeController::class, 'toggle']);
     Route::delete('/sedes/{id}', [SedeController::class, 'destroy']);
-    
+
     // Catálogos - Facultades
-    Route::get('/facultades', function (Illuminate\Http\Request $request) {
+    Route::get('/facultades', function (Request $request) {
         $query = Facultad::with('sede');
 
         // Búsqueda por nombre de facultad
         if ($request->filled('search')) {
-            $query->where('Nombre_Facultad', 'like', '%' . $request->search . '%');
+            $query->where('Nombre_Facultad', 'like', '%'.$request->search.'%');
         }
 
         // Ordenamiento
@@ -286,12 +296,13 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'sedes' => \App\Models\Sede::select('Codigo_Sede', 'Nombre_Sede')->get(),
+            'sedes' => Sede::select('Codigo_Sede', 'Nombre_Sede')->get(),
         ]);
     })->name('facultades');
     Route::post('/facultades', [FacultadController::class, 'store']);
     Route::get('/facultades/create', function () {
         $sedes = Sede::select('Codigo_Sede', 'Nombre_Sede')->get();
+
         return Inertia::render('Catalogos/FacultadesForm', [
             'sedes' => $sedes,
         ]);
@@ -300,17 +311,17 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/facultades/{id}', [FacultadController::class, 'update']);
     Route::patch('/facultades/{id}/toggle', [FacultadController::class, 'toggle']);
     Route::delete('/facultades/{id}', [FacultadController::class, 'destroy']);
-    
+
     // Catálogos - Programas
-    Route::get('/programas', function (Illuminate\Http\Request $request) {
+    Route::get('/programas', function (Request $request) {
         $query = Programa::with(['facultad', 'facultad.sede']);
 
         // Búsqueda por nombre o código
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Nombre_Programa', 'like', '%' . $search . '%')
-                  ->orWhere('Codigo_Programa', 'like', '%' . $search . '%');
+                $q->where('Nombre_Programa', 'like', '%'.$search.'%')
+                    ->orWhere('Codigo_Programa', 'like', '%'.$search.'%');
             });
         }
 
@@ -333,11 +344,12 @@ Route::middleware(['auth'])->group(function () {
                     'sort_order' => $sortOrder,
                 ],
             ],
-            'facultades' => \App\Models\Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get(),
+            'facultades' => Facultad::select('ID_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get(),
         ]);
     })->name('programas');
     Route::get('/programas/create', function () {
-        $facultades = \App\Models\Facultad::select('Codigo_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get();
+        $facultades = Facultad::select('Codigo_Facultad', 'Nombre_Facultad')->where('Esta_Activo', 1)->get();
+
         return Inertia::render('Catalogos/ProgramasForm', [
             'facultades' => $facultades,
         ]);
@@ -347,28 +359,28 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/programas/{id}', [ProgramaController::class, 'update']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
     Route::delete('/programas/{id}', [ProgramaController::class, 'destroy']);
-    
+
     // Catálogos - Normativas
-    Route::get('/normativas', function (Illuminate\Http\Request $request) {
-        $query = \App\Models\Normativa::with('programa');
+    Route::get('/normativas', function (Request $request) {
+        $query = Normativa::with('programa');
 
         // Búsqueda por tipo, número o año
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Tipo_Normativa', 'like', '%' . $search . '%')
-                  ->orWhere('Numero_Normativa', 'like', '%' . $search . '%')
-                  ->orWhere('Instancia', 'like', '%' . $search . '%');
+                $q->where('Tipo_Normativa', 'like', '%'.$search.'%')
+                    ->orWhere('Numero_Normativa', 'like', '%'.$search.'%')
+                    ->orWhere('Instancia', 'like', '%'.$search.'%');
             });
         }
 
         // Ordenamiento
         $sortField = $request->sort_by ?? 'ID_Normativa';
         $sortOrder = $request->sort_order ?? 'asc';
-        
+
         // Validar campos permitidos para ordenamiento (solo columnas reales en BD)
         $allowedSortFields = ['ID_Normativa', 'Tipo_Normativa', 'Numero_Normativa', 'Anio_Normativa', 'Instancia', 'Esta_Activo'];
-        
+
         if (in_array($sortField, $allowedSortFields)) {
             $query->orderBy($sortField, $sortOrder);
         } else {
@@ -376,7 +388,7 @@ Route::middleware(['auth'])->group(function () {
         }
 
         $normativas = $query->paginate(20)->withQueryString();
-        
+
         // Mapear datos para incluir Nombre_Programa directamente
         $normativasData = collect($normativas->items())->map(function ($normativa) {
             return [
@@ -411,6 +423,7 @@ Route::middleware(['auth'])->group(function () {
     })->name('normativas');
     Route::get('/normativas/create', function () {
         $programas = Programa::select('ID_Programa', 'Codigo_Programa', 'Nombre_Programa')->where('Esta_Activo', 1)->get();
+
         return Inertia::render('Catalogos/NormativasForm', [
             'programas' => $programas,
         ]);
@@ -420,14 +433,14 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/normativas/{id}', [NormativaController::class, 'update']);
     Route::patch('/normativas/{id}/toggle', [NormativaController::class, 'toggle']);
     Route::delete('/normativas/{id}', [NormativaController::class, 'destroy']);
-    
+
     // Catálogos - Componentes
-    Route::get('/componentes', function (Illuminate\Http\Request $request) {
+    Route::get('/componentes', function (Request $request) {
         $query = Componente::query();
 
         // Búsqueda por nombre
         if ($request->has('search') && $request->search) {
-            $query->where('Nombre_Componente', 'like', '%' . $request->search . '%');
+            $query->where('Nombre_Componente', 'like', '%'.$request->search.'%');
         }
 
         // Ordenamiento
@@ -458,14 +471,14 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/asignaturas/{id}', [AsignaturaController::class, 'update']);
     Route::post('/usuarios', [UsuarioController::class, 'store']);
     Route::put('/usuarios/{id}', [UsuarioController::class, 'update']);
-    
+
     // Catálogos - Agrupaciones
-    Route::get('/agrupaciones', function (Illuminate\Http\Request $request) {
-        $query = \App\Models\PlantillaAgrupacion::with(['programa', 'componente']);
+    Route::get('/agrupaciones', function (Request $request) {
+        $query = PlantillaAgrupacion::with(['programa', 'componente']);
 
         // Búsqueda por nombre
         if ($request->has('search') && $request->search) {
-            $query->where('Nombre_Agrupacion', 'like', '%' . $request->search . '%');
+            $query->where('Nombre_Agrupacion', 'like', '%'.$request->search.'%');
         }
 
         // Ordenamiento
@@ -490,8 +503,9 @@ Route::middleware(['auth'])->group(function () {
         ]);
     })->name('agrupaciones');
     Route::get('/agrupaciones/create', function () {
-        $programas = \App\Models\Programa::select('ID_Programa', 'Nombre_Programa')->get();
+        $programas = Programa::select('ID_Programa', 'Nombre_Programa')->get();
         $componentes = Componente::select('ID_Componente', 'Nombre_Componente')->get();
+
         return Inertia::render('Catalogos/AgrupacionesForm', [
             'programas' => $programas,
             'componentes' => $componentes,
@@ -502,17 +516,17 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/agrupaciones', [AgrupacionController::class, 'store']);
     Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
     Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
-    
+
     // Catálogos - Asignaturas
-    Route::get('/asignaturas', function (Illuminate\Http\Request $request) {
-        $query = \App\Models\Asignatura::query();
+    Route::get('/asignaturas', function (Request $request) {
+        $query = Asignatura::query();
 
         // Búsqueda por nombre o código
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Nombre_Asignatura', 'like', '%' . $search . '%')
-                  ->orWhere('Codigo_Asignatura', 'like', '%' . $search . '%');
+                $q->where('Nombre_Asignatura', 'like', '%'.$search.'%')
+                    ->orWhere('Codigo_Asignatura', 'like', '%'.$search.'%');
             });
         }
 
@@ -541,17 +555,17 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/asignaturas/create', 'Catalogos/AsignaturasForm')->name('asignaturas.create');
     Route::get('/asignaturas/{id}/edit', [AsignaturaController::class, 'edit']);
     Route::patch('/asignaturas/{id}/toggle', [AsignaturaController::class, 'toggle']);
-    
+
     // Catálogos - Usuarios
-    Route::get('/usuarios', function (Illuminate\Http\Request $request) {
-        $query = \App\Models\Usuario::query();
+    Route::get('/usuarios', function (Request $request) {
+        $query = Usuario::query();
 
         // Búsqueda por nombre o email
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Nombre_Usuario', 'like', '%' . $search . '%')
-                  ->orWhere('Email_Usuario', 'like', '%' . $search . '%');
+                $q->where('Nombre_Usuario', 'like', '%'.$search.'%')
+                    ->orWhere('Email_Usuario', 'like', '%'.$search.'%');
             });
         }
 
@@ -579,15 +593,15 @@ Route::middleware(['auth'])->group(function () {
     Route::inertia('/usuarios/create', 'Catalogos/UsuariosForm')->name('usuarios.create');
     Route::get('/usuarios/{id}/edit', [UsuarioController::class, 'edit']);
     Route::patch('/usuarios/{id}/toggle', [UsuarioController::class, 'toggle']);
-    
+
     // Mallas y cargas (Fase 3+)
     Route::inertia('/cargas', 'Cargas/Cargas')->name('cargas');
 
-    Route::get('/mallas', function (Illuminate\Http\Request $request) {
+    Route::get('/mallas', function (Request $request) {
         $mallas = MallaCurricular::with('programa')
             ->orderBy('ID_Malla', 'desc')
             ->paginate(15);
-        
+
         return Inertia::render('Mallas/Index', [
             'mallas' => [
                 'data' => $mallas->items(),
@@ -595,20 +609,20 @@ Route::middleware(['auth'])->group(function () {
                     'current_page' => $mallas->currentPage(),
                     'last_page' => $mallas->lastPage(),
                     'total' => $mallas->total(),
-                ]
-            ]
+                ],
+            ],
         ]);
     })->name('mallas.index');
 
     Route::get('/mallas/{id}', function ($id) {
         $malla = MallaCurricular::with([
-            'programa', 
+            'programa',
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-            'agrupaciones.componente'
+            'agrupaciones.componente',
         ])->findOrFail($id);
-        
+
         return Inertia::render('Mallas/Show', [
-            'malla' => $malla
+            'malla' => $malla,
         ]);
     })->name('mallas.show');
 
@@ -619,16 +633,16 @@ Route::middleware(['auth'])->group(function () {
             'agrupaciones.componente',
             'agrupaciones.slots',
         ])->findOrFail($id);
-        
+
         return Inertia::render('Mallas/Visualizer', [
-            'malla' => $malla
+            'malla' => $malla,
         ]);
     })->name('mallas.visualizer');
 
     // Gestión de optativas por agrupación (admin)
     Route::get('/mallas/{id}/optativas-asignacion', function ($id) {
         $malla = MallaCurricular::with('programa')->findOrFail($id);
-        
+
         return Inertia::render('Mallas/OptativasAsignacion', [
             'malla' => [
                 'ID_Malla' => $malla->ID_Malla,
@@ -640,17 +654,17 @@ Route::middleware(['auth'])->group(function () {
             ],
         ]);
     })->name('mallas.optativas-asignacion');
-    
+
     // Auditoría y Aprobación (módulos nuevos)
-    Route::get('/auditoria', function (\Illuminate\Http\Request $request) {
-        $query = \App\Models\LogActividad::with('usuario');
+    Route::get('/auditoria', function (Request $request) {
+        $query = LogActividad::with('usuario');
 
         // Aplicar filtros desde la URL
         if ($request->filled('search')) {
             $search = $request->search;
             $query->where(function ($q) use ($search) {
-                $q->where('Detalle_Log', 'like', '%' . $search . '%')
-                  ->orWhere('IP_Origen_Log', 'like', '%' . $search . '%');
+                $q->where('Detalle_Log', 'like', '%'.$search.'%')
+                    ->orWhere('IP_Origen_Log', 'like', '%'.$search.'%');
             });
         }
         if ($request->filled('accion')) {
@@ -672,42 +686,42 @@ Route::middleware(['auth'])->group(function () {
         $logs = $query->orderBy('Creacion_Log', 'desc')
             ->paginate(20)
             ->withQueryString();
-        
+
         // Obtener estadísticas
-        $totalLogs = \App\Models\LogActividad::count();
-        $porAccion = \App\Models\LogActividad::select('Accion_Log')
+        $totalLogs = LogActividad::count();
+        $porAccion = LogActividad::select('Accion_Log')
             ->selectRaw('COUNT(*) as total')
             ->groupBy('Accion_Log')
             ->orderBy('total', 'desc')
             ->get();
-            
-        $porEntidad = \App\Models\LogActividad::select('Entidad_Log')
+
+        $porEntidad = LogActividad::select('Entidad_Log')
             ->selectRaw('COUNT(*) as total')
             ->groupBy('Entidad_Log')
             ->orderBy('total', 'desc')
             ->get();
-            
-        $porUsuario = \App\Models\LogActividad::with('usuario')
+
+        $porUsuario = LogActividad::with('usuario')
             ->select('ID_Usuario')
             ->selectRaw('COUNT(*) as total')
             ->groupBy('ID_Usuario')
             ->orderBy('total', 'desc')
             ->limit(10)
             ->get();
-        
+
         // Obtener acciones y entidades disponibles
-        $acciones = \App\Models\LogActividad::select('Accion_Log')
+        $acciones = LogActividad::select('Accion_Log')
             ->distinct()
             ->pluck('Accion_Log')
             ->sort()
             ->values();
-            
-        $entidades = \App\Models\LogActividad::select('Entidad_Log')
+
+        $entidades = LogActividad::select('Entidad_Log')
             ->distinct()
             ->pluck('Entidad_Log')
             ->sort()
             ->values();
-        
+
         return Inertia::render('Auditoria/AuditoriaPage', [
             'logs' => $logs->items(),
             'meta' => [
@@ -727,21 +741,21 @@ Route::middleware(['auth'])->group(function () {
             'filters' => $request->only(['usuario_id', 'accion', 'entidad', 'desde', 'hasta', 'search']),
         ]);
     })->name('auditoria');
-    
+
     Route::get('/aprobacion', function () {
         // Obtener cargas pendientes de revisión
-        $pendientes = \App\Models\CargaMalla::with(['malla', 'usuario', 'programa'])
+        $pendientes = CargaMalla::with(['malla', 'usuario', 'programa'])
             ->where('Estado_Carga', 'pendiente_aprobacion')
             ->where('ID_Usuario', '!=', auth()->user()->ID_Usuario)
             ->orderBy('Creacion_Carga', 'desc')
             ->get();
-        
+
         // Obtener mis cargas
-        $misCargas = \App\Models\CargaMalla::with(['malla', 'usuarioRevisor', 'programa'])
+        $misCargas = CargaMalla::with(['malla', 'usuarioRevisor', 'programa'])
             ->where('ID_Usuario', auth()->user()->ID_Usuario)
             ->orderBy('Creacion_Carga', 'desc')
             ->get();
-        
+
         return Inertia::render('Aprobacion/AprobacionPage', [
             'pendientes' => $pendientes,
             'misCargas' => $misCargas,

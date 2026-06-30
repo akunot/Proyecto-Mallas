@@ -47,7 +47,7 @@ class AprobacionController extends Controller
     {
         $carga = CargaMalla::findOrFail($id);
 
-        if (!$carga->ID_Malla) {
+        if (! $carga->ID_Malla) {
             return response()->json(['data' => null, 'message' => 'No hay malla asociada'], 404);
         }
 
@@ -58,7 +58,7 @@ class AprobacionController extends Controller
             'agrupaciones.slots',
         ])->find($carga->ID_Malla);
 
-        if (!$malla) {
+        if (! $malla) {
             return response()->json(['data' => null, 'message' => 'Malla no encontrada'], 404);
         }
 
@@ -74,14 +74,14 @@ class AprobacionController extends Controller
         $usuario = $request->user();
 
         $permitidos = ['borrador', 'con_errores'];
-        if (!in_array($carga->Estado_Carga, $permitidos)) {
+        if (! in_array($carga->Estado_Carga, $permitidos)) {
             return response()->json([
                 'message' => 'Error al enviar a revisión',
                 'error' => 'La carga debe estar en estado borrador para enviar a revisión',
             ], 400);
         }
 
-        if (!$carga->ID_Malla) {
+        if (! $carga->ID_Malla) {
             return response()->json([
                 'message' => 'Error al enviar a revisión',
                 'error' => 'No existe una malla asociada a esta carga',
@@ -134,7 +134,7 @@ class AprobacionController extends Controller
 
             if ($mallaAnterior) {
                 $mallaAnterior->update([
-                    'Es_Vigente' => 0,
+                    'Es_Vigente' => null,
                     'Fecha_Fin_Vigencia' => now(),
                     'Estado' => 'archivada',
                 ]);

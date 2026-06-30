@@ -8,34 +8,37 @@ use App\Models\Asignatura;
 use App\Models\CargaMalla;
 use App\Models\Componente;
 use App\Models\ErrorCarga;
-use App\Models\Facultad;
 use App\Models\MallaCurricular;
 use App\Models\Normativa;
 use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
-use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
-use App\Models\Sede;
 use App\Models\SlotAgrupacion;
-use App\Services\CodeNormalizationService;
 use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
 
 class ExcelParserService
 {
     private CargaMalla $carga;
+
     private ?MallaCurricular $malla = null;
+
     private array $errors = [];
+
     private array $warnings = [];
+
     private array $asignaturasProcessed = [];
+
     private int $totalRows = 0;
+
     private int $processedRows = 0;
 
     // Cache de catálogos para evitar N+1 queries
     private array $asignaturasCache = [];      // Codigo_Base => ID_Asignatura
+
     private array $componentesCache = [];      // Nombre_Componente => ID_Componente
+
     private array $agrupacionesCache = [];     // "ID_Malla|ID_Componente|Nombre" => ID_Agrupacion
 
     // Batch size para inserts
@@ -53,7 +56,7 @@ class ExcelParserService
         $tipoCarga = $this->carga->tipo_carga;
 
         if ($tipoCarga === 'malla') {
-            if (!$this->carga->ID_Archivo_Malla) {
+            if (! $this->carga->ID_Archivo_Malla) {
                 $this->recordError(
                     0,
                     'Carga',
@@ -72,13 +75,13 @@ class ExcelParserService
                     'total_rows' => $this->totalRows,
                 ];
             }
-            
+
             // Si no hay malla ID en la carga, la crearemos en prepareMalla
             if ($this->carga->ID_Malla) {
                 $this->malla = MallaCurricular::find($this->carga->ID_Malla);
             }
         } elseif ($tipoCarga === 'asignaturas') {
-            if (!$this->carga->ID_Archivo_Asignaturas) {
+            if (! $this->carga->ID_Archivo_Asignaturas) {
                 $this->recordError(
                     0,
                     'Carga',
@@ -98,7 +101,7 @@ class ExcelParserService
                 ];
             }
         } elseif ($tipoCarga === 'electivas') {
-            if (!$this->carga->ID_Archivo_Electivas) {
+            if (! $this->carga->ID_Archivo_Electivas) {
                 $this->recordError(
                     0,
                     'Carga',
@@ -118,15 +121,16 @@ class ExcelParserService
                 ];
             }
         } elseif ($tipoCarga === 'optativa') {
-            if (!$this->carga->ID_Archivo_Electivas) {
+            if (! $this->carga->ID_Archivo_Electivas) {
                 $this->recordError(0, 'Carga', 'Falta el archivo de optativas.', null, 'error');
                 $this->carga->update(['Estado_Carga' => 'con_errores']);
+
                 return [
-                    'success'        => false,
-                    'errors_count'   => count($this->errors),
+                    'success' => false,
+                    'errors_count' => count($this->errors),
                     'warnings_count' => count($this->warnings),
                     'processed_rows' => $this->processedRows,
-                    'total_rows'     => $this->totalRows,
+                    'total_rows' => $this->totalRows,
                 ];
             }
         }
@@ -137,42 +141,42 @@ class ExcelParserService
 
         $this->carga->update(['Estado_Carga' => 'validando']);
 
-         try {
-             if ($tipoCarga === 'malla') {
-                 $mallaSpreadsheet = $this->loadSpreadsheetFromField('archivoMalla');
-                 if (!$this->prepareMalla($mallaSpreadsheet)) {
-                     return [
-                         'success' => false,
-                         'errors_count' => count($this->errors),
-                         'warnings_count' => count($this->warnings),
-                         'processed_rows' => $this->processedRows,
-                         'total_rows' => $this->totalRows,
-                     ];
-                 }
-                 
-                 // Pre-cargar catálogos DESPUÉS de asegurar que $this->malla existe
-                 $this->preloadCatalogs();
+        try {
+            if ($tipoCarga === 'malla') {
+                $mallaSpreadsheet = $this->loadSpreadsheetFromField('archivoMalla');
+                if (! $this->prepareMalla($mallaSpreadsheet)) {
+                    return [
+                        'success' => false,
+                        'errors_count' => count($this->errors),
+                        'warnings_count' => count($this->warnings),
+                        'processed_rows' => $this->processedRows,
+                        'total_rows' => $this->totalRows,
+                    ];
+                }
 
-                 $this->parseAgglomerationSheets($mallaSpreadsheet);
-                 $result = $this->parseMalla($mallaSpreadsheet);
-             } elseif ($tipoCarga === 'asignaturas') {
-                 // Para carga simple de asignaturas, también precarga para búsquedas
-                 $this->preloadAsignaturasCache();
-                 $asignaturasSpreadsheet = $this->loadSpreadsheetFromField('archivoAsignaturas');
-                 $this->parseAsignaturasFile($asignaturasSpreadsheet);
-                 $result = true;
-             } elseif ($tipoCarga === 'electivas') {
-                 // Para electivas, precarga asignaturas
-                 $this->preloadAsignaturasCache();
-                 $electivasSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
-                 $this->parseElectivasFile($electivasSpreadsheet);
-                 $result = true;
-             } elseif ($tipoCarga === 'optativa') {
-                 $this->preloadAsignaturasCache();
-                 $optativaSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
-                 $this->parseOptativaFile($optativaSpreadsheet);
-                 $result = true;
-             }
+                // Pre-cargar catálogos DESPUÉS de asegurar que $this->malla existe
+                $this->preloadCatalogs();
+
+                $this->parseAgglomerationSheets($mallaSpreadsheet);
+                $result = $this->parseMalla($mallaSpreadsheet);
+            } elseif ($tipoCarga === 'asignaturas') {
+                // Para carga simple de asignaturas, también precarga para búsquedas
+                $this->preloadAsignaturasCache();
+                $asignaturasSpreadsheet = $this->loadSpreadsheetFromField('archivoAsignaturas');
+                $this->parseAsignaturasFile($asignaturasSpreadsheet);
+                $result = true;
+            } elseif ($tipoCarga === 'electivas') {
+                // Para electivas, precarga asignaturas
+                $this->preloadAsignaturasCache();
+                $electivasSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
+                $this->parseElectivasFile($electivasSpreadsheet);
+                $result = true;
+            } elseif ($tipoCarga === 'optativa') {
+                $this->preloadAsignaturasCache();
+                $optativaSpreadsheet = $this->loadSpreadsheetFromField('archivoElectivas');
+                $this->parseOptativaFile($optativaSpreadsheet);
+                $result = true;
+            }
 
             $this->updateCargaStatus();
 
@@ -197,29 +201,29 @@ class ExcelParserService
     {
         $archivo = $this->carga->{$field};
 
-        if (!$archivo) {
+        if (! $archivo) {
             throw new \RuntimeException("El archivo requerido '{$field}' no está disponible para esta carga.");
         }
 
         $tempDir = storage_path('tmp');
-        if (!is_dir($tempDir)) {
+        if (! is_dir($tempDir)) {
             mkdir($tempDir, 0755, true);
         }
 
         $tempPath = tempnam($tempDir, 'malla_xlsx_');
 
-        if (!$tempPath) {
+        if (! $tempPath) {
             throw new \RuntimeException('No se pudo crear el archivo temporal para procesar el Excel.');
         }
 
         try {
             file_put_contents($tempPath, $archivo->Contenido_Archivo);
-            
+
             // Leer solo datos, ignorando imágenes y estilos
             $inputFileType = IOFactory::identify($tempPath);
             $reader = IOFactory::createReader($inputFileType);
             $reader->setReadDataOnly(true);
-            
+
             return $reader->load($tempPath);
         } finally {
             if (file_exists($tempPath)) {
@@ -235,8 +239,9 @@ class ExcelParserService
     private function parseAsignaturasFile(Spreadsheet $spreadsheet): void
     {
         $sheet = $spreadsheet->getSheet(0);
-        if (!$sheet) {
+        if (! $sheet) {
             $this->recordError(0, 'Asignaturas', 'Hoja de asignaturas no encontrada.', null, 'error');
+
             return;
         }
 
@@ -254,12 +259,12 @@ class ExcelParserService
             $codigoOriginal = $this->cleanCodeCell($data[0] ?? null);
             $nombreRaw = $this->cleanCell($data[1] ?? '');
             $nombre = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
-            $creditos = !empty($data[2]) ? (int)$data[2] : 0;
-            $horasPresencial = !empty($data[3]) ? (int)$data[3] : null;
-            $horasEstudiante = !empty($data[4]) ? (int)$data[4] : null;
+            $creditos = ! empty($data[2]) ? (int) $data[2] : 0;
+            $horasPresencial = ! empty($data[3]) ? (int) $data[3] : null;
+            $horasEstudiante = ! empty($data[4]) ? (int) $data[4] : null;
 
             if (empty($codigoOriginal) || empty($nombre)) {
-                if (!empty($nombreRaw)) {
+                if (! empty($nombreRaw)) {
                     $this->recordError(
                         $i + 1,
                         'Asignaturas',
@@ -268,6 +273,7 @@ class ExcelParserService
                         'error'
                     );
                 }
+
                 continue;
             }
 
@@ -284,6 +290,7 @@ class ExcelParserService
                     $codigoOriginal,
                     'error'
                 );
+
                 continue;
             }
             $codigosProcesados[$codigoBase] = $i + 1;
@@ -294,6 +301,7 @@ class ExcelParserService
                 $asignaturaId = $this->asignaturasCache[$codigoBase];
                 // Podemos obtener el nombre real haciendo query si needed, pero para performance solo advertimos
                 $this->recordWarningIfNameDiffers($asignaturaId, $nombre, $i + 1);
+
                 continue;
             }
 
@@ -310,7 +318,7 @@ class ExcelParserService
             ];
 
             // Marcar en cache provisional para evitar duplicados en este batch
-            $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
+            $this->asignaturasCache[$codigoBase] = 'PENDING_'.count($batch);
         }
 
         // Bulk insert en chunks
@@ -323,8 +331,9 @@ class ExcelParserService
     private function parseElectivasFile(Spreadsheet $spreadsheet): void
     {
         $sheet = $spreadsheet->getSheet(0);
-        if (!$sheet) {
+        if (! $sheet) {
             $this->recordError(0, 'Electivas', 'Hoja de electivas no encontrada.', null, 'error');
+
             return;
         }
 
@@ -333,19 +342,19 @@ class ExcelParserService
             return;
         }
 
-        $batch             = [];
+        $batch = [];
         $codigosProcesados = [];
 
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
             $codigoOriginal = $this->cleanCodeCell($data[0] ?? null);
-            $nombreRaw      = $this->cleanCell($data[1] ?? '');
-            $nombre         = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
-            $creditos       = !empty($data[2]) ? (int)$data[2] : 0;
+            $nombreRaw = $this->cleanCell($data[1] ?? '');
+            $nombre = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
+            $creditos = ! empty($data[2]) ? (int) $data[2] : 0;
 
             if (empty($codigoOriginal) || empty($nombre)) {
-                if (!empty($nombreRaw)) {
+                if (! empty($nombreRaw)) {
                     $this->recordError(
                         $i + 1,
                         'Electivas',
@@ -354,6 +363,7 @@ class ExcelParserService
                         'error'
                     );
                 }
+
                 continue;
             }
 
@@ -369,6 +379,7 @@ class ExcelParserService
                     $codigoOriginal,
                     'error'
                 );
+
                 continue;
             }
             $codigosProcesados[$codigoBase] = $i + 1;
@@ -377,27 +388,28 @@ class ExcelParserService
             if (isset($this->asignaturasCache[$codigoBase])) {
                 $asignaturaId = $this->asignaturasCache[$codigoBase];
                 $this->recordWarningIfNameDiffers($asignaturaId, $nombre, $i + 1);
+
                 continue;
             }
 
             $batch[] = [
-                'Codigo_Asignatura'   => $codigoOriginal,
-                'Codigo_Base'         => $codigoBase,
-                'Nombre_Asignatura'   => $nombre,
+                'Codigo_Asignatura' => $codigoOriginal,
+                'Codigo_Base' => $codigoBase,
+                'Nombre_Asignatura' => $nombre,
                 'Creditos_Asignatura' => $creditos,
-                'Horas_Presencial'    => null,
-                'Horas_Estudiante'    => null,
-                'created_at'          => now(),
-                'updated_at'          => now(),
+                'Horas_Presencial' => null,
+                'Horas_Estudiante' => null,
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
 
-            $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
+            $this->asignaturasCache[$codigoBase] = 'PENDING_'.count($batch);
         }
 
         $this->bulkInsertAsignaturas($batch);
 
         // Marcar todas las asignaturas procesadas como electivas de libre elección
-        if (!empty($codigosProcesados)) {
+        if (! empty($codigosProcesados)) {
             DB::table('asignaturas')
                 ->whereIn('Codigo_Base', array_map('strval', array_keys($codigosProcesados)))
                 ->update(['es_electiva_libre' => true, 'updated_at' => now()]);
@@ -420,8 +432,9 @@ class ExcelParserService
     private function parseOptativaFile(Spreadsheet $spreadsheet): void
     {
         $sheet = $spreadsheet->getSheet(0);
-        if (!$sheet) {
+        if (! $sheet) {
             $this->recordError(0, 'Optativa', 'Hoja de optativas no encontrada.', null, 'error');
+
             return;
         }
 
@@ -430,53 +443,55 @@ class ExcelParserService
             return;
         }
 
-        $batch                = [];
-        $codigosPorPrograma   = [];
-        $codigosProcesados    = []; // prog|codigoBase => fila primera ocurrencia
-        $programasCache       = []; // Codigo_Programa => ID_Programa|null
-        $optativaGroupMeta    = []; // [programaId][codigoBase] => ['ID_Componente'=>..., 'ID_Plantilla_Agrupacion'=>...]
+        $batch = [];
+        $codigosPorPrograma = [];
+        $codigosProcesados = []; // prog|codigoBase => fila primera ocurrencia
+        $programasCache = []; // Codigo_Programa => ID_Programa|null
+        $optativaGroupMeta = []; // [programaId][codigoBase] => ['ID_Componente'=>..., 'ID_Plantilla_Agrupacion'=>...]
         // Cada entrada: [codigoBase, programaId, tipoReq, reqCodigo|null, esTexto, descripcion|null, fila]
-        $requisitosData       = [];
+        $requisitosData = [];
 
         for ($i = 1; $i < count($rows); $i++) {
             $data = $rows[$i];
 
-            $codigoPrograma = !empty($data[0]) ? trim((string)$this->cleanCodeCell($data[0])) : null;
-            $componenteId   = !empty($data[1]) ? (int)$data[1] : null;
-            $plantillaId    = !empty($data[2]) ? (int)$data[2] : null;
+            $codigoPrograma = ! empty($data[0]) ? trim((string) $this->cleanCodeCell($data[0])) : null;
+            $componenteId = ! empty($data[1]) ? (int) $data[1] : null;
+            $plantillaId = ! empty($data[2]) ? (int) $data[2] : null;
             $codigoOriginal = $this->cleanCodeCell($data[3] ?? null);
-            $nombreRaw      = $this->cleanCell($data[4] ?? '');
-            $nombre         = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
-            $creditos       = !empty($data[5]) ? (int)$data[5] : 0;
+            $nombreRaw = $this->cleanCell($data[4] ?? '');
+            $nombre = $nombreRaw !== null ? $this->normalizeNombreAsignatura($nombreRaw) : null;
+            $creditos = ! empty($data[5]) ? (int) $data[5] : 0;
 
             if (empty($codigoOriginal) || empty($nombre)) {
                 continue;
             }
 
-            if (!$codigoPrograma) {
+            if (! $codigoPrograma) {
                 $this->recordError($i + 1, 'Optativa', 'Fila sin código de programa.', $codigoOriginal, 'advertencia');
+
                 continue;
             }
 
-            if (!array_key_exists($codigoPrograma, $programasCache)) {
+            if (! array_key_exists($codigoPrograma, $programasCache)) {
                 $prog = Programa::where('Codigo_Programa', $codigoPrograma)->first(['ID_Programa']);
                 $programasCache[$codigoPrograma] = $prog?->ID_Programa;
             }
             $programaId = $programasCache[$codigoPrograma];
 
-            if (!$programaId) {
+            if (! $programaId) {
                 $this->recordError($i + 1, 'Optativa', "Programa con código '{$codigoPrograma}' no encontrado en la base de datos.", $codigoOriginal, 'error');
+
                 continue;
             }
 
             $codigoBase = $this->normalizeCodigo($codigoOriginal);
-            $key        = $programaId . '|' . $codigoBase;
+            $key = $programaId.'|'.$codigoBase;
 
             // Primera ocurrencia: registrar asignatura y vincular al programa
-            if (!isset($codigosProcesados[$key])) {
+            if (! isset($codigosProcesados[$key])) {
                 $codigosProcesados[$key] = $i + 1;
 
-                if (!isset($codigosPorPrograma[$programaId])) {
+                if (! isset($codigosPorPrograma[$programaId])) {
                     $codigosPorPrograma[$programaId] = [];
                 }
                 $codigosPorPrograma[$programaId][] = $codigoBase;
@@ -485,18 +500,18 @@ class ExcelParserService
                     'ID_Plantilla_Agrupacion' => $plantillaId,
                 ];
 
-                if (!isset($this->asignaturasCache[$codigoBase])) {
+                if (! isset($this->asignaturasCache[$codigoBase])) {
                     $batch[] = [
-                        'Codigo_Asignatura'   => $codigoOriginal,
-                        'Codigo_Base'         => $codigoBase,
-                        'Nombre_Asignatura'   => $nombre,
+                        'Codigo_Asignatura' => $codigoOriginal,
+                        'Codigo_Base' => $codigoBase,
+                        'Nombre_Asignatura' => $nombre,
                         'Creditos_Asignatura' => $creditos,
-                        'Horas_Presencial'    => null,
-                        'Horas_Estudiante'    => null,
-                        'created_at'          => now(),
-                        'updated_at'          => now(),
+                        'Horas_Presencial' => null,
+                        'Horas_Estudiante' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
-                    $this->asignaturasCache[$codigoBase] = 'PENDING_' . count($batch);
+                    $this->asignaturasCache[$codigoBase] = 'PENDING_'.count($batch);
                 }
             }
 
@@ -504,18 +519,18 @@ class ExcelParserService
             // Col 7 = código req (puede ser '-' o vacío), Col 8 = nombre/texto, Col 9 = tipo
             $rCodigo = $this->cleanCodeCell($data[7] ?? null);
             $rNombre = $this->cleanCell($data[8] ?? null);
-            $rTipo   = $this->cleanCell($data[9] ?? null);
+            $rTipo = $this->cleanCell($data[9] ?? null);
 
-            $tipoValido = !empty($rTipo) && $rTipo !== '-';
+            $tipoValido = ! empty($rTipo) && $rTipo !== '-';
 
-            if (!$tipoValido) {
+            if (! $tipoValido) {
                 continue; // fila sin requisito
             }
 
-            if (!empty($rCodigo) && $rCodigo !== '-') {
+            if (! empty($rCodigo) && $rCodigo !== '-') {
                 // Requisito referenciado por código de asignatura
                 $requisitosData[] = [$codigoBase, $programaId, $rTipo, $rCodigo, false, null, $i + 1];
-            } elseif (!empty($rNombre) && $rNombre !== '-') {
+            } elseif (! empty($rNombre) && $rNombre !== '-') {
                 // Requisito de texto (condición de créditos o nombre sin código)
                 $requisitosData[] = [$codigoBase, $programaId, $rTipo, null, true, $rNombre, $i + 1];
             }
@@ -524,7 +539,7 @@ class ExcelParserService
         $this->bulkInsertAsignaturas($batch);
         $this->preloadAsignaturasCache();
 
-        if (!empty($this->errors)) {
+        if (! empty($this->errors)) {
             return;
         }
 
@@ -535,9 +550,9 @@ class ExcelParserService
         }
 
         // Insertar requisitos
-        if (!empty($requisitosData)) {
+        if (! empty($requisitosData)) {
             $batchRequisitos = [];
-            $seenInBatch     = [];
+            $seenInBatch = [];
 
             // Cargar requisitos ya existentes para estos programas (dedup en re-subida)
             $programaIdsAfectados = array_unique(array_column($requisitosData, 1));
@@ -545,16 +560,16 @@ class ExcelParserService
                 ->whereIn('ID_Programa', $programaIdsAfectados)
                 ->select('ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida', 'Descripcion_Requisito')
                 ->get()
-                ->mapWithKeys(fn($r) => [
-                    "{$r->ID_Asignatura}|{$r->ID_Programa}|" .
-                    ($r->ID_Asignatura_Requerida ?? 'null') . '|' .
+                ->mapWithKeys(fn ($r) => [
+                    "{$r->ID_Asignatura}|{$r->ID_Programa}|".
+                    ($r->ID_Asignatura_Requerida ?? 'null').'|'.
                     ($r->Descripcion_Requisito ?? '') => true,
                 ])
                 ->all();
 
             foreach ($requisitosData as [$codigoBase, $programaId, $tipoReq, $reqCodigo, $esTexto, $descripcion, $rowNumber]) {
                 $asignaturaId = $this->asignaturasCache[$codigoBase] ?? null;
-                if (!is_int($asignaturaId)) {
+                if (! is_int($asignaturaId)) {
                     continue;
                 }
 
@@ -571,21 +586,22 @@ class ExcelParserService
                     $seenInBatch[$dupKey] = true;
 
                     $batchRequisitos[] = [
-                        'ID_Asignatura'           => $asignaturaId,
-                        'ID_Programa'             => $programaId,
+                        'ID_Asignatura' => $asignaturaId,
+                        'ID_Programa' => $programaId,
                         'ID_Asignatura_Requerida' => null,
-                        'Tipo_Requisito'          => $tipoMapeado,
-                        'Valor_Creditos'          => null,
-                        'Descripcion_Requisito'   => $descripcion,
-                        'created_at'              => now(),
-                        'updated_at'              => now(),
+                        'Tipo_Requisito' => $tipoMapeado,
+                        'Valor_Creditos' => null,
+                        'Descripcion_Requisito' => $descripcion,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 } else {
                     // Requisito por código de asignatura
-                    $reqBase         = $this->normalizeCodigo($reqCodigo);
+                    $reqBase = $this->normalizeCodigo($reqCodigo);
                     $reqAsignaturaId = $this->asignaturasCache[$reqBase] ?? null;
-                    if (!is_int($reqAsignaturaId)) {
+                    if (! is_int($reqAsignaturaId)) {
                         $this->recordError($rowNumber, 'Optativa', "Requisito '{$reqCodigo}' no encontrado en catálogo.", $codigoBase, 'advertencia');
+
                         continue;
                     }
 
@@ -596,19 +612,19 @@ class ExcelParserService
                     $seenInBatch[$dupKey] = true;
 
                     $batchRequisitos[] = [
-                        'ID_Asignatura'           => $asignaturaId,
-                        'ID_Programa'             => $programaId,
+                        'ID_Asignatura' => $asignaturaId,
+                        'ID_Programa' => $programaId,
                         'ID_Asignatura_Requerida' => $reqAsignaturaId,
-                        'Tipo_Requisito'          => $this->mapTipoRequisito($tipoReq),
-                        'Valor_Creditos'          => null,
-                        'Descripcion_Requisito'   => null,
-                        'created_at'              => now(),
-                        'updated_at'              => now(),
+                        'Tipo_Requisito' => $this->mapTipoRequisito($tipoReq),
+                        'Valor_Creditos' => null,
+                        'Descripcion_Requisito' => null,
+                        'created_at' => now(),
+                        'updated_at' => now(),
                     ];
                 }
             }
 
-            if (!empty($batchRequisitos)) {
+            if (! empty($batchRequisitos)) {
                 $this->bulkInsertModel($batchRequisitos, 'requisitos');
             }
         }
@@ -623,7 +639,7 @@ class ExcelParserService
             return;
         }
 
-        $ids = \App\Models\Asignatura::whereIn('Codigo_Base', $codigosBase)
+        $ids = Asignatura::whereIn('Codigo_Base', $codigosBase)
             ->pluck('ID_Asignatura')
             ->all();
 
@@ -631,12 +647,12 @@ class ExcelParserService
             return;
         }
 
-        $now  = now();
-        $lote = array_map(fn($id) => [
-            'ID_Programa'   => $programaId,
+        $now = now();
+        $lote = array_map(fn ($id) => [
+            'ID_Programa' => $programaId,
             'ID_Asignatura' => $id,
-            'created_at'    => $now,
-            'updated_at'    => $now,
+            'created_at' => $now,
+            'updated_at' => $now,
         ], $ids);
 
         foreach (array_chunk($lote, self::BATCH_SIZE) as $chunk) {
@@ -651,7 +667,7 @@ class ExcelParserService
     private function persistOptativaAgrupacionLinkages(int $programaId, array $codigosBase, array $metaByCodigo): void
     {
         $malla = $this->resolveMallaForOptativaPrograma($programaId);
-        if (!$malla || empty($codigosBase)) {
+        if (! $malla || empty($codigosBase)) {
             return;
         }
 
@@ -664,7 +680,7 @@ class ExcelParserService
 
         foreach ($codigosBase as $codigoBase) {
             $asignaturaId = $this->asignaturasCache[$codigoBase] ?? null;
-            if (!is_int($asignaturaId)) {
+            if (! is_int($asignaturaId)) {
                 continue;
             }
 
@@ -672,7 +688,7 @@ class ExcelParserService
             $meta = $metaByCodigo[$codigoBase] ?? [];
             $plantillaId = $meta['ID_Plantilla_Agrupacion'] ?? null;
 
-            if (!empty($plantillaId) && isset($plantillasCache[$plantillaId])) {
+            if (! empty($plantillaId) && isset($plantillasCache[$plantillaId])) {
                 $plantilla = $plantillasCache[$plantillaId];
                 $componenteId = $meta['ID_Componente'] ?? null;
 
@@ -699,6 +715,7 @@ class ExcelParserService
                         $codigoBase,
                         'advertencia'
                     );
+
                     continue;
                 }
             } else {
@@ -706,15 +723,16 @@ class ExcelParserService
                 $this->recordError(
                     0,
                     'Optativa',
-                    "La optativa '{$codigoBase}' no tiene plantilla de agrupación asociada. " .
-                    "Debes asignarla manualmente desde el panel de administración.",
+                    "La optativa '{$codigoBase}' no tiene plantilla de agrupación asociada. ".
+                    'Debes asignarla manualmente desde el panel de administración.',
                     $codigoBase,
                     'advertencia'
                 );
+
                 continue;
             }
 
-            if (!isset($rowsByAgrupacion[$agrupacionId])) {
+            if (! isset($rowsByAgrupacion[$agrupacionId])) {
                 $rowsByAgrupacion[$agrupacionId] = [];
             }
 
@@ -730,7 +748,7 @@ class ExcelParserService
 
         // Insertar por agrupación para mantener consistencia
         foreach ($rowsByAgrupacion as $agrupacionId => $rows) {
-            if (!empty($rows)) {
+            if (! empty($rows)) {
                 DB::table('agrupacion_asignatura')
                     ->upsert($rows, ['ID_Agrupacion', 'ID_Asignatura', 'ID_Malla'], ['Tipo_Asignatura', 'updated_at']);
             }
@@ -750,7 +768,7 @@ class ExcelParserService
 
     private function findOrCreateAgrupacionFromPlantilla(MallaCurricular $malla, ?int $componenteId, PlantillaAgrupacion $plantilla): ?int
     {
-        if (!$componenteId) {
+        if (! $componenteId) {
             return null;
         }
 
@@ -761,6 +779,10 @@ class ExcelParserService
                 'Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion,
             ],
             [
+                'ID_Malla' => $malla->ID_Malla,
+                'ID_Programa' => $malla->ID_Programa,
+                'ID_Componente' => $componenteId,
+                'Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion,
                 'Tipo_Agrupacion' => $plantilla->Tipo_Agrupacion,
                 'Creditos_Requeridos' => $plantilla->Creditos_Requeridos,
                 'Creditos_Maximos' => $plantilla->Creditos_Maximos,
@@ -800,7 +822,7 @@ class ExcelParserService
     private function parseAgrupaciones(Spreadsheet $spreadsheet): void
     {
         $sheetName = $this->findSheetContaining($spreadsheet, 'Agrupacion');
-        if (!$sheetName) {
+        if (! $sheetName) {
             return;
         }
 
@@ -831,7 +853,7 @@ class ExcelParserService
 
             $tipoAgrupacionRaw = strtoupper($this->cleanCell($data[1] ?? ''));
             $esObligatoria = $tipoAgrupacionRaw === 'OBLIGATORIA' ? 1 : 0;
-            $creditosRequeridos = !empty($data[3]) ? (int) $data[3] : null;
+            $creditosRequeridos = ! empty($data[3]) ? (int) $data[3] : null;
 
             Agrupacion::firstOrCreate(
                 [
@@ -859,12 +881,12 @@ class ExcelParserService
                 return $name;
             }
         }
-        
+
         // Fallback to first sheet only for MALLA (file may just be named "Hoja 1")
         if (strtoupper($needle) === 'MALLA') {
             return $spreadsheet->getSheetNames()[0] ?? null;
         }
-        
+
         return null;
     }
 
@@ -875,8 +897,9 @@ class ExcelParserService
         }
 
         $sheetName = $this->findSheetContaining($spreadsheet, 'MALLA');
-        if (!$sheetName) {
+        if (! $sheetName) {
             $this->recordError(1, 'MALLA', 'No se encontró la hoja MALLA en el archivo');
+
             return false;
         }
 
@@ -885,13 +908,14 @@ class ExcelParserService
 
         if (count($rows) < 2) {
             $this->recordError(1, 'MALLA', 'La hoja MALLA está vacía');
+
             return false;
         }
 
         // Extraer normativa del Excel si no viene en la carga
-        if (!$this->carga->ID_Normativa) {
+        if (! $this->carga->ID_Normativa) {
             for ($i = 1; $i < count($rows); $i++) {
-                if (!$this->isRowEmpty($rows[$i]) && !empty($rows[$i][0])) {
+                if (! $this->isRowEmpty($rows[$i]) && ! empty($rows[$i][0])) {
                     $normativaIdStr = $this->cleanCell($rows[$i][0]);
                     $normativaId = is_numeric($normativaIdStr) ? (int) $normativaIdStr : null;
                     if ($normativaId) {
@@ -903,8 +927,9 @@ class ExcelParserService
         }
 
         $normativa = Normativa::with(['programa.facultad.sede'])->find($this->carga->ID_Normativa);
-        if (!$normativa) {
+        if (! $normativa) {
             $this->recordError(0, 'Malla', 'La carga no tiene normativa asociada ni se encontró en el archivo.', null, 'error');
+
             return false;
         }
 
@@ -915,7 +940,7 @@ class ExcelParserService
         // Actualizamos la carga con el programa y normativa extraídos
         $this->carga->update([
             'ID_Normativa' => $normativa->ID_Normativa,
-            'ID_Programa' => $programa->ID_Programa
+            'ID_Programa' => $programa->ID_Programa,
         ]);
 
         $this->malla = MallaCurricular::create([
@@ -924,7 +949,7 @@ class ExcelParserService
             'Version_Numero' => $this->getNextVersionNumber($programa->ID_Programa),
             'Fecha_Vigencia' => now(), // Corregido de Fecha_Inicio_Vigencia a Fecha_Vigencia
             'Estado' => 'borrador',
-            'Es_Vigente' => 0,
+            'Es_Vigente' => null,
         ]);
 
         $this->carga->update(['ID_Malla' => $this->malla->ID_Malla]);
@@ -940,8 +965,9 @@ class ExcelParserService
     private function parseMalla(Spreadsheet $spreadsheet): bool
     {
         $sheetName = $this->findSheetContaining($spreadsheet, 'MALLA');
-        if (!$sheetName) {
+        if (! $sheetName) {
             $this->recordError(1, 'MALLA', 'No se encontró la hoja MALLA en el archivo');
+
             return false;
         }
 
@@ -975,6 +1001,7 @@ class ExcelParserService
                 if ($emptyRowCount >= $maxEmptyRows) {
                     break;
                 }
+
                 continue;
             }
             $emptyRowCount = 0;
@@ -988,7 +1015,7 @@ class ExcelParserService
         // === BULK INSERTS (en orden dependiente) ===
 
         // 1. Insertar nuevos componentes
-        if (!empty($batchComponentes)) {
+        if (! empty($batchComponentes)) {
             $this->bulkInsertModel($batchComponentes, 'componentes');
         }
 
@@ -996,7 +1023,7 @@ class ExcelParserService
         $this->componentesCache = Componente::pluck('ID_Componente', 'Nombre_Componente')->toArray();
 
         // 3. Insertar nuevas agrupaciones
-        if (!empty($batchAgrupaciones)) {
+        if (! empty($batchAgrupaciones)) {
             $this->bulkInsertModel($batchAgrupaciones, 'agrupaciones');
         }
 
@@ -1005,7 +1032,7 @@ class ExcelParserService
             ->get(['ID_Agrupacion', 'ID_Componente', 'Nombre_Agrupacion']);
         $this->agrupacionesCache = [];
         foreach ($agrupaciones as $agrup) {
-            $key = $agrup->ID_Componente . '|' . $agrup->Nombre_Agrupacion;
+            $key = $agrup->ID_Componente.'|'.$agrup->Nombre_Agrupacion;
             $this->agrupacionesCache[$key] = $agrup->ID_Agrupacion;
         }
 
@@ -1013,13 +1040,32 @@ class ExcelParserService
         $this->resolveRelacionIds($batchRelaciones);
 
         // 6. Insertar relaciones agrupacion_asignatura
-        if (!empty($batchRelaciones)) {
+        if (! empty($batchRelaciones)) {
             $this->bulkInsertModel($batchRelaciones, 'agrupacion_asignatura');
         }
 
-        // 7. Insertar requisitos
-        if (!empty($batchRequisitos)) {
-            $this->bulkInsertModel($batchRequisitos, 'requisitos');
+        // 7. Insertar requisitos (usando upsert para evitar duplicados por re-upload)
+        if (! empty($batchRequisitos)) {
+            $chunks = array_chunk($batchRequisitos, self::BATCH_SIZE);
+            foreach ($chunks as $chunk) {
+                try {
+                    DB::transaction(function () use ($chunk) {
+                        DB::table('requisitos')->upsert(
+                            $chunk,
+                            ['ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida'],
+                            ['Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito', 'updated_at']
+                        );
+                    });
+                } catch (\Throwable $e) {
+                    $this->recordError(
+                        0,
+                        'Requisitos',
+                        'Error en upsert de requisitos: '.$e->getMessage(),
+                        null,
+                        'error'
+                    );
+                }
+            }
         }
 
         // 8. Segunda pasada: procesar placeholders (LIBRE1-11, OPTATIVA1-8, NIVELATORIO1-2).
@@ -1031,7 +1077,7 @@ class ExcelParserService
                 continue;
             }
             $codigoAsignatura = $this->cleanCodeCell($data[3] ?? null);
-            if (!empty($codigoAsignatura) && $this->esPlaceholder($codigoAsignatura)) {
+            if (! empty($codigoAsignatura) && $this->esPlaceholder($codigoAsignatura)) {
                 $this->procesarPlaceholder($data, $i + 1);
             }
         }
@@ -1043,7 +1089,7 @@ class ExcelParserService
      * Acumula una fila de la hoja MALLA en los batches.
      * No hace queries, solo construye arrays.
      */
-        private function accumulateMallaRow(
+    private function accumulateMallaRow(
         array $data,
         int $rowNumber,
         array &$batchComponentes,
@@ -1053,16 +1099,17 @@ class ExcelParserService
         array &$compTempMap,
         array &$agrupTempMap
     ): void {
-        $componenteId = (int) $this->cleanCell($data[1] ?? "");
-        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? "");
-        $codigoAsignatura = $this->cleanCodeCell($data[3] ?? "");
-        $obligatoriaVal = $this->cleanCell($data[4] ?? "");
+        $componenteId = (int) $this->cleanCell($data[1] ?? '');
+        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? '');
+        $codigoAsignatura = $this->cleanCodeCell($data[3] ?? '');
+        $obligatoriaVal = $this->cleanCell($data[4] ?? '');
         $reqTipo = $this->cleanCell($data[5] ?? null);
         $reqCodigo = $this->cleanCodeCell($data[6] ?? null);
-        $semestre = !empty($data[7]) ? (int)$data[7] : null;
+        $semestre = ! empty($data[7]) ? (int) $data[7] : null;
 
         if (empty($codigoAsignatura)) {
-            $this->recordError($rowNumber, "Codigo Asignatura", "Fila sin codigo de asignatura", "", "error");
+            $this->recordError($rowNumber, 'Codigo Asignatura', 'Fila sin codigo de asignatura', '', 'error');
+
             return;
         }
 
@@ -1072,35 +1119,37 @@ class ExcelParserService
         }
 
         $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoAsignatura));
-        if (!$asignaturaReqId) {
-            $this->recordError($rowNumber, "Asignatura", "Asignatura no encontrada en el catalogo. Asegurese de subirla primero.", $codigoAsignatura, "error");
+        if (! $asignaturaReqId) {
+            $this->recordError($rowNumber, 'Asignatura', 'Asignatura no encontrada en el catalogo. Asegurese de subirla primero.', $codigoAsignatura, 'error');
+
             return;
         }
 
         static $plantillasCache = null;
         if ($plantillasCache === null) {
-             $plantillasCache = \App\Models\PlantillaAgrupacion::all()->keyBy("ID_Plantilla_Agrupacion");
+            $plantillasCache = PlantillaAgrupacion::all()->keyBy('ID_Plantilla_Agrupacion');
         }
 
-        if (!isset($plantillasCache[$plantillaAgrupacionId])) {
-              $this->recordError($rowNumber, "Agrupacion", "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no valida.", $codigoAsignatura, "error");
-              return;
+        if (! isset($plantillasCache[$plantillaAgrupacionId])) {
+            $this->recordError($rowNumber, 'Agrupacion', "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no valida.", $codigoAsignatura, 'error');
+
+            return;
         }
 
         $plantilla = $plantillasCache[$plantillaAgrupacionId];
-        $agrupKey = $componenteId . "|" . $plantilla->Nombre_Agrupacion;
-        
-        if (!isset($this->agrupacionesCache[$agrupKey])) {
+        $agrupKey = $componenteId.'|'.$plantilla->Nombre_Agrupacion;
+
+        if (! isset($this->agrupacionesCache[$agrupKey])) {
             $batchAgrupaciones[] = [
-                "ID_Malla" => $this->malla->ID_Malla,
-                "ID_Programa" => $this->malla->ID_Programa,
-                "ID_Componente" => $componenteId,
-                "Nombre_Agrupacion" => $plantilla->Nombre_Agrupacion,
-                "Tipo_Agrupacion" => $plantilla->Tipo_Agrupacion,
-                "Creditos_Requeridos" => $plantilla->Creditos_Requeridos,
-                "Es_Obligatoria" => $plantilla->Es_Obligatoria,
-                "created_at" => now(),
-                "updated_at" => now(),
+                'ID_Malla' => $this->malla->ID_Malla,
+                'ID_Programa' => $this->malla->ID_Programa,
+                'ID_Componente' => $componenteId,
+                'Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion,
+                'Tipo_Agrupacion' => $plantilla->Tipo_Agrupacion,
+                'Creditos_Requeridos' => $plantilla->Creditos_Requeridos,
+                'Es_Obligatoria' => $plantilla->Es_Obligatoria,
+                'created_at' => now(),
+                'updated_at' => now(),
             ];
             $tempAgrupId = count($batchAgrupaciones) * -1;
             $agrupTempMap[$agrupKey] = $tempAgrupId;
@@ -1110,23 +1159,23 @@ class ExcelParserService
         $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
 
         // Prevenir duplicados en el mismo batch antes de insert
-        $relKey = $agrupKey . "|" . $asignaturaReqId;
+        $relKey = $agrupKey.'|'.$asignaturaReqId;
         static $processedRels = [];
         if (isset($processedRels[$relKey])) {
-             return;
+            return;
         }
         $processedRels[$relKey] = true;
 
         $batchRelaciones[] = [
-            "ID_Malla" => $this->malla->ID_Malla,
-            "ID_Agrupacion" => $agrupKey,
-            "ID_Asignatura" => $asignaturaReqId,
-            "Tipo_Asignatura" => $tipoAsignatura,
-            "Semestre_Sugerido" => $semestre,
-            "created_at" => now(),
-            "updated_at" => now(),
+            'ID_Malla' => $this->malla->ID_Malla,
+            'ID_Agrupacion' => $agrupKey,
+            'ID_Asignatura' => $asignaturaReqId,
+            'Tipo_Asignatura' => $tipoAsignatura,
+            'Semestre_Sugerido' => $semestre,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
-        
+
         $this->asignaturasProcessed[$codigoAsignatura] = true;
 
         // Procesar requisitos (soporta hasta 3 pares de columnas si existieran)
@@ -1134,8 +1183,8 @@ class ExcelParserService
         foreach ($reqColumns as $cols) {
             $rTipo = $this->cleanCell($data[$cols[0]] ?? null);
             $rCodigo = $this->cleanCodeCell($data[$cols[1]] ?? null);
-            
-            if (!empty($rTipo) && (!empty($rCodigo) || str_contains(strtoupper($rTipo), 'CREDITOS'))) {
+
+            if (! empty($rTipo) && (! empty($rCodigo) || str_contains(strtoupper($rTipo), 'CREDITOS'))) {
                 $this->processRequisitoBatch(
                     $asignaturaReqId,
                     $this->malla->ID_Programa,
@@ -1151,25 +1200,24 @@ class ExcelParserService
     private function isRowEmpty(array $row): bool
     {
         foreach ($row as $cell) {
-            if (!empty($cell)) {
+            if (! empty($cell)) {
                 return false;
             }
         }
+
         return true;
     }
 
-    
     /**
      * Resuelve una asignatura: busca por Codigo_Base (cache) o crea nueva.
      * Para carga malla, Tipo_Asignatura se determina según el archivo de origen.
      * NOTA: No actualiza asignaturas existentes (solo warning si nombre difiere).
      *
-     * @param string $codigoOriginal Código tal como viene del Excel
-     * @param string $nombre Nombre de la asignatura
-     * @param float|int|null $creditos Créditos (puede venir del Excel)
-     * @param int $rowNumber Número de fila para logs
-     * @param string $tipo 'regular' o 'electiva'
-     * @return Asignatura
+     * @param  string  $codigoOriginal  Código tal como viene del Excel
+     * @param  string  $nombre  Nombre de la asignatura
+     * @param  float|int|null  $creditos  Créditos (puede venir del Excel)
+     * @param  int  $rowNumber  Número de fila para logs
+     * @param  string  $tipo  'regular' o 'electiva'
      */
     private function resolveAsignatura(string $codigoOriginal, string $nombre, $creditos, int $rowNumber, string $tipo = 'regular'): ?Asignatura
     {
@@ -1185,6 +1233,7 @@ class ExcelParserService
                 if ($asignatura) {
                     // Validar nombre (solo warning)
                     $this->recordWarningIfNameDiffers($cachedId, $nombre, $rowNumber);
+
                     return $asignatura;
                 }
             }
@@ -1201,7 +1250,7 @@ class ExcelParserService
                 'Codigo_Asignatura' => $codigoOriginal,
                 'Codigo_Base' => $codigoBase,
                 'Nombre_Asignatura' => $nombre,
-                'Creditos_Asignatura' => (int)$creditos,
+                'Creditos_Asignatura' => (int) $creditos,
                 'Horas_Presencial' => $tipo === 'regular' ? 0 : null, // temporal, se rellenará después si hay datos
                 'Horas_Estudiante' => $tipo === 'regular' ? 0 : null,
             ]);
@@ -1211,7 +1260,8 @@ class ExcelParserService
 
             return $asignatura;
         } catch (\Throwable $e) {
-            $this->recordError($rowNumber, 'Asignatura', 'Error al crear asignatura: ' . $e->getMessage(), $codigoOriginal, 'error');
+            $this->recordError($rowNumber, 'Asignatura', 'Error al crear asignatura: '.$e->getMessage(), $codigoOriginal, 'error');
+
             return null;
         }
     }
@@ -1220,6 +1270,7 @@ class ExcelParserService
     {
         if (empty($nombre)) {
             $this->recordError($rowNumber, 'Componente', 'Componente vacío', null, 'error');
+
             return null;
         }
 
@@ -1232,6 +1283,7 @@ class ExcelParserService
     {
         if (empty($nombre)) {
             $this->recordError($rowNumber, 'Agrupación', 'Agrupación vacía', null, 'error');
+
             return null;
         }
 
@@ -1286,7 +1338,7 @@ class ExcelParserService
             ->get(['ID_Agrupacion', 'ID_Componente', 'Nombre_Agrupacion']);
 
         foreach ($agrupaciones as $agrup) {
-            $key = $agrup->ID_Componente . '|' . $agrup->Nombre_Agrupacion;
+            $key = $agrup->ID_Componente.'|'.$agrup->Nombre_Agrupacion;
             $this->agrupacionesCache[$key] = $agrup->ID_Agrupacion;
         }
     }
@@ -1308,6 +1360,7 @@ class ExcelParserService
     {
         if (isset($this->asignaturasCache[$codigoBase])) {
             $id = $this->asignaturasCache[$codigoBase];
+
             return is_int($id) ? $id : null;
         }
 
@@ -1315,6 +1368,7 @@ class ExcelParserService
         $asignatura = Asignatura::where('Codigo_Base', $codigoBase)->first();
         if ($asignatura) {
             $this->asignaturasCache[$codigoBase] = $asignatura->ID_Asignatura;
+
             return $asignatura->ID_Asignatura;
         }
 
@@ -1349,7 +1403,7 @@ class ExcelParserService
                 $this->recordError(
                     0,
                     'Asignatura',
-                    'Error en batch insert de asignaturas: ' . $e->getMessage(),
+                    'Error en batch insert de asignaturas: '.$e->getMessage(),
                     null,
                     'error'
                 );
@@ -1377,7 +1431,7 @@ class ExcelParserService
                 $this->recordError(
                     0,
                     ucfirst($table),
-                    'Error en bulk insert de ' . $table . ': ' . $e->getMessage(),
+                    'Error en bulk insert de '.$table.': '.$e->getMessage(),
                     null,
                     'error'
                 );
@@ -1403,7 +1457,7 @@ class ExcelParserService
                     $nombreAgrup = $keyParts[1] ?? '';
 
                     $componenteId = is_int($componentePart) ? $componentePart
-                        : (int)str_replace('PENDING_', '', $componentePart);
+                        : (int) str_replace('PENDING_', '', $componentePart);
 
                     $agrup = Agrupacion::where('ID_Malla', $this->malla->ID_Malla)
                         ->where('Nombre_Agrupacion', $nombreAgrup)
@@ -1421,7 +1475,6 @@ class ExcelParserService
         }
     }
 
-
     /**
      * Registra advertencia si el nombre de la asignatura difiere del catálogo.
      * Optimizado: evita query adicional si ya tenemos el objeto en cache.
@@ -1429,7 +1482,9 @@ class ExcelParserService
     private function recordWarningIfNameDiffers(int $asignaturaId, string $nombreExcel, int $fila): void
     {
         $asignatura = Asignatura::find($asignaturaId);
-        if (!$asignatura) return;
+        if (! $asignatura) {
+            return;
+        }
 
         if ($asignatura->Nombre_Asignatura !== $this->cleanCell($nombreExcel)) {
             $this->recordError(
@@ -1481,18 +1536,21 @@ class ExcelParserService
             // Si es un número romano, mantenerlo en mayúsculas
             if (isset($romanSet[$upperWord])) {
                 $result[] = $upperWord;
+
                 continue;
             }
 
             // Si es la primera palabra, capitalizar
             if ($index === 0) {
                 $result[] = mb_convert_case($lowerWord, MB_CASE_TITLE, 'UTF-8');
+
                 continue;
             }
 
             // Si es una palabra que debe ir en minúscula
             if (in_array($lowerWord, $lowercaseWords)) {
                 $result[] = $lowerWord;
+
                 continue;
             }
 
@@ -1528,6 +1586,7 @@ class ExcelParserService
         }
         // Eliminar caracteres de control no imprimibles (excepto \n, \r, \t)
         $converted = preg_replace('/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/', '', $converted);
+
         return $converted;
     }
 
@@ -1622,40 +1681,41 @@ class ExcelParserService
 
         $reqCodigoLimpiado = $this->cleanCell($reqCodigo); // Usamos cleanCell para no perder texto largo
         $tipoMapeado = $this->mapTipoRequisito($reqTipo);
-        
+
         $asignaturaReqId = null;
         $valorCreditos = null;
         $descripcion = null;
 
-        if (!empty($reqCodigoLimpiado)) {
+        if (! empty($reqCodigoLimpiado)) {
             // 1. Detectar si es una condición de créditos por texto
             if ($this->isConditionRequirement($reqCodigoLimpiado)) {
                 $descripcion = $reqCodigoLimpiado;
                 $tipoMapeado = 'creditos';
-                
+
                 // Intentar extraer el primer número que aparezca como créditos razonables
                 if (preg_match('/(\d+)\s*(?:créditos|creditos)/i', $reqCodigoLimpiado, $matches)) {
-                    $valorCreditos = (int)$matches[1];
+                    $valorCreditos = (int) $matches[1];
                 }
             } else {
                 // 2. Intentar buscar como asignatura (flujo normal)
                 $codigoLimpio = $this->cleanCodeCell($reqCodigoLimpiado);
                 $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
-                
-                if (!$asignaturaReqId) {
+
+                if (! $asignaturaReqId) {
                     // 3. Si no es asignatura y es numérico, es requisito de créditos simple
                     if (is_numeric($codigoLimpio)) {
-                        $valorCreditos = (int)$codigoLimpio;
+                        $valorCreditos = (int) $codigoLimpio;
                         $tipoMapeado = 'creditos';
                     } else {
                         // Es un texto que no reconocemos como condición ni como código
                         $this->recordError(
                             $rowNumber,
-                            "Requisito",
-                            "Asignatura requisito no encontrada: " . $reqCodigoLimpiado,
+                            'Requisito',
+                            'Asignatura requisito no encontrada: '.$reqCodigoLimpiado,
                             $reqCodigoLimpiado,
-                            "advertencia"
+                            'advertencia'
                         );
+
                         return;
                     }
                 }
@@ -1663,22 +1723,23 @@ class ExcelParserService
         }
 
         $batchRequisitos[] = [
-            "ID_Asignatura" => $asignaturaBaseId,
-            "ID_Programa" => $idPrograma,
-            "ID_Asignatura_Requerida" => $asignaturaReqId,
-            "Tipo_Requisito" => $tipoMapeado,
-            "Valor_Creditos" => $valorCreditos,
-            "Descripcion_Requisito" => $descripcion,
-            "created_at" => now(),
-            "updated_at" => now(),
+            'ID_Asignatura' => $asignaturaBaseId,
+            'ID_Programa' => $idPrograma,
+            'ID_Asignatura_Requerida' => $asignaturaReqId,
+            'Tipo_Requisito' => $tipoMapeado,
+            'Valor_Creditos' => $valorCreditos,
+            'Descripcion_Requisito' => $descripcion,
+            'created_at' => now(),
+            'updated_at' => now(),
         ];
     }
 
     private function isConditionRequirement(string $text): bool
     {
         $textUC = mb_strtoupper($text);
-        return str_contains($textUC, 'HABER APROBADO') || 
-               str_contains($textUC, 'CRÉDITOS') || 
+
+        return str_contains($textUC, 'HABER APROBADO') ||
+               str_contains($textUC, 'CRÉDITOS') ||
                str_contains($textUC, 'CREDITOS') ||
                str_contains($textUC, 'PLAN DE ESTUDIOS') ||
                str_contains($textUC, 'COMPONENTES') ||
@@ -1705,24 +1766,25 @@ class ExcelParserService
             $descripcion = $reqCodigoLimpiado;
             $tipoMapeado = 'creditos';
             if (preg_match('/(\d+)\s*(?:créditos|creditos)/i', $reqCodigoLimpiado, $matches)) {
-                $valorCreditos = (int)$matches[1];
+                $valorCreditos = (int) $matches[1];
             }
         } else {
             $codigoLimpio = $this->cleanCodeCell($reqCodigoLimpiado);
             $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
-            
-            if (!$asignaturaReqId) {
+
+            if (! $asignaturaReqId) {
                 if (is_numeric($codigoLimpio)) {
-                    $valorCreditos = (int)$codigoLimpio;
+                    $valorCreditos = (int) $codigoLimpio;
                     $tipoMapeado = 'creditos';
                 } else {
                     $this->recordError(
                         $rowNumber,
                         'Requisito',
-                        'Asignatura requisito no encontrada: ' . $reqCodigoLimpiado,
+                        'Asignatura requisito no encontrada: '.$reqCodigoLimpiado,
                         $reqCodigoLimpiado,
                         'advertencia'
                     );
+
                     return;
                 }
             }
@@ -1749,7 +1811,7 @@ class ExcelParserService
         if (str_contains($tipoLimpio, 'PREREQUISITO') || str_contains($tipoLimpio, 'PRE-REQUISITO') || $tipoLimpio === 'OBLIGATORIO') {
             return 'prerrequisito';
         }
-        
+
         if (str_contains($tipoLimpio, 'CORREQUISITO') || str_contains($tipoLimpio, 'CO-REQUISITO')) {
             return 'correquisito';
         }
@@ -1795,6 +1857,7 @@ class ExcelParserService
         $componente = Componente::where('Nombre_Componente', $componenteValue)->first();
         if ($componente) {
             $this->componentesCache[$componenteValue] = $componente->ID_Componente;
+
             return $componente->ID_Componente;
         }
 
@@ -1824,11 +1887,12 @@ class ExcelParserService
             if ($agrupacion) {
                 return $agrupacion->ID_Agrupacion;
             }
+
             return null;
         }
 
         // Buscar por nombre dentro del componente y malla actual
-        $key = $componenteId . '|' . $agrupacionValue;
+        $key = $componenteId.'|'.$agrupacionValue;
         if (isset($this->agrupacionesCache[$key])) {
             return $this->agrupacionesCache[$key];
         }
@@ -1841,6 +1905,7 @@ class ExcelParserService
 
         if ($agrupacion) {
             $this->agrupacionesCache[$key] = $agrupacion->ID_Agrupacion;
+
             return $agrupacion->ID_Agrupacion;
         }
 
@@ -1853,7 +1918,7 @@ class ExcelParserService
     private function mapTipoAsignatura(?string $obligatoria): string
     {
         $valorLimpio = strtoupper($this->cleanCell($obligatoria));
-        
+
         return ($valorLimpio === 'SI') ? 'regular' : 'electiva';
     }
 
@@ -1875,32 +1940,37 @@ class ExcelParserService
         // Validaciones básicas
         if (empty($codigoAsignatura)) {
             $this->recordError($rowNumber, 'Malla', 'Código de asignatura vacío', null, 'error');
+
             return;
         }
 
         // Verificar si es un placeholder (slot)
         if ($this->esPlaceholder($codigoAsignatura)) {
             $this->procesarPlaceholder($data, $rowNumber);
+
             return;
         }
 
         // Resolver IDs
         $componenteId = $this->resolveComponenteId($componenteValue);
-        if (!$componenteId) {
+        if (! $componenteId) {
             $this->recordError($rowNumber, 'Malla', "Componente no encontrado: {$componenteValue}", $codigoAsignatura, 'error');
+
             return;
         }
 
         $agrupacionId = $this->resolveAgrupacionId($agrupacionValue, $componenteId);
-        if (!$agrupacionId) {
+        if (! $agrupacionId) {
             $this->recordError($rowNumber, 'Malla', "Agrupación no encontrada: {$agrupacionValue}", $codigoAsignatura, 'error');
+
             return;
         }
 
         // Obtener o crear asignatura
         $asignatura = $this->resolveAsignatura($codigoAsignatura, '', 0, $rowNumber);
-        if (!$asignatura) {
+        if (! $asignatura) {
             $this->recordError($rowNumber, 'Malla', "No se pudo resolver asignatura: {$codigoAsignatura}", $codigoAsignatura, 'error');
+
             return;
         }
 
@@ -1917,7 +1987,7 @@ class ExcelParserService
         ]);
 
         // Procesar requisitos si existen
-        if (!empty($tipoRequisito) || !empty($codigoRequisito)) {
+        if (! empty($tipoRequisito) || ! empty($codigoRequisito)) {
             $this->processRequisito($relacion, $tipoRequisito, $codigoRequisito, $rowNumber);
         }
     }
@@ -1934,6 +2004,7 @@ class ExcelParserService
 
             if (count($rows) < 2) {
                 $this->recordError(0, 'Malla', 'El archivo no tiene datos suficientes', null, 'error');
+
                 return false;
             }
 
@@ -1941,22 +2012,25 @@ class ExcelParserService
 
             // Obtener ID de normativa desde la primera fila de datos
             $firstRow = $rows[1] ?? null;
-            if (!$firstRow) {
+            if (! $firstRow) {
                 $this->recordError(0, 'Malla', 'No hay datos en el archivo', null, 'error');
+
                 return false;
             }
 
             $normativaId = $this->cleanCell($firstRow[0] ?? null);
             if (empty($normativaId)) {
                 $this->recordError(0, 'Malla', 'El ID de normativa es obligatorio en la columna A', null, 'error');
+
                 return false;
             }
 
             // Crear la malla si no existe
-            if (!$this->malla) {
+            if (! $this->malla) {
                 $normativa = Normativa::with(['programa.facultad.sede'])->find($normativaId);
-                if (!$normativa) {
+                if (! $normativa) {
                     $this->recordError(0, 'Malla', "Normativa no encontrada con ID: {$normativaId}", null, 'error');
+
                     return false;
                 }
 
@@ -1972,7 +2046,7 @@ class ExcelParserService
                     'Version_Numero' => $this->getNextVersionNumber($programa->ID_Programa),
                     'Fecha_Inicio_Vigencia' => now(),
                     'Estado' => 'borrador',
-                    'Es_Vigente' => 0,
+                    'Es_Vigente' => null,
                 ]);
             }
 
@@ -1987,7 +2061,8 @@ class ExcelParserService
             return true;
 
         } catch (\Throwable $e) {
-            $this->recordError(0, 'Malla', 'Error procesando archivo: ' . $e->getMessage(), null, 'error');
+            $this->recordError(0, 'Malla', 'Error procesando archivo: '.$e->getMessage(), null, 'error');
+
             return false;
         }
     }
@@ -2001,10 +2076,11 @@ class ExcelParserService
             'OPTATIVA1', 'OPTATIVA2', 'OPTATIVA3', 'OPTATIVA4', 'OPTATIVA5', 'OPTATIVA6', 'OPTATIVA7', 'OPTATIVA8',
             'LIBRE1', 'LIBRE2', 'LIBRE3', 'LIBRE4', 'LIBRE5',
             'LIBRE6', 'LIBRE7', 'LIBRE8', 'LIBRE9', 'LIBRE10', 'LIBRE11',
-            'NIVELATORIO1', 'NIVELATORIO2'
+            'NIVELATORIO1', 'NIVELATORIO2',
         ];
-        
+
         $normalized = preg_replace('/\s+/', '', strtoupper(trim($codigoAsignatura)));
+
         return in_array($normalized, $placeholders);
     }
 
@@ -2013,13 +2089,14 @@ class ExcelParserService
      */
     private function procesarPlaceholder(array $data, int $rowNumber): void
     {
-        $componenteId          = (int) $this->cleanCell($data[1] ?? null);
+        $componenteId = (int) $this->cleanCell($data[1] ?? null);
         $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? null);
-        $codigoPlaceholder     = trim((string) $this->cleanCell($data[3] ?? null));
-        $semestre              = $this->cleanCell($data[7] ?? null);
+        $codigoPlaceholder = trim((string) $this->cleanCell($data[3] ?? null));
+        $semestre = $this->cleanCell($data[7] ?? null);
 
-        if (!$componenteId || !$plantillaAgrupacionId || empty($codigoPlaceholder)) {
+        if (! $componenteId || ! $plantillaAgrupacionId || empty($codigoPlaceholder)) {
             $this->recordError($rowNumber, 'Malla', 'Fila de placeholder incompleta.', $codigoPlaceholder, 'error');
+
             return;
         }
 
@@ -2029,13 +2106,14 @@ class ExcelParserService
             $plantillasCache = PlantillaAgrupacion::all()->keyBy('ID_Plantilla_Agrupacion');
         }
 
-        if (!isset($plantillasCache[$plantillaAgrupacionId])) {
+        if (! isset($plantillasCache[$plantillaAgrupacionId])) {
             $this->recordError($rowNumber, 'Agrupacion', "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no válida.", $codigoPlaceholder, 'error');
+
             return;
         }
 
         $plantilla = $plantillasCache[$plantillaAgrupacionId];
-        $agrupKey  = $componenteId . '|' . $plantilla->Nombre_Agrupacion;
+        $agrupKey = $componenteId.'|'.$plantilla->Nombre_Agrupacion;
 
         if (isset($this->agrupacionesCache[$agrupKey]) && is_int($this->agrupacionesCache[$agrupKey])) {
             $agrupacionId = $this->agrupacionesCache[$agrupKey];
@@ -2045,7 +2123,7 @@ class ExcelParserService
                 ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
                 ->first();
 
-            if (!$agrup) {
+            if (! $agrup) {
                 // Si la agrupación no existe aún, crearla desde la plantilla para que el slot pueda generarse.
                 $agrup = $plantilla->generarAgrupacion($this->malla->ID_Malla);
             }
@@ -2054,19 +2132,19 @@ class ExcelParserService
             $this->agrupacionesCache[$agrupKey] = $agrupacionId;
         }
 
-        $tipoSlot   = $this->determinarTipoSlot($codigoPlaceholder);
+        $tipoSlot = $this->determinarTipoSlot($codigoPlaceholder);
         $semestreNum = is_numeric($semestre) ? (int) $semestre : null;
 
         try {
             SlotAgrupacion::create([
                 'ID_Agrupacion' => $agrupacionId,
-                'Nombre_Slot'   => $codigoPlaceholder,
-                'Tipo_Slot'     => $tipoSlot,
-                'Semestre'      => $semestreNum,
+                'Nombre_Slot' => $codigoPlaceholder,
+                'Tipo_Slot' => $tipoSlot,
+                'Semestre' => $semestreNum,
             ]);
             $this->processedRows++;
         } catch (\Exception $e) {
-            $this->recordError($rowNumber, 'Malla', "Error creando slot '{$codigoPlaceholder}': " . $e->getMessage(), $codigoPlaceholder, 'error');
+            $this->recordError($rowNumber, 'Malla', "Error creando slot '{$codigoPlaceholder}': ".$e->getMessage(), $codigoPlaceholder, 'error');
         }
     }
 
