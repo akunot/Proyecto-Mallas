@@ -7,6 +7,7 @@ use App\Models\AgrupacionAsignatura;
 use App\Models\Asignatura;
 use App\Models\MallaCurricular;
 use App\Models\PlantillaAgrupacion;
+use App\Models\Programa;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
@@ -52,6 +53,12 @@ class MallaController extends Controller
      */
     public function publicHistory(int $programaId): JsonResponse
     {
+        $programa = Programa::find($programaId);
+
+        if (! $programa) {
+            return response()->json(['message' => 'Programa no encontrado.'], 404);
+        }
+
         $versiones = MallaCurricular::where('ID_Programa', $programaId)
             ->whereIn('Estado', ['activa', 'archivada'])
             ->orderBy('Version_Numero', 'desc')

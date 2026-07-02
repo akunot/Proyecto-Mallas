@@ -36,11 +36,13 @@ class AgrupacionController extends CatalogoController
      */
     protected function getValidationRules(string $operation): array
     {
+        $required = $operation === 'update' ? 'sometimes' : 'required';
+
         $rules = [
-            'ID_Programa' => 'required|exists:programas,ID_Programa',
-            'ID_Componente' => 'required|exists:componentes,ID_Componente',
-            'Nombre_Agrupacion' => 'required|string|max:255',
-            'Tipo_Agrupacion' => 'required|string|max:100',
+            'ID_Programa' => "{$required}|exists:programas,ID_Programa",
+            'ID_Componente' => "{$required}|exists:componentes,ID_Componente",
+            'Nombre_Agrupacion' => "{$required}|string|max:255",
+            'Tipo_Agrupacion' => "{$required}|string|max:100",
             'Creditos_Requeridos' => 'nullable|integer|min:0',
             'Creditos_Maximos' => 'nullable|integer|min:0',
             'Es_Obligatoria' => 'sometimes|boolean',
