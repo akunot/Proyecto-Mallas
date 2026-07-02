@@ -4,16 +4,14 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Normativa;
 use App\Models\Programa;
-use Illuminate\Database\Eloquent\Model;
 
 class NormativaController extends CatalogoController
 {
-    protected Model $model;
     protected string $routeName = 'normativa';
 
     public function __construct()
     {
-        $this->model = new Normativa();
+        $this->model = new Normativa;
         $this->fillable = [
             'Codigo_Programa',
             'Tipo_Normativa',

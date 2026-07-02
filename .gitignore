@@ -28,3 +28,8 @@ yarn-error.log
 mcp_config.json
 arranque.bat
 opencode.json
+phpunit.xml
+/docs
+/tests_output.txt
+/migrate_status.txt
+/nul

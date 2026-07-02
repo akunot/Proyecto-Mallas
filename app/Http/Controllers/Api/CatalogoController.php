@@ -4,8 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Services\LogActividadService;
-use Illuminate\Http\Request;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Inertia\Inertia;
 
 class CatalogoController extends Controller
@@ -19,6 +20,7 @@ class CatalogoController extends Controller
      * Nombre de la ruta para mensajes
      */
     protected string $routeName;
+
     protected string $routeBase = '';
 
     /**
@@ -31,24 +33,36 @@ class CatalogoController extends Controller
      */
     public function index(Request $request)
     {
-        $query = $this->model->query();
-
-        // Búsqueda por nombre
-        if ($request->has('search') && $request->search) {
-            $searchField = $this->fillable[1] ?? 'Nombre_' . ucfirst($this->routeName);
-            $query->where($searchField, 'like', '%' . $request->search . '%');
-        }
-
-        // Ordenamiento
-        $sortField = $request->sort_by ?? $this->fillable[1] ?? 'id';
-        $sortOrder = $request->sort_order ?? 'asc';
-        $query->orderBy($sortField, $sortOrder);
-
-        // Paginación
         $perPage = $request->per_page ?? 20;
-        $results = $query->paginate($perPage);
+        $search = $request->search;
+        $allowedSortFields = array_merge($this->fillable, [$this->model->getKeyName()]);
+        $sortField = in_array($request->sort_by, $allowedSortFields) ? $request->sort_by : ($this->fillable[1] ?? 'id');
+        $sortOrder = in_array(strtolower($request->sort_order ?? ''), ['asc', 'desc']) ? $request->sort_order : 'asc';
 
-        // Limpieza eficiente de UTF-8 usando json_encode/json_decode (nativo en C)
+        $version = Cache::get($this->routeName.':version', 0);
+        $cacheKey = sprintf(
+            '%s:index:v%s:%s:%s:%s:%s',
+            $this->routeName,
+            $version,
+            $search ?: '',
+            $sortField,
+            $sortOrder,
+            $perPage
+        );
+
+        $results = Cache::remember($cacheKey, 3600, function () use ($perPage, $search, $sortField, $sortOrder) {
+            $query = $this->model->query();
+
+            if ($search) {
+                $searchField = $this->fillable[1] ?? 'Nombre_'.ucfirst($this->routeName);
+                $query->where($searchField, 'like', '%'.$search.'%');
+            }
+
+            $query->orderBy($sortField, $sortOrder);
+
+            return $query->paginate($perPage);
+        });
+
         $cleanItems = json_decode(json_encode($results->items(), JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
 
         return response()->json([
@@ -86,7 +100,18 @@ class CatalogoController extends Controller
     {
         $validated = $request->validate($this->getValidationRules('create'));
 
-        $record = $this->model->create($validated);
+        try {
+            $record = $this->model->create($validated);
+            Cache::increment($this->routeName.':version');
+        } catch (\Exception $e) {
+            if (str_contains($e->getMessage(), 'Duplicate')) {
+                return response()->json([
+                    'message' => 'Ya existe un registro con ese valor.',
+                    'errors' => ['duplicate' => ['El valor ingresado ya está registrado.']],
+                ], 422);
+            }
+            throw $e;
+        }
 
         // Registrar log de creación
         if (auth()->check()) {
@@ -99,7 +124,16 @@ class CatalogoController extends Controller
             );
         }
 
-        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'))->with('success', ucfirst($this->routeName) . ' creado exitosamente.');
+        if ($request->expectsJson()) {
+            $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
+
+            return response()->json([
+                'data' => $cleanRecord,
+                'message' => ucfirst($this->routeName).' creado exitosamente.',
+            ], 201);
+        }
+
+        return redirect('/'.($this->routeBase ?: $this->routeName.'s'))->with('success', ucfirst($this->routeName).' creado exitosamente.');
     }
 
     /**
@@ -112,6 +146,7 @@ class CatalogoController extends Controller
         $validated = $request->validate($this->getValidationRules('update'));
 
         $record->update($validated);
+        Cache::increment($this->routeName.':version');
 
         if (auth()->check()) {
             LogActividadService::registrar(
@@ -123,7 +158,16 @@ class CatalogoController extends Controller
             );
         }
 
-        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'));
+        if ($request->expectsJson()) {
+            $cleanRecord = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
+
+            return response()->json([
+                'data' => $cleanRecord,
+                'message' => ucfirst($this->routeName).' actualizado exitosamente.',
+            ]);
+        }
+
+        return redirect('/'.($this->routeBase ?: $this->routeName.'s'));
     }
 
     /**
@@ -138,16 +182,17 @@ class CatalogoController extends Controller
         $activeField = $this->getActiveField($modelName);
 
         // Si no hay campo activo, retornar error
-        if (!$activeField) {
+        if (! $activeField) {
             return response()->json([
                 'data' => null,
                 'message' => 'Este catálogo no soporta activación/desactivación.',
             ], 422);
         }
 
-        $newStatus = !$record->{$activeField};
+        $newStatus = ! $record->{$activeField};
 
         $record->update([$activeField => $newStatus]);
+        Cache::increment($this->routeName.':version');
 
         $statusText = $newStatus ? 'activado' : 'desactivado';
 
@@ -171,7 +216,7 @@ class CatalogoController extends Controller
 
         return response()->json([
             'data' => $cleanRecord,
-            'message' => ucfirst($this->routeName) . ' ' . $statusText . ' exitosamente.',
+            'message' => ucfirst($this->routeName).' '.$statusText.' exitosamente.',
         ]);
     }
 
@@ -194,8 +239,16 @@ class CatalogoController extends Controller
         }
 
         $record->delete();
+        Cache::increment($this->routeName.':version');
 
-        return redirect('/' . ($this->routeBase ?: $this->routeName . 's'))->with('success', ucfirst($this->routeName) . ' eliminado exitosamente.');
+        if (request()->expectsJson()) {
+            return response()->json([
+                'data' => null,
+                'message' => ucfirst($this->routeName).' eliminado exitosamente.',
+            ]);
+        }
+
+        return redirect('/'.($this->routeBase ?: $this->routeName.'s'))->with('success', ucfirst($this->routeName).' eliminado exitosamente.');
     }
 
     /**
@@ -204,9 +257,9 @@ class CatalogoController extends Controller
     public function edit(int $id)
     {
         $record = $this->model->newQuery()->findOrFail($id);
-        
+
         $relatedData = $this->getRelatedData();
-        
+
         $recordArray = json_decode(json_encode($record, JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_IGNORE), true);
 
         return inertia($this->getInertiaComponent(), array_merge(
@@ -228,8 +281,9 @@ class CatalogoController extends Controller
      */
     protected function getInertiaComponent(): string
     {
-        $name = $this->routeBase ? ucfirst($this->routeBase) : ucfirst($this->routeName) . 's';
-        return 'Catalogos/' . $name . 'Form';
+        $name = $this->routeBase ? ucfirst($this->routeBase) : ucfirst($this->routeName).'s';
+
+        return 'Catalogos/'.$name.'Form';
     }
 
     /**
@@ -274,14 +328,15 @@ class CatalogoController extends Controller
     private function getActiveField(string $model): ?string
     {
         $map = [
-            'Sede'       => null,
-            'Facultad'   => 'Esta_Activo',
-            'Programa'   => 'Esta_Activo',
-            'Normativa'  => 'Esta_Activo',
+            'Sede' => null,
+            'Facultad' => 'Esta_Activo',
+            'Programa' => 'Esta_Activo',
+            'Normativa' => 'Esta_Activo',
             'Componente' => null,
             'Asignatura' => null,
-            'Usuario'    => 'Activo_Usuario',
+            'Usuario' => 'Activo_Usuario',
         ];
+
         return $map[$model] ?? null;
     }
 }

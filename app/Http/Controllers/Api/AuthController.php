@@ -10,7 +10,6 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Support\Facades\Mail;
-use Illuminate\Support\Str;
 
 class AuthController extends Controller
 {
@@ -28,16 +27,16 @@ class AuthController extends Controller
             ->where('Activo_Usuario', 1)
             ->first();
 
-        if (!$usuario) {
+        if (! $usuario) {
             return response()->json([
                 'message' => 'Usuario no encontrado o inactivo.',
-                'errors' => ['email' => ['El correo electrónico no está registrado o el usuario está inactivo.']]
+                'errors' => ['email' => ['El correo electrónico no está registrado o el usuario está inactivo.']],
             ], 422);
         }
 
         // Generar código OTP de 6 dígitos
         $otpCode = str_pad((string) random_int(0, 999999), 6, '0', STR_PAD_LEFT);
-        
+
         // Guardar código hasheado con bcrypt (cost factor 12 definido en .env)
         $usuario->update([
             'Otp_Code' => Hash::make($otpCode),
@@ -45,28 +44,28 @@ class AuthController extends Controller
         ]);
 
         // Siempre mostrar el código en desarrollo para pruebas
-        if (app()->environment('local')) {
-            \Log::info('Código OTP (desarrollo): ' . $otpCode);
-            
+        if (app()->environment('local', 'testing')) {
+            \Log::info('Código OTP (desarrollo): '.$otpCode);
+
             return response()->json([
                 'message' => 'Código OTP enviado exitosamente (modo desarrollo).',
                 'debug' => [
                     'code' => $otpCode,
                     'email' => $usuario->Email_Usuario,
                     'expires_at' => $usuario->Otp_Expires_At,
-                ]
+                ],
             ]);
         }
 
         // En producción, enviar correo con el código
         try {
-            Mail::to($usuario->Email_Usuario)->send(new OtpCodeMail($otpCode, $usuario->Nombre_Usuario));
+            Mail::to($usuario->Email_Usuario)->queue(new OtpCodeMail($otpCode, $usuario->Nombre_Usuario));
         } catch (\Exception $e) {
-            \Log::error('Error enviando correo OTP: ' . $e->getMessage());
-            
+            \Log::error('Error enviando correo OTP: '.$e->getMessage());
+
             return response()->json([
                 'message' => 'Error al enviar el código OTP.',
-                'error' => $e->getMessage()
+                'error' => $e->getMessage(),
             ], 500);
         }
 
@@ -75,7 +74,7 @@ class AuthController extends Controller
             'data' => [
                 'email' => $usuario->Email_Usuario,
                 'expires_at' => $usuario->Otp_Expires_At,
-            ]
+            ],
         ]);
     }
 
@@ -94,18 +93,18 @@ class AuthController extends Controller
             ->where('Activo_Usuario', 1)
             ->first();
 
-        if (!$usuario) {
+        if (! $usuario) {
             return response()->json([
                 'message' => 'Usuario no encontrado o inactivo.',
-                'errors' => ['email' => ['El correo electrónico no está registrado o el usuario está inactivo.']]
+                'errors' => ['email' => ['El correo electrónico no está registrado o el usuario está inactivo.']],
             ], 422);
         }
 
         // Verificar si hay código OTP activo
-        if (!$usuario->Otp_Code || !$usuario->Otp_Expires_At) {
+        if (! $usuario->Otp_Code || ! $usuario->Otp_Expires_At) {
             return response()->json([
                 'message' => 'No hay código OTP activo. Solicite uno nuevo.',
-                'errors' => ['code' => ['Debe solicitar un código OTP primero.']]
+                'errors' => ['code' => ['Debe solicitar un código OTP primero.']],
             ], 422);
         }
 
@@ -116,18 +115,18 @@ class AuthController extends Controller
                 'Otp_Code' => null,
                 'Otp_Expires_At' => null,
             ]);
-            
+
             return response()->json([
                 'message' => 'El código OTP ha expirado. Solicite uno nuevo.',
-                'errors' => ['code' => ['El código ha expirado. Por favor, solicite un nuevo código.']]
+                'errors' => ['code' => ['El código ha expirado. Por favor, solicite un nuevo código.']],
             ], 422);
         }
 
         // Verificar código
-        if (!Hash::check($request->code, $usuario->Otp_Code)) {
+        if (! Hash::check($request->code, $usuario->Otp_Code)) {
             return response()->json([
                 'message' => 'Código OTP inválido.',
-                'errors' => ['code' => ['El código proporcionado no es válido.']]
+                'errors' => ['code' => ['El código proporcionado no es válido.']],
             ], 422);
         }
 
@@ -160,8 +159,8 @@ class AuthController extends Controller
                     'id' => $usuario->ID_Usuario,
                     'nombre' => $usuario->Nombre_Usuario,
                     'email' => $usuario->Email_Usuario,
-                ]
-            ]
+                ],
+            ],
         ]);
 
         return $response;
@@ -174,7 +173,7 @@ class AuthController extends Controller
     public function logout(Request $request): JsonResponse
     {
         $usuario = auth()->user();
-        
+
         // Registrar log de cierre de sesión
         if ($usuario) {
             LogActividadService::registrar(
@@ -196,7 +195,7 @@ class AuthController extends Controller
 
         return response()->json([
             'message' => 'Sesión cerrada exitosamente.',
-            'data' => null
+            'data' => null,
         ]);
     }
 
@@ -215,7 +214,7 @@ class AuthController extends Controller
                 'email' => $usuario->Email_Usuario,
                 'activo' => $usuario->Activo_Usuario,
                 'creado_en' => $usuario->Creacion_Usuario,
-            ]
+            ],
         ]);
     }
 }

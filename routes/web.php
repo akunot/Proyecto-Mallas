@@ -629,6 +629,8 @@ Route::middleware(['auth'])->group(function () {
     Route::get('/mallas/{id}/grafica', function ($id) {
         $malla = MallaCurricular::with([
             'programa',
+            'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
+            'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
             'agrupaciones.componente',
             'agrupaciones.slots',

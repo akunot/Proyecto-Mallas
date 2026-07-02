@@ -16,13 +16,22 @@ class AprobacionController extends Controller
      */
     public function misCargas(Request $request): JsonResponse
     {
+        $perPage = $request->per_page ?? 20;
         $cargas = CargaMalla::with(['usuario', 'programa', 'malla'])
             ->where('ID_Usuario', $request->user()->ID_Usuario)
             ->where('tipo_carga', 'malla')
             ->orderBy('Creacion_Carga', 'desc')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $cargas]);
+        return response()->json([
+            'data' => $cargas->items(),
+            'meta' => [
+                'current_page' => $cargas->currentPage(),
+                'total' => $cargas->total(),
+                'per_page' => $cargas->perPage(),
+                'last_page' => $cargas->lastPage(),
+            ],
+        ]);
     }
 
     /**
@@ -30,14 +39,22 @@ class AprobacionController extends Controller
      */
     public function pendientes(Request $request): JsonResponse
     {
+        $perPage = $request->per_page ?? 20;
         $cargas = CargaMalla::with(['usuario', 'programa', 'malla'])
             ->where('Estado_Carga', 'pendiente_aprobacion')
             ->where('tipo_carga', 'malla')
-            ->where('ID_Usuario', '!=', $request->user()->ID_Usuario)
             ->orderBy('Creacion_Carga', 'desc')
-            ->get();
+            ->paginate($perPage);
 
-        return response()->json(['data' => $cargas]);
+        return response()->json([
+            'data' => $cargas->items(),
+            'meta' => [
+                'current_page' => $cargas->currentPage(),
+                'total' => $cargas->total(),
+                'per_page' => $cargas->perPage(),
+                'last_page' => $cargas->lastPage(),
+            ],
+        ]);
     }
 
     /**
@@ -73,11 +90,11 @@ class AprobacionController extends Controller
         $carga = CargaMalla::findOrFail($id);
         $usuario = $request->user();
 
-        $permitidos = ['borrador', 'con_errores'];
+        $permitidos = ['borrador', 'con_errores', 'rechazado'];
         if (! in_array($carga->Estado_Carga, $permitidos)) {
             return response()->json([
                 'message' => 'Error al enviar a revisión',
-                'error' => 'La carga debe estar en estado borrador para enviar a revisión',
+                'error' => 'La carga debe estar en estado borrador o rechazado para enviar a revisión',
             ], 400);
         }
 
@@ -88,7 +105,16 @@ class AprobacionController extends Controller
             ], 400);
         }
 
-        $carga->update(['Estado_Carga' => 'pendiente_aprobacion']);
+        $updateData = ['Estado_Carga' => 'pendiente_aprobacion'];
+
+        if ($carga->Estado_Carga === 'rechazado') {
+            $updateData['Comentario_Revisor'] = null;
+            $updateData['ID_Usuario_Revisor'] = null;
+            $updateData['Fecha_Revision'] = null;
+            $updateData['Finalizacion_Carga'] = null;
+        }
+
+        $carga->update($updateData);
         $carga->malla?->update(['Estado' => 'en_revision']);
 
         LogActividadService::registrar(

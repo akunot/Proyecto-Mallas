@@ -3,16 +3,14 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Sede;
-use Illuminate\Database\Eloquent\Model;
 
 class SedeController extends CatalogoController
 {
-    protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'sede';
 
     public function __construct()
     {
-        $this->model = new Sede();
+        $this->model = new Sede;
         $this->fillable = [
             'Codigo_Sede',
             'Nombre_Sede',

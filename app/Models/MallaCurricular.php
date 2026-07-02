@@ -2,15 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class MallaCurricular extends Model
 {
+    use HasFactory;
+
     protected $table = 'mallas_curriculares';
+
     protected $primaryKey = 'ID_Malla';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [
@@ -18,6 +24,7 @@ class MallaCurricular extends Model
         'ID_Programa',
         'Version_Numero',
         'Version_Etiqueta',
+        'Codigo_Plan',
         'Fecha_Vigencia',
         'Fecha_Fin_Vigencia',
         'Estado',

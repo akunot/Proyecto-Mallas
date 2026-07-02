@@ -4,17 +4,16 @@ namespace App\Http\Controllers\Api;
 
 use App\Models\Facultad;
 use App\Models\Sede;
-use Illuminate\Database\Eloquent\Model;
 
 class FacultadController extends CatalogoController
 {
-    protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'facultad';
+
     protected string $routeBase = 'facultades';
 
     public function __construct()
     {
-        $this->model = new Facultad();
+        $this->model = new Facultad;
         $this->fillable = [
             'Codigo_Sede',
             'Codigo_Facultad',

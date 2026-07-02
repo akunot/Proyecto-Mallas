@@ -1158,6 +1158,25 @@ class ExcelParserService
 
         $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
 
+        // Procesar requisitos ANTES del dedup: así si una materia tiene
+        // múltiples prerequisitos en filas separadas, todos se registran.
+        $reqColumns = [[5, 6], [8, 9], [10, 11]];
+        foreach ($reqColumns as $cols) {
+            $rTipo = $this->cleanCell($data[$cols[0]] ?? null);
+            $rCodigo = $this->cleanCodeCell($data[$cols[1]] ?? null);
+
+            if (! empty($rTipo) && (! empty($rCodigo) || str_contains(strtoupper($rTipo), 'CREDITOS'))) {
+                $this->processRequisitoBatch(
+                    $asignaturaReqId,
+                    $this->malla->ID_Programa,
+                    $rTipo,
+                    $rCodigo,
+                    $rowNumber,
+                    $batchRequisitos
+                );
+            }
+        }
+
         // Prevenir duplicados en el mismo batch antes de insert
         $relKey = $agrupKey.'|'.$asignaturaReqId;
         static $processedRels = [];
@@ -1177,24 +1196,6 @@ class ExcelParserService
         ];
 
         $this->asignaturasProcessed[$codigoAsignatura] = true;
-
-        // Procesar requisitos (soporta hasta 3 pares de columnas si existieran)
-        $reqColumns = [[5, 6], [8, 9], [10, 11]]; // Pares de (Tipo, Código)
-        foreach ($reqColumns as $cols) {
-            $rTipo = $this->cleanCell($data[$cols[0]] ?? null);
-            $rCodigo = $this->cleanCodeCell($data[$cols[1]] ?? null);
-
-            if (! empty($rTipo) && (! empty($rCodigo) || str_contains(strtoupper($rTipo), 'CREDITOS'))) {
-                $this->processRequisitoBatch(
-                    $asignaturaReqId,
-                    $this->malla->ID_Programa,
-                    $rTipo,
-                    $rCodigo,
-                    $rowNumber,
-                    $batchRequisitos
-                );
-            }
-        }
     }
 
     private function isRowEmpty(array $row): bool
@@ -1721,6 +1722,13 @@ class ExcelParserService
                 }
             }
         }
+
+        $dedupKey = $asignaturaBaseId.'|'.($asignaturaReqId ?? 'null').'|'.$idPrograma;
+        static $processedReqs = [];
+        if (isset($processedReqs[$dedupKey])) {
+            return;
+        }
+        $processedReqs[$dedupKey] = true;
 
         $batchRequisitos[] = [
             'ID_Asignatura' => $asignaturaBaseId,

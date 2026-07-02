@@ -46,8 +46,8 @@ use Illuminate\Support\Facades\Route;
 */
 // Rutas de autenticación (públicas)
 Route::prefix('v1/auth')->group(function () {
-    Route::post('/request-otp', [AuthController::class, 'requestOtp']);
-    Route::post('/verify-otp', [AuthController::class, 'verifyOtp']);
+    Route::post('/request-otp', [AuthController::class, 'requestOtp'])->middleware('throttle:otp-request');
+    Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
 });
 
 // Rutas públicas para visualizar mallas (sin login)

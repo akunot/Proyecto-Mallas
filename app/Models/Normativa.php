@@ -2,15 +2,21 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Normativa extends Model
 {
+    use HasFactory;
+
     protected $table = 'normativas';
+
     protected $primaryKey = 'ID_Normativa';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [

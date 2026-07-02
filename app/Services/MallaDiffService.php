@@ -2,12 +2,13 @@
 
 namespace App\Services;
 
-use App\Models\MallaCurricular;
 use App\Models\AgrupacionAsignatura;
-use App\Models\Requisito;
-use App\Models\DiffMalla;
 use App\Models\CargaMalla;
+use App\Models\DiffMalla;
+use App\Models\MallaCurricular;
+use App\Models\Requisito;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
 
 class MallaDiffService
 {
@@ -17,8 +18,9 @@ class MallaDiffService
     public function generarDiffs(MallaCurricular $mallaNueva, ?MallaCurricular $mallaBase, CargaMalla $carga): void
     {
         // Si no hay malla base, todo es INSERT
-        if (!$mallaBase) {
+        if (! $mallaBase) {
             $this->generarDiffsPrimeraVersion($mallaNueva, $carga);
+
             return;
         }
 
@@ -41,30 +43,19 @@ class MallaDiffService
      */
     private function generarDiffsPrimeraVersion(MallaCurricular $mallaNueva, CargaMalla $carga): void
     {
-        $asignaciones = $this->getAgrupacionesAsignaturas($mallaNueva->ID_Malla);
-        
-        foreach ($asignaciones as $asignacion) {
-            DiffMalla::create([
-                'ID_Carga' => $carga->ID_Carga,
-                'Entidad_Afectada' => 'agrupacion_asignatura',
-                'Tipo_Cambio' => 'INSERT',
-                'ID_Registro' => $asignacion['ID_Agrup_Asig'],
-                'Valor_Anterior' => null,
-                'Valor_Nuevo' => $asignacion,
-            ]);
+        $payload = [];
+        $now = now();
+
+        foreach ($this->getAgrupacionesAsignaturas($mallaNueva->ID_Malla) as $asignacion) {
+            $payload[] = $this->diffPayload($carga->ID_Carga, 'agrupacion_asignatura', 'INSERT', $asignacion['ID_Agrup_Asig'], null, $asignacion, $now);
         }
 
-        $requisitos = $this->getRequisitos($mallaNueva->ID_Malla);
-        
-        foreach ($requisitos as $requisito) {
-            DiffMalla::create([
-                'ID_Carga' => $carga->ID_Carga,
-                'Entidad_Afectada' => 'requisito',
-                'Tipo_Cambio' => 'INSERT',
-                'ID_Registro' => $requisito['ID_Requisito'],
-                'Valor_Anterior' => null,
-                'Valor_Nuevo' => $requisito,
-            ]);
+        foreach ($this->getRequisitos($mallaNueva->ID_Malla) as $requisito) {
+            $payload[] = $this->diffPayload($carga->ID_Carga, 'requisito', 'INSERT', $requisito['ID_Requisito'], null, $requisito, $now);
+        }
+
+        if (! empty($payload)) {
+            DB::table('diffs_mallas')->insert($payload);
         }
     }
 
@@ -73,58 +64,35 @@ class MallaDiffService
      */
     private function compararAsignaciones(Collection $nuevas, Collection $base, CargaMalla $carga): void
     {
-        $baseKeyed = $base->keyBy(function($item) {
-            return $item['ID_Agrupacion'] . '|' . $item['ID_Asignatura'];
-        });
+        $baseKeyed = $base->keyBy(fn ($item) => $item['ID_Asignatura']);
+        $nuevasKeyed = $nuevas->keyBy(fn ($item) => $item['ID_Asignatura']);
 
-        $nuevasKeyed = $nuevas->keyBy(function($item) {
-            return $item['ID_Agrupacion'] . '|' . $item['ID_Asignatura'];
-        });
+        $payload = [];
+        $now = now();
 
-        // Detectar INSERTs (nuevos en la malla nueva)
         foreach ($nuevasKeyed as $key => $asignacion) {
-            if (!$baseKeyed->has($key)) {
-                DiffMalla::create([
-                    'ID_Carga' => $carga->ID_Carga,
-                    'Entidad_Afectada' => 'agrupacion_asignatura',
-                    'Tipo_Cambio' => 'INSERT',
-                    'ID_Registro' => $asignacion['ID_Agrup_Asig'],
-                    'Valor_Anterior' => null,
-                    'Valor_Nuevo' => $asignacion,
-                ]);
+            if (! $baseKeyed->has($key)) {
+                $payload[] = $this->diffPayload($carga->ID_Carga, 'agrupacion_asignatura', 'INSERT', $asignacion['ID_Agrup_Asig'], null, $asignacion, $now);
             }
         }
 
-        // Detectar DELETEs (eliminados de la malla base)
         foreach ($baseKeyed as $key => $asignacion) {
-            if (!$nuevasKeyed->has($key)) {
-                DiffMalla::create([
-                    'ID_Carga' => $carga->ID_Carga,
-                    'Entidad_Afectada' => 'agrupacion_asignatura',
-                    'Tipo_Cambio' => 'DELETE',
-                    'ID_Registro' => $asignacion['ID_Agrup_Asig'],
-                    'Valor_Anterior' => $asignacion,
-                    'Valor_Nuevo' => null,
-                ]);
+            if (! $nuevasKeyed->has($key)) {
+                $payload[] = $this->diffPayload($carga->ID_Carga, 'agrupacion_asignatura', 'DELETE', $asignacion['ID_Agrup_Asig'], $asignacion, null, $now);
             }
         }
 
-        // Detectar UPDATEs (existentes en ambas pero con cambios)
         foreach ($nuevasKeyed as $key => $nueva) {
             if ($baseKeyed->has($key)) {
                 $base = $baseKeyed->get($key);
-                
                 if ($this->asignacionCambiada($nueva, $base)) {
-                    DiffMalla::create([
-                        'ID_Carga' => $carga->ID_Carga,
-                        'Entidad_Afectada' => 'agrupacion_asignatura',
-                        'Tipo_Cambio' => 'UPDATE',
-                        'ID_Registro' => $nueva['ID_Agrup_Asig'],
-                        'Valor_Anterior' => $base,
-                        'Valor_Nuevo' => $nueva,
-                    ]);
+                    $payload[] = $this->diffPayload($carga->ID_Carga, 'agrupacion_asignatura', 'UPDATE', $nueva['ID_Agrup_Asig'], $base, $nueva, $now);
                 }
             }
+        }
+
+        if (! empty($payload)) {
+            DB::table('diffs_mallas')->insert($payload);
         }
     }
 
@@ -133,41 +101,42 @@ class MallaDiffService
      */
     private function compararRequisitos(Collection $nuevos, Collection $base, CargaMalla $carga): void
     {
-        $baseKeyed = $base->keyBy(function($item) {
-            return $item['ID_Agrup_Asig'] . '|' . ($item['ID_Agrup_Asig_Requerida'] ?? 'NULL') . '|' . $item['Tipo_Requisito'];
-        });
+        $keyFn = fn ($item) => $item['ID_Asignatura'].'|'.($item['ID_Asignatura_Requerida'] ?? 'NULL').'|'.$item['Tipo_Requisito'];
+        $baseKeyed = $base->keyBy($keyFn);
+        $nuevosKeyed = $nuevos->keyBy($keyFn);
 
-        $nuevosKeyed = $nuevos->keyBy(function($item) {
-            return $item['ID_Agrup_Asig'] . '|' . ($item['ID_Agrup_Asig_Requerida'] ?? 'NULL') . '|' . $item['Tipo_Requisito'];
-        });
+        $payload = [];
+        $now = now();
 
-        // INSERTs
         foreach ($nuevosKeyed as $key => $requisito) {
-            if (!$baseKeyed->has($key)) {
-                DiffMalla::create([
-                    'ID_Carga' => $carga->ID_Carga,
-                    'Entidad_Afectada' => 'requisito',
-                    'Tipo_Cambio' => 'INSERT',
-                    'ID_Registro' => $requisito['ID_Requisito'],
-                    'Valor_Anterior' => null,
-                    'Valor_Nuevo' => $requisito,
-                ]);
+            if (! $baseKeyed->has($key)) {
+                $payload[] = $this->diffPayload($carga->ID_Carga, 'requisito', 'INSERT', $requisito['ID_Requisito'], null, $requisito, $now);
             }
         }
 
-        // DELETEs
         foreach ($baseKeyed as $key => $requisito) {
-            if (!$nuevosKeyed->has($key)) {
-                DiffMalla::create([
-                    'ID_Carga' => $carga->ID_Carga,
-                    'Entidad_Afectada' => 'requisito',
-                    'Tipo_Cambio' => 'DELETE',
-                    'ID_Registro' => $requisito['ID_Requisito'],
-                    'Valor_Anterior' => $requisito,
-                    'Valor_Nuevo' => null,
-                ]);
+            if (! $nuevosKeyed->has($key)) {
+                $payload[] = $this->diffPayload($carga->ID_Carga, 'requisito', 'DELETE', $requisito['ID_Requisito'], $requisito, null, $now);
             }
         }
+
+        if (! empty($payload)) {
+            DB::table('diffs_mallas')->insert($payload);
+        }
+    }
+
+    private function diffPayload(int $idCarga, string $entidad, string $tipo, ?int $idRegistro, mixed $anterior, mixed $nuevo, $now): array
+    {
+        return [
+            'ID_Carga' => $idCarga,
+            'Entidad_Afectada' => $entidad,
+            'Tipo_Cambio' => $tipo,
+            'ID_Registro' => $idRegistro,
+            'Valor_Anterior' => $anterior !== null ? json_encode($anterior) : null,
+            'Valor_Nuevo' => $nuevo !== null ? json_encode($nuevo) : null,
+            'created_at' => $now,
+            'updated_at' => $now,
+        ];
     }
 
     /**
@@ -176,13 +145,13 @@ class MallaDiffService
     private function asignacionCambiada(array $nueva, array $base): bool
     {
         $camposComparar = ['Tipo_Asignatura', 'Semestre_Sugerido'];
-        
+
         foreach ($camposComparar as $campo) {
             if (($nueva[$campo] ?? null) !== ($base[$campo] ?? null)) {
                 return true;
             }
         }
-        
+
         return false;
     }
 
@@ -215,34 +184,31 @@ class MallaDiffService
      */
     private function getRequisitos(int $idMalla): Collection
     {
-        return Requisito::whereHas('agrupacionAsignatura', function($query) use ($idMalla) {
-            $query->where('ID_Malla', $idMalla);
-        })
-        ->with([
-            'agrupacionAsignatura.agrupacion',
-            'agrupacionAsignatura.asignatura',
-            'agrupacionAsignaturaRequerida.agrupacion',
-            'agrupacionAsignaturaRequerida.asignatura'
-        ])
-        ->get()
-        ->map(function ($item) {
-            return [
-                'ID_Requisito' => $item->ID_Requisito,
-                'ID_Agrup_Asig' => $item->ID_Agrup_Asig,
-                'ID_Agrup_Asig_Requerida' => $item->ID_Agrup_Asig_Requerida,
-                'Tipo_Requisito' => $item->Tipo_Requisito,
-                'Creditos_Minimos' => $item->Creditos_Minimos,
-                'Descripcion_Requisito' => $item->Descripcion_Requisito,
-                'asignatura_principal' => [
-                    'Codigo_Asignatura' => $item->agrupacionAsignatura->asignatura?->Codigo_Asignatura,
-                    'Nombre_Asignatura' => $item->agrupacionAsignatura->asignatura?->Nombre_Asignatura,
-                ],
-                'asignatura_requerida' => $item->agrupacionAsignaturaRequerida ? [
-                    'Codigo_Asignatura' => $item->agrupacionAsignaturaRequerida->asignatura?->Codigo_Asignatura,
-                    'Nombre_Asignatura' => $item->agrupacionAsignaturaRequerida->asignatura?->Nombre_Asignatura,
-                ] : null,
-            ];
-        });
+        $asignaturaIds = AgrupacionAsignatura::where('ID_Malla', $idMalla)
+            ->pluck('ID_Asignatura');
+
+        return Requisito::whereIn('ID_Asignatura', $asignaturaIds)
+            ->orWhereIn('ID_Asignatura_Requerida', $asignaturaIds)
+            ->with(['asignatura', 'asignaturaRequerida'])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'ID_Requisito' => $item->ID_Requisito,
+                    'ID_Asignatura' => $item->ID_Asignatura,
+                    'ID_Asignatura_Requerida' => $item->ID_Asignatura_Requerida,
+                    'Tipo_Requisito' => $item->Tipo_Requisito,
+                    'Creditos_Minimos' => $item->Creditos_Minimos,
+                    'Descripcion_Requisito' => $item->Descripcion_Requisito,
+                    'asignatura_principal' => [
+                        'Codigo_Asignatura' => $item->asignatura?->Codigo_Asignatura,
+                        'Nombre_Asignatura' => $item->asignatura?->Nombre_Asignatura,
+                    ],
+                    'asignatura_requerida' => $item->asignaturaRequerida ? [
+                        'Codigo_Asignatura' => $item->asignaturaRequerida->Codigo_Asignatura,
+                        'Nombre_Asignatura' => $item->asignaturaRequerida->Nombre_Asignatura,
+                    ] : null,
+                ];
+            });
     }
 
     /**
@@ -274,7 +240,7 @@ class MallaDiffService
      */
     public function generarResumenCambios(CargaMalla $carga): array
     {
-        $diffs = DiffMalla::where('ID_Carga', $carga->ID_Calla)->get();
+        $diffs = DiffMalla::where('ID_Carga', $carga->ID_Carga)->get();
 
         return [
             'total_cambios' => $diffs->count(),

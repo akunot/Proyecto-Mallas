@@ -15,11 +15,21 @@ on:
       - workos
 
 jobs:
-  ci:
+  php:
     runs-on: ubuntu-latest
     strategy:
       matrix:
         php-version: ['8.3', '8.4', '8.5']
+
+    services:
+      mysql:
+        image: mysql:8.0
+        env:
+          MYSQL_ROOT_PASSWORD: password
+          MYSQL_DATABASE: mallas_db
+        ports:
+          - 3306:3306
+        options: --health-cmd="mysqladmin ping" --health-interval=10s --health-timeout=5s --health-retries=5
 
     steps:
       - name: Checkout code
@@ -32,13 +42,31 @@ jobs:
           tools: composer:v2
           coverage: xdebug
 
+      - name: Get composer cache directory
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> $GITHUB_OUTPUT
+
+      - name: Cache composer dependencies
+        uses: actions/cache@v6
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.lock') }}
+          restore-keys: ${{ runner.os }}-composer-
+
       - name: Setup Node
         uses: actions/setup-node@v6
         with:
           node-version: '22'
 
+      - name: Cache Node dependencies
+        uses: actions/cache@v6
+        with:
+          path: node_modules
+          key: ${{ runner.os }}-node-${{ hashFiles('package-lock.json') }}
+          restore-keys: ${{ runner.os }}-node-
+
       - name: Install Node Dependencies
-        run: npm i
+        run: npm ci --no-audit --no-fund
 
       - name: Install Dependencies
         run: composer install --no-interaction --prefer-dist --optimize-autoloader
@@ -49,8 +77,29 @@ jobs:
       - name: Generate Application Key
         run: php artisan key:generate
 
+      - name: Configure MySQL
+        run: |
+          echo "DB_CONNECTION=mysql" >> .env
+          echo "DB_HOST=127.0.0.1" >> .env
+          echo "DB_PORT=3306" >> .env
+          echo "DB_DATABASE=mallas_db" >> .env
+          echo "DB_USERNAME=root" >> .env
+          echo "DB_PASSWORD=password" >> .env
+          echo "SESSION_DRIVER=array" >> .env
+          echo "CACHE_STORE=array" >> .env
+          echo "QUEUE_CONNECTION=sync" >> .env
+
+      - name: Run migrations
+        run: php artisan migrate --force
+
       - name: Build Assets
         run: npm run build
 
-      - name: Tests
+      - name: Type check
+        run: npx tsc --noEmit
+
+      - name: Frontend tests
+        run: npx vitest run
+
+      - name: PHP tests
         run: ./vendor/bin/pest

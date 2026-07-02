@@ -2,15 +2,23 @@
 
 namespace App\Models;
 
-use Illuminate\Foundation\Auth\User as Authenticatable;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Foundation\Auth\User as Authenticatable;
+use Laravel\Sanctum\HasApiTokens;
 
 class Usuario extends Authenticatable
 {
+    use HasApiTokens, HasFactory;
+
     protected $table = 'usuarios';
+
     protected $primaryKey = 'ID_Usuario';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
+
     public $timestamps = true;
 
     protected $fillable = [
@@ -48,7 +56,7 @@ class Usuario extends Authenticatable
 
     public function isOtpValid(string $code): bool
     {
-        if (!$this->Otp_Code || !$this->Otp_Expires_At) {
+        if (! $this->Otp_Code || ! $this->Otp_Expires_At) {
             return false;
         }
 

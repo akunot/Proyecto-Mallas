@@ -3,16 +3,16 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Asignatura;
+use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
 class AsignaturaController extends CatalogoController
 {
-    protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'asignatura';
 
     public function __construct()
     {
-        $this->model = new Asignatura();
+        $this->model = new Asignatura;
         $this->fillable = [
             'Codigo_Asignatura',
             'Nombre_Asignatura',
@@ -32,13 +32,14 @@ class AsignaturaController extends CatalogoController
 
         // Búsqueda por nombre
         if ($request->has('search') && $request->search) {
-            $searchField = $this->fillable[1] ?? 'Nombre_' . ucfirst($this->routeName);
-            $query->where($searchField, 'like', '%' . $request->search . '%');
+            $searchField = $this->fillable[1] ?? 'Nombre_'.ucfirst($this->routeName);
+            $query->where($searchField, 'like', '%'.$request->search.'%');
         }
 
         // Ordenamiento
-        $sortField = $request->sort_by ?? $this->fillable[1] ?? 'id';
-        $sortOrder = $request->sort_order ?? 'asc';
+        $allowedSortFields = array_merge($this->fillable, [$this->model->getKeyName()]);
+        $sortField = in_array($request->sort_by, $allowedSortFields) ? $request->sort_by : ($this->fillable[1] ?? 'id');
+        $sortOrder = in_array(strtolower($request->sort_order ?? ''), ['asc', 'desc']) ? $request->sort_order : 'asc';
         $query->orderBy($sortField, $sortOrder);
 
         // Paginación
@@ -60,7 +61,7 @@ class AsignaturaController extends CatalogoController
         ]);
     }
 
-    public function catalogo(): \Illuminate\Http\JsonResponse
+    public function catalogo(): JsonResponse
     {
         $electivas = Asignatura::where('es_electiva_libre', true)
             ->select('ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura')
@@ -70,9 +71,9 @@ class AsignaturaController extends CatalogoController
         return response()->json([
             'data' => $electivas->items(),
             'meta' => [
-                'total'        => $electivas->total(),
+                'total' => $electivas->total(),
                 'current_page' => $electivas->currentPage(),
-                'last_page'    => $electivas->lastPage(),
+                'last_page' => $electivas->lastPage(),
             ],
         ]);
     }

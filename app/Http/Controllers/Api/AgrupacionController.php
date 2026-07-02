@@ -2,18 +2,18 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Componente;
 use App\Models\PlantillaAgrupacion;
-use Illuminate\Database\Eloquent\Model;
 
 class AgrupacionController extends CatalogoController
 {
-    protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'agrupacion';
+
     protected string $routeBase = 'agrupaciones';
 
     public function __construct()
     {
-        $this->model = new PlantillaAgrupacion();
+        $this->model = new PlantillaAgrupacion;
         $this->fillable = [
             'ID_Programa',
             'ID_Componente',
@@ -83,8 +83,8 @@ class AgrupacionController extends CatalogoController
     protected function getRelatedData(): array
     {
         return [
-            'programas' => \App\Models\Programa::select('ID_Programa', 'Nombre_Programa')->get(),
-            'componentes' => \App\Models\Componente::select('ID_Componente', 'Nombre_Componente')->get(),
+            'programas' => Programa::select('ID_Programa', 'Nombre_Programa')->get(),
+            'componentes' => Componente::select('ID_Componente', 'Nombre_Componente')->get(),
         ];
     }
 

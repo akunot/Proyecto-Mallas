@@ -874,7 +874,7 @@ export default function DetallePublico({
                             </Link>
 
                             <div className="min-w-0 pt-0.5">
-                                {/* Eyebrow: facultad + plan */}
+                                {/* Eyebrow: facultad + normativa + plan */}
                                 <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase">
                                     <span
                                         className="material-symbols-outlined !text-[11px] opacity-70"
@@ -883,6 +883,29 @@ export default function DetallePublico({
                                         school
                                     </span>
                                     {programa.Facultad}
+                                    {activeMalla?.normativa && (
+                                        <>
+                                            <span className="mx-0.5 text-blue-400/60">
+                                                ·
+                                            </span>
+                                            <span className="text-blue-100">
+                                                {
+                                                    activeMalla.normativa
+                                                        .Tipo_Normativa
+                                                }{' '}
+                                                {
+                                                    activeMalla.normativa
+                                                        .Numero_Normativa
+                                                }
+                                                {activeMalla.normativa
+                                                    .Anio_Normativa &&
+                                                    ` de ${activeMalla.normativa.Anio_Normativa}`}
+                                                {activeMalla.normativa
+                                                    .Instancia &&
+                                                    ` (${activeMalla.normativa.Instancia})`}
+                                            </span>
+                                        </>
+                                    )}
                                     {activeMalla?.Codigo_Plan && (
                                         <>
                                             <span className="mx-0.5 text-blue-400/60">
@@ -1012,7 +1035,7 @@ export default function DetallePublico({
 
             {/* 2. SEMESTER CANVAS - Sin scroll, todo visible */}
             <main
-                className="flex-1 overflow-y-auto p-4"
+                className="flex-1 overflow-x-auto overflow-y-auto p-4"
                 style={
                     {
                         '--n-sem': numSemestres,
@@ -1021,7 +1044,7 @@ export default function DetallePublico({
                 }
             >
                 <div
-                    className="grid h-full gap-3"
+                    className="grid h-full min-w-[720px] gap-3"
                     style={{
                         gridTemplateColumns: `repeat(${numSemestres}, minmax(0, 1fr))`,
                     }}

@@ -2,18 +2,16 @@
 
 namespace App\Http\Controllers\Api;
 
-use App\Models\Programa;
 use App\Models\Facultad;
-use Illuminate\Database\Eloquent\Model;
+use App\Models\Programa;
 
 class ProgramaController extends CatalogoController
 {
-    protected \Illuminate\Database\Eloquent\Model $model;
     protected string $routeName = 'programa';
 
     public function __construct()
     {
-        $this->model = new Programa();
+        $this->model = new Programa;
         $this->fillable = [
             'Codigo_Facultad',
             'Codigo_Programa',
@@ -45,9 +43,9 @@ class ProgramaController extends CatalogoController
         ];
     }
 
-    public function electivas(int $id): \Illuminate\Http\JsonResponse
+    public function electivas(int $id): JsonResponse
     {
-        $programa  = Programa::findOrFail($id);
+        $programa = Programa::findOrFail($id);
         $electivas = $programa->electivas()
             ->select('asignaturas.ID_Asignatura', 'Codigo_Asignatura', 'Nombre_Asignatura', 'Creditos_Asignatura')
             ->with(['requisitos.asignaturaRequerida'])
@@ -57,9 +55,9 @@ class ProgramaController extends CatalogoController
         return response()->json([
             'data' => $electivas->items(),
             'meta' => [
-                'total'        => $electivas->total(),
+                'total' => $electivas->total(),
                 'current_page' => $electivas->currentPage(),
-                'last_page'    => $electivas->lastPage(),
+                'last_page' => $electivas->lastPage(),
             ],
         ]);
     }

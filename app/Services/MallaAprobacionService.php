@@ -18,9 +18,9 @@ class MallaAprobacionService
     {
         // Validar que la malla esté en un estado que permita enviar a revisión
         // Puede ser 'borrador' (procesada sin errores) o 'con_errores' (procesada con errores pero la malla ya fue creada)
-        $estadosPermitidos = ['borrador', 'con_errores'];
+        $estadosPermitidos = ['borrador', 'con_errores', 'rechazado'];
         if (! in_array($carga->Estado_Carga, $estadosPermitidos)) {
-            throw new \Exception('La carga debe estar en estado borrador para enviar a revisión');
+            throw new \Exception('La carga debe estar en estado borrador o rechazado para enviar a revisión');
         }
 
         // Validar que exista una malla asociada
@@ -30,9 +30,16 @@ class MallaAprobacionService
 
         return DB::transaction(function () use ($carga, $usuario) {
             // Actualizar estado
-            $carga->update([
-                'Estado_Carga' => 'pendiente_aprobacion',
-            ]);
+            $updateData = ['Estado_Carga' => 'pendiente_aprobacion'];
+
+            if ($carga->Estado_Carga === 'rechazado') {
+                $updateData['Comentario_Revisor'] = null;
+                $updateData['ID_Usuario_Revisor'] = null;
+                $updateData['Fecha_Revision'] = null;
+                $updateData['Finalizacion_Carga'] = null;
+            }
+
+            $carga->update($updateData);
 
             // Actualizar estado de la malla
             $malla = $carga->malla;
@@ -62,11 +69,6 @@ class MallaAprobacionService
      */
     public function aprobarMalla(CargaMalla $carga, Usuario $revisor, string $comentario): CargaMalla
     {
-        // Validar que el revisor sea diferente al usuario que cargó
-        if ($carga->ID_Usuario === $revisor->ID_Usuario) {
-            throw new \Exception('El mismo usuario que cargó la malla no puede aprobarla');
-        }
-
         // Validar que la malla esté pendiente de aprobación
         if ($carga->Estado_Carga !== 'pendiente_aprobacion') {
             throw new \Exception('La malla no está pendiente de aprobación');
@@ -152,11 +154,6 @@ class MallaAprobacionService
      */
     public function rechazarMalla(CargaMalla $carga, Usuario $revisor, string $comentario): CargaMalla
     {
-        // Validar que el revisor sea diferente al usuario que cargó
-        if ($carga->ID_Usuario === $revisor->ID_Usuario) {
-            throw new \Exception('El mismo usuario que cargó la malla no puede rechazarla');
-        }
-
         // Validar que la malla esté pendiente de aprobación
         if ($carga->Estado_Carga !== 'pendiente_aprobacion') {
             throw new \Exception('La malla no está pendiente de aprobación');
@@ -213,7 +210,6 @@ class MallaAprobacionService
     {
         return CargaMalla::with(['malla', 'usuario', 'programa'])
             ->where('Estado_Carga', 'pendiente_aprobacion')
-            ->where('ID_Usuario', '!=', $usuario->ID_Usuario)
             ->orderBy('Creacion_Carga', 'desc')
             ->get();
     }
@@ -234,8 +230,7 @@ class MallaAprobacionService
      */
     public function puedeRevisar(Usuario $usuario, CargaMalla $carga): bool
     {
-        return $carga->Estado_Carga === 'pendiente_aprobacion' &&
-               $carga->ID_Usuario !== $usuario->ID_Usuario;
+        return $carga->Estado_Carga === 'pendiente_aprobacion';
     }
 
     /**
@@ -243,7 +238,7 @@ class MallaAprobacionService
      */
     public function puedeEnviarRevision(Usuario $usuario, CargaMalla $carga): bool
     {
-        $estadosPermitidos = ['borrador', 'con_errores'];
+        $estadosPermitidos = ['borrador', 'con_errores', 'rechazado'];
 
         return in_array($carga->Estado_Carga, $estadosPermitidos) &&
                $carga->ID_Malla !== null;

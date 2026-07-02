@@ -1,3 +1,4 @@
+import { router } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { createContext, useContext, useState, useEffect } from 'react';
 import type { AuthUser } from '../api/auth';
@@ -50,6 +51,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             await authApi.logout();
         } finally {
             setUser(null);
+            router.visit('/login');
         }
     };
 

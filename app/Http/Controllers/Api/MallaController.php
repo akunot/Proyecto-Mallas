@@ -165,7 +165,7 @@ class MallaController extends Controller
      */
     public static function buildPublicVisualizerPayload(int $idPrograma): ?array
     {
-        $malla = MallaCurricular::with(self::visualizerEagerLoads())
+        $malla = MallaCurricular::with(self::visualizerEagerLoads($idPrograma))
             ->where('ID_Programa', $idPrograma)
             ->whereIn('Estado', ['activa', 'ACTIVO'])
             ->orderBy('Fecha_Vigencia', 'desc')
@@ -178,13 +178,16 @@ class MallaController extends Controller
         return self::mallaToVisualizerPayload($malla);
     }
 
-    private static function visualizerEagerLoads(): array
+    private static function visualizerEagerLoads(?int $idPrograma = null): array
     {
         return [
             'programa',
             'normativa',
             'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
             'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
+            'agrupaciones.asignaturas.requisitos' => $idPrograma
+                ? fn ($q) => $q->where('ID_Programa', $idPrograma)
+                : fn ($q) => $q,
             'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
             'agrupaciones.componente',
             'agrupaciones.slots',
@@ -228,6 +231,7 @@ class MallaController extends Controller
                             'Horas_Estudiante' => $asignatura->Horas_Estudiante ?? 0,
                             'requisitos' => $asignatura->requisitos
                                 ->where('ID_Programa', $idPrograma)
+                                ->values()
                                 ->map(fn ($r) => [
                                     'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
                                     'Tipo_Requisito' => $r->Tipo_Requisito,

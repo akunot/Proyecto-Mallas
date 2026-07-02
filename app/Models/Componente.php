@@ -2,14 +2,20 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class Componente extends Model
 {
+    use HasFactory;
+
     protected $table = 'componentes';
+
     protected $primaryKey = 'ID_Componente';
+
     public $incrementing = true;
+
     protected $keyType = 'int';
 
     protected $fillable = [

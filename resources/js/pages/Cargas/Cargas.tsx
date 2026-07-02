@@ -160,6 +160,19 @@ export default function Cargas() {
     const [filtroEstado, setFiltroEstado] = useState<string>('');
     const [filtroBusqueda, setFiltroBusqueda] = useState<string>('');
 
+    // Toast notifications
+    const [toast, setToast] = useState<{
+        message: string;
+        type: 'error' | 'success' | 'info';
+    } | null>(null);
+
+    useEffect(() => {
+        if (toast) {
+            const t = setTimeout(() => setToast(null), 4000);
+            return () => clearTimeout(t);
+        }
+    }, [toast]);
+
     const apiUrl = window.location.origin;
 
     const getCsrf = () =>
@@ -274,8 +287,10 @@ export default function Cargas() {
         e.preventDefault();
 
         if (!selectedTipo || !selectedFile) {
-            alert('Seleccione el tipo de archivo y un archivo Excel.');
-
+            setToast({
+                message: 'Seleccione el tipo de archivo y un archivo Excel.',
+                type: 'error',
+            });
             return;
         }
 
@@ -303,8 +318,7 @@ export default function Cargas() {
                 const msgs = createData.errors
                     ? Object.values(createData.errors).flat().join('\n')
                     : (createData.message ?? 'Error al crear la carga');
-                alert(msgs);
-
+                setToast({ message: msgs, type: 'error' });
                 return;
             }
 
@@ -335,8 +349,7 @@ export default function Cargas() {
                 const msgs = uploadData.errors
                     ? Object.values(uploadData.errors).flat().join('\n')
                     : (uploadData.message ?? 'Error al subir el archivo');
-                alert(msgs);
-
+                setToast({ message: msgs, type: 'error' });
                 return;
             }
 
@@ -355,7 +368,10 @@ export default function Cargas() {
             fetchCargas();
         } catch (e) {
             console.error('Error en upload:', e);
-            alert('Error de conexión al subir el archivo.');
+            setToast({
+                message: 'Error de conexión al subir el archivo.',
+                type: 'error',
+            });
         } finally {
             setUploading(false);
         }
@@ -379,16 +395,25 @@ export default function Cargas() {
 
             if (!res.ok) {
                 const data = await res.json();
-                alert(data.message ?? 'Error al procesar.');
-
+                setToast({
+                    message: data.message ?? 'Error al procesar.',
+                    type: 'error',
+                });
                 return;
             }
 
+            setToast({
+                message: 'Procesamiento iniciado correctamente.',
+                type: 'success',
+            });
             setPollingIds((prev) => new Set(prev).add(cargaId));
             fetchCargas();
         } catch (e) {
             console.error('Error procesando:', e);
-            alert('Error de conexión.');
+            setToast({
+                message: 'Error de conexión al procesar.',
+                type: 'error',
+            });
         }
     };
 
@@ -413,15 +438,25 @@ export default function Cargas() {
             const data = await res.json();
 
             if (!res.ok) {
-                alert(data.message ?? 'Error al eliminar la carga.');
+                setToast({
+                    message: data.message ?? 'Error al eliminar la carga.',
+                    type: 'error',
+                });
                 return;
             }
 
             setDeleteConfirm(null);
+            setToast({
+                message: 'Carga eliminada correctamente.',
+                type: 'success',
+            });
             fetchCargas();
         } catch (e) {
             console.error('Error deleting carga:', e);
-            alert('Error de conexión.');
+            setToast({
+                message: 'Error de conexión al eliminar.',
+                type: 'error',
+            });
         }
     };
 
@@ -462,6 +497,38 @@ export default function Cargas() {
     return (
         <MainLayout>
             <Head title="Gestión de Cargas" />
+
+            {/* Toast Notification */}
+            {toast && (
+                <div className="fixed top-6 right-6 z-[200] duration-300 animate-in fade-in slide-in-from-right-4">
+                    <div
+                        className={`flex items-center gap-3 rounded-2xl border px-5 py-3 text-sm font-bold shadow-2xl ${
+                            toast.type === 'error'
+                                ? 'border-red-200 bg-red-50 text-red-700'
+                                : toast.type === 'success'
+                                  ? 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                                  : 'border-blue-200 bg-blue-50 text-blue-700'
+                        }`}
+                    >
+                        <span className="material-symbols-outlined !text-lg">
+                            {toast.type === 'error'
+                                ? 'error'
+                                : toast.type === 'success'
+                                  ? 'check_circle'
+                                  : 'info'}
+                        </span>
+                        {toast.message}
+                        <button
+                            onClick={() => setToast(null)}
+                            className="ml-2 opacity-60 hover:opacity-100"
+                        >
+                            <span className="material-symbols-outlined !text-lg">
+                                close
+                            </span>
+                        </button>
+                    </div>
+                </div>
+            )}
 
             <div className="mx-auto max-w-[1400px] space-y-6 pb-10">
                 {/* Header Profesional */}
@@ -522,180 +589,193 @@ export default function Cargas() {
 
                 {/* Tabla Refactorizada */}
                 <div className="overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm">
-                    <table className="w-full border-collapse">
-                        <thead>
-                            <tr>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Carga & Tipo
-                                </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Programa / Normativa
-                                </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Estado
-                                </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Calidad de Datos
-                                </th>
-                                <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Registro
-                                </th>
-                                <th className="px-6 py-4 text-right text-[11px] font-bold tracking-wider text-slate-400 uppercase">
-                                    Acciones
-                                </th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-100">
-                            {cargasFiltradas.map((carga) => (
-                                <tr
-                                    key={carga.ID_Carga}
-                                    className={`transition-colors hover:bg-slate-50/80 ${pollingIds.has(carga.ID_Carga) ? 'bg-blue-50/30' : ''}`}
-                                >
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col">
-                                            <span className="font-mono text-xs text-slate-400">
-                                                #{carga.ID_Carga}
-                                            </span>
-                                            <span className="text-sm font-bold text-slate-800 capitalize">
-                                                {carga.tipo_carga}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex max-w-[250px] flex-col">
-                                            <span className="truncate text-sm font-semibold text-slate-700">
-                                                {carga.programa
-                                                    ?.Nombre_Programa ||
-                                                    carga.normativa?.programa
+                    <div className="overflow-x-auto">
+                        <table className="w-full min-w-[700px] border-collapse">
+                            <thead>
+                                <tr>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Carga & Tipo
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Programa / Normativa
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Estado
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Calidad de Datos
+                                    </th>
+                                    <th className="px-6 py-4 text-left text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Registro
+                                    </th>
+                                    <th className="px-6 py-4 text-right text-[11px] font-bold tracking-wider text-slate-400 uppercase">
+                                        Acciones
+                                    </th>
+                                </tr>
+                            </thead>
+                            <tbody className="divide-y divide-slate-100">
+                                {cargasFiltradas.map((carga) => (
+                                    <tr
+                                        key={carga.ID_Carga}
+                                        className={`transition-colors hover:bg-slate-50/80 ${pollingIds.has(carga.ID_Carga) ? 'bg-blue-50/30' : ''}`}
+                                    >
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col">
+                                                <span className="font-mono text-xs text-slate-400">
+                                                    #{carga.ID_Carga}
+                                                </span>
+                                                <span className="text-sm font-bold text-slate-800 capitalize">
+                                                    {carga.tipo_carga}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex max-w-[250px] flex-col">
+                                                <span className="truncate text-sm font-semibold text-slate-700">
+                                                    {carga.programa
                                                         ?.Nombre_Programa ||
-                                                    '—'}
-                                            </span>
-                                            <span className="text-xs text-slate-400">
-                                                {carga.normativa
-                                                    ? `${carga.normativa.Tipo_Normativa} ${carga.normativa.Numero_Normativa}`
-                                                    : 'Sin normativa'}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <StatusBadge
-                                            estado={carga.Estado_Carga}
-                                            tipo={carga.tipo_carga}
-                                        />
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex items-center gap-2">
-                                            {(carga.errores_count || 0) > 0 && (
+                                                        carga.normativa
+                                                            ?.programa
+                                                            ?.Nombre_Programa ||
+                                                        '—'}
+                                                </span>
+                                                <span className="text-xs text-slate-400">
+                                                    {carga.normativa
+                                                        ? `${carga.normativa.Tipo_Normativa} ${carga.normativa.Numero_Normativa}`
+                                                        : 'Sin normativa'}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <StatusBadge
+                                                estado={carga.Estado_Carga}
+                                                tipo={carga.tipo_carga}
+                                            />
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex items-center gap-2">
+                                                {(carga.errores_count || 0) >
+                                                    0 && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleOpenErrores(
+                                                                carga,
+                                                            )
+                                                        }
+                                                        className="flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-600 ring-1 ring-rose-200 transition-colors hover:bg-rose-100"
+                                                    >
+                                                        <span className="material-symbols-outlined !text-sm">
+                                                            error
+                                                        </span>
+                                                        {carga.errores_count}
+                                                    </button>
+                                                )}
+                                                {(carga.advertencias_count ||
+                                                    0) > 0 && (
+                                                    <div className="flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-600 ring-1 ring-amber-200">
+                                                        <span className="material-symbols-outlined !text-sm">
+                                                            warning
+                                                        </span>
+                                                        {
+                                                            carga.advertencias_count
+                                                        }
+                                                    </div>
+                                                )}
+                                                {!carga.errores_count &&
+                                                    !carga.advertencias_count && (
+                                                        <span className="material-symbols-outlined !text-sm text-emerald-400">
+                                                            check_circle
+                                                        </span>
+                                                    )}
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4">
+                                            <div className="flex flex-col text-[11px]">
+                                                <span className="font-bold text-slate-600">
+                                                    {
+                                                        carga.usuario
+                                                            ?.Nombre_Usuario
+                                                    }
+                                                </span>
+                                                <span className="text-slate-400">
+                                                    {new Date(
+                                                        carga.Creacion_Carga,
+                                                    ).toLocaleDateString()}
+                                                </span>
+                                            </div>
+                                        </td>
+                                        <td className="px-6 py-4 text-right">
+                                            <div className="flex justify-end gap-1">
+                                                {carga.Estado_Carga ===
+                                                    'listo_para_procesar' && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleProcesar(
+                                                                carga.ID_Carga,
+                                                            )
+                                                        }
+                                                        disabled={pollingIds.has(
+                                                            carga.ID_Carga,
+                                                        )}
+                                                        className="rounded-lg bg-blue-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
+                                                    >
+                                                        PROCESAR
+                                                    </button>
+                                                )}
+                                                {carga.Estado_Carga ===
+                                                    'con_errores' && (
+                                                    <button
+                                                        onClick={() =>
+                                                            handleProcesar(
+                                                                carga.ID_Carga,
+                                                            )
+                                                        }
+                                                        className="rounded-lg bg-amber-500 px-3 py-1 text-[11px] font-bold text-white hover:bg-amber-600"
+                                                        title="Reintentar"
+                                                    >
+                                                        REINTENTAR
+                                                    </button>
+                                                )}
+                                                {[
+                                                    'esperando_archivos',
+                                                    'listo_para_procesar',
+                                                    'con_errores',
+                                                    'borrador',
+                                                ].includes(
+                                                    carga.Estado_Carga,
+                                                ) && (
+                                                    <button
+                                                        onClick={() =>
+                                                            setDeleteConfirm(
+                                                                carga.ID_Carga,
+                                                            )
+                                                        }
+                                                        className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
+                                                        title="Eliminar carga"
+                                                    >
+                                                        <span className="material-symbols-outlined !text-xl">
+                                                            delete
+                                                        </span>
+                                                    </button>
+                                                )}
                                                 <button
                                                     onClick={() =>
                                                         handleOpenErrores(carga)
                                                     }
-                                                    className="flex items-center gap-1 rounded-lg bg-rose-50 px-2 py-1 text-[11px] font-black text-rose-600 ring-1 ring-rose-200 transition-colors hover:bg-rose-100"
-                                                >
-                                                    <span className="material-symbols-outlined !text-sm">
-                                                        error
-                                                    </span>
-                                                    {carga.errores_count}
-                                                </button>
-                                            )}
-                                            {(carga.advertencias_count || 0) >
-                                                0 && (
-                                                <div className="flex items-center gap-1 rounded-lg bg-amber-50 px-2 py-1 text-[11px] font-black text-amber-600 ring-1 ring-amber-200">
-                                                    <span className="material-symbols-outlined !text-sm">
-                                                        warning
-                                                    </span>
-                                                    {carga.advertencias_count}
-                                                </div>
-                                            )}
-                                            {!carga.errores_count &&
-                                                !carga.advertencias_count && (
-                                                    <span className="material-symbols-outlined !text-sm text-emerald-400">
-                                                        check_circle
-                                                    </span>
-                                                )}
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4">
-                                        <div className="flex flex-col text-[11px]">
-                                            <span className="font-bold text-slate-600">
-                                                {carga.usuario?.Nombre_Usuario}
-                                            </span>
-                                            <span className="text-slate-400">
-                                                {new Date(
-                                                    carga.Creacion_Carga,
-                                                ).toLocaleDateString()}
-                                            </span>
-                                        </div>
-                                    </td>
-                                    <td className="px-6 py-4 text-right">
-                                        <div className="flex justify-end gap-1">
-                                            {carga.Estado_Carga ===
-                                                'listo_para_procesar' && (
-                                                <button
-                                                    onClick={() =>
-                                                        handleProcesar(
-                                                            carga.ID_Carga,
-                                                        )
-                                                    }
-                                                    disabled={pollingIds.has(
-                                                        carga.ID_Carga,
-                                                    )}
-                                                    className="rounded-lg bg-blue-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
-                                                >
-                                                    PROCESAR
-                                                </button>
-                                            )}
-                                            {carga.Estado_Carga ===
-                                                'con_errores' && (
-                                                <button
-                                                    onClick={() =>
-                                                        handleProcesar(
-                                                            carga.ID_Carga,
-                                                        )
-                                                    }
-                                                    className="rounded-lg bg-amber-500 px-3 py-1 text-[11px] font-bold text-white hover:bg-amber-600"
-                                                    title="Reintentar"
-                                                >
-                                                    REINTENTAR
-                                                </button>
-                                            )}
-                                            {[
-                                                'esperando_archivos',
-                                                'listo_para_procesar',
-                                                'con_errores',
-                                                'borrador',
-                                            ].includes(carga.Estado_Carga) && (
-                                                <button
-                                                    onClick={() =>
-                                                        setDeleteConfirm(
-                                                            carga.ID_Carga,
-                                                        )
-                                                    }
-                                                    className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-red-50 hover:text-red-600"
-                                                    title="Eliminar carga"
+                                                    className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
+                                                    title="Ver Errores"
                                                 >
                                                     <span className="material-symbols-outlined !text-xl">
-                                                        delete
+                                                        visibility
                                                     </span>
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={() =>
-                                                    handleOpenErrores(carga)
-                                                }
-                                                className="rounded-lg p-2 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
-                                                title="Ver Errores"
-                                            >
-                                                <span className="material-symbols-outlined !text-xl">
-                                                    visibility
-                                                </span>
-                                            </button>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
                     {loading ? (
                         <div className="flex items-center justify-center gap-3 py-20 text-slate-400">
                             <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
