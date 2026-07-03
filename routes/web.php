@@ -10,6 +10,7 @@ use App\Http\Controllers\Api\NormativaController;
 use App\Http\Controllers\Api\ProgramaController;
 use App\Http\Controllers\Api\SedeController;
 use App\Http\Controllers\Api\UsuarioController;
+use App\Http\Controllers\MallaPublicaController;
 use App\Models\Asignatura;
 use App\Models\CargaMalla;
 use App\Models\Componente;
@@ -113,47 +114,8 @@ Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
  * Query params:
  *   ?v=ID_Malla  — Carga una versión específica en lugar de la activa.
  */
-Route::get('/malla-publica/{id_programa}', function ($id_programa) {
-    $programa = Programa::with('facultad')->findOrFail($id_programa);
-
-    $versionId = request()->query('v');
-
-    if ($versionId) {
-        $mallaEstructurada = MallaController::publicShow((int) $versionId)->getData(true);
-        if (! isset($mallaEstructurada['ID_Malla'])) {
-            $mallaEstructurada = null;
-        }
-    } else {
-        $mallaEstructurada = MallaController::buildPublicVisualizerPayload((int) $id_programa);
-    }
-
-    if (! $mallaEstructurada) {
-        return Inertia::render('Mallas/DetallePublico', [
-            'disponible' => false,
-            'programa' => [
-                'ID_Programa' => $programa->ID_Programa,
-                'Nombre_Programa' => $programa->Nombre_Programa,
-                'Nivel_Formacion' => $programa->Nivel_Formacion,
-                'Duracion_Semestres' => $programa->Duracion_Semestres,
-            ],
-        ]);
-    }
-
-    return Inertia::render('Mallas/DetallePublico', [
-        'disponible' => true,
-        'programa' => [
-            'ID_Programa' => $programa->ID_Programa,
-            'Nombre_Programa' => $programa->Nombre_Programa,
-            'Nivel_Formacion' => $programa->Nivel_Formacion,
-            'Duracion_Semestres' => $programa->Duracion_Semestres,
-            'Creditos_Totales' => $programa->Creditos_Totales,
-            'Codigo_SNIES' => $programa->Codigo_SNIES,
-            'Titulo_Otorgado' => $programa->Titulo_Otorgado,
-            'Facultad' => $programa->facultad->Nombre_Facultad ?? '',
-        ],
-        'malla' => $mallaEstructurada,
-    ]);
-})->name('malla.publica');
+Route::get('/malla-publica/{id_programa}', [MallaPublicaController::class, 'show'])
+    ->name('malla.publica');
 
 // ============================================================================
 // RUTAS PROTEGIDAS (requieren autenticación usando sesión web)

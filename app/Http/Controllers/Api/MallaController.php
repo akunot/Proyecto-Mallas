@@ -11,6 +11,7 @@ use App\Models\Programa;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
+use App\Services\MallaVisualizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
@@ -25,7 +26,7 @@ class MallaController extends Controller
      */
     public function publicVisualizer(Request $request, int $id): JsonResponse
     {
-        $payload = self::buildPublicVisualizerPayload($id);
+        $payload = app(MallaVisualizerService::class)->forPrograma($id);
 
         if (! $payload) {
             return response()->json([
@@ -41,11 +42,15 @@ class MallaController extends Controller
      */
     public function publicShow(int $id): JsonResponse
     {
-        $malla = MallaCurricular::with(self::visualizerEagerLoads())
-            ->whereIn('Estado', ['activa', 'archivada'])
-            ->findOrFail($id);
+        $payload = app(MallaVisualizerService::class)->byVersion($id);
 
-        return response()->json(self::mallaToVisualizerPayload($malla));
+        if (! $payload) {
+            return response()->json([
+                'message' => 'Malla no encontrada.',
+            ], 404);
+        }
+
+        return response()->json($payload);
     }
 
     /**
@@ -165,119 +170,13 @@ class MallaController extends Controller
 
     /**
      * Construye el payload de la malla (estructura "estilo Visualizer") para un
-     * programa dado. Se expone como helper reutilizable para que routes/web.php
-     * pueda generar la misma estructura sin duplicar la lógica de consulta/transformación.
+     * programa dado usando el servicio cacheado.
      *
      * @return array<string, mixed>|null
      */
     public static function buildPublicVisualizerPayload(int $idPrograma): ?array
     {
-        $malla = MallaCurricular::with(self::visualizerEagerLoads($idPrograma))
-            ->where('ID_Programa', $idPrograma)
-            ->whereIn('Estado', ['activa', 'ACTIVO'])
-            ->orderBy('Fecha_Vigencia', 'desc')
-            ->first();
-
-        if (! $malla) {
-            return null;
-        }
-
-        return self::mallaToVisualizerPayload($malla);
-    }
-
-    public static function visualizerEagerLoads(?int $idPrograma = null): array
-    {
-        return [
-            'programa',
-            'programa.facultad',
-            'normativa',
-            'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
-            'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
-            'agrupaciones.asignaturas.requisitos' => $idPrograma
-                ? fn ($q) => $q->where('ID_Programa', $idPrograma)
-                : fn ($q) => $q,
-            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-            'agrupaciones.componente',
-            'agrupaciones.slots',
-        ];
-    }
-
-    public static function mallaToVisualizerPayload(MallaCurricular $malla): array
-    {
-        $idPrograma = $malla->programa->ID_Programa ?? 0;
-
-        return [
-            'ID_Malla' => $malla->ID_Malla,
-            'Codigo_Plan' => $malla->Codigo_Plan,
-            'programa' => [
-                'ID_Programa' => $idPrograma,
-                'Nombre_Programa' => $malla->programa->Nombre_Programa ?? '',
-                'Creditos_Totales' => $malla->programa->Creditos_Totales ?? null,
-                'Duracion_Semestres' => $malla->programa->Duracion_Semestres ?? null,
-                'Nivel_Formacion' => $malla->programa->Nivel_Formacion ?? null,
-                'Codigo_SNIES' => $malla->programa->Codigo_SNIES ?? null,
-                'Titulo_Otorgado' => $malla->programa->Titulo_Otorgado ?? null,
-            ],
-            'normativa' => $malla->normativa ? [
-                'Tipo_Normativa' => $malla->normativa->Tipo_Normativa,
-                'Numero_Normativa' => $malla->normativa->Numero_Normativa,
-                'Instancia' => $malla->normativa->Instancia,
-                'Anio_Normativa' => $malla->normativa->Anio_Normativa,
-            ] : null,
-            'agrupaciones' => $malla->agrupaciones->map(function ($agrupacion) use ($idPrograma) {
-                return [
-                    'ID_Agrupacion' => $agrupacion->ID_Agrupacion,
-                    'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
-                    'ID_Componente' => $agrupacion->ID_Componente,
-                    'Creditos_Requeridos' => $agrupacion->Creditos_Requeridos,
-                    'Es_Obligatoria' => (bool) $agrupacion->Es_Obligatoria,
-                    'componente' => $agrupacion->componente ? [
-                        'Nombre_Componente' => $agrupacion->componente->Nombre_Componente,
-                    ] : null,
-                    'asignaturas' => $agrupacion->asignaturas->map(function ($asignatura) use ($idPrograma) {
-                        return [
-                            'ID_Asignatura' => $asignatura->ID_Asignatura,
-                            'Nombre_Asignatura' => $asignatura->Nombre_Asignatura,
-                            'Codigo_Asignatura' => $asignatura->Codigo_Asignatura,
-                            'Creditos_Asignatura' => $asignatura->Creditos_Asignatura,
-                            'Horas_Presencial' => $asignatura->Horas_Presencial ?? 0,
-                            'Horas_Estudiante' => $asignatura->Horas_Estudiante ?? 0,
-                            'requisitos' => $asignatura->requisitos
-                                ->where('ID_Programa', $idPrograma)
-                                ->values()
-                                ->map(fn ($r) => [
-                                    'ID_Asignatura_Requerida' => $r->ID_Asignatura_Requerida,
-                                    'Tipo_Requisito' => $r->Tipo_Requisito,
-                                    'Descripcion_Requisito' => $r->Descripcion_Requisito,
-                                    'Valor_Creditos' => $r->Valor_Creditos,
-                                    'asignatura_requerida' => $r->asignaturaRequerida ? [
-                                        'Nombre_Asignatura' => $r->asignaturaRequerida->Nombre_Asignatura,
-                                        'Codigo_Asignatura' => $r->asignaturaRequerida->Codigo_Asignatura,
-                                    ] : null,
-                                ])->values(),
-                            'ID_Componente' => $asignatura->ID_Componente ?? null,
-                            'pivot' => [
-                                'Semestre_Sugerido' => $asignatura->pivot->Semestre_Sugerido,
-                                'Tipo_Asignatura' => $asignatura->pivot->Tipo_Asignatura,
-                                'Orden' => $asignatura->pivot->Orden,
-                            ],
-                        ];
-                    })->values(),
-                    'slots' => $agrupacion->slots->map(function ($slot) use ($agrupacion) {
-                        $tipoSlot = strtolower((string) ($slot->Tipo_Slot ?? ''));
-
-                        return [
-                            'ID_Slot' => $slot->ID_Slot,
-                            'Nombre_Slot' => $slot->Nombre_Slot,
-                            'Tipo_Slot' => in_array($tipoSlot, ['optativa', 'libre', 'nivelatorio'], true) ? $tipoSlot : 'libre',
-                            'Semestre' => $slot->Semestre,
-                            'Orden' => $slot->Orden,
-                            'Nombre_Agrupacion' => $agrupacion->Nombre_Agrupacion,
-                        ];
-                    })->values(),
-                ];
-            })->values(),
-        ];
+        return app(MallaVisualizerService::class)->forPrograma($idPrograma);
     }
 
     public function reordenar(Request $request, int $mallaId): JsonResponse
@@ -313,6 +212,8 @@ class MallaController extends Controller
                     ]);
             }
         });
+
+        app(MallaVisualizerService::class)->forgetAll($malla->ID_Programa, $malla->ID_Malla);
 
         return response()->json(['ok' => true]);
     }
@@ -473,6 +374,8 @@ class MallaController extends Controller
             ]
         );
 
+        app(MallaVisualizerService::class)->forgetAll($malla->ID_Programa, $malla->ID_Malla);
+
         return response()->json(['ok' => true, 'message' => 'Optativa asignada correctamente.']);
     }
 
@@ -527,6 +430,8 @@ class MallaController extends Controller
 
         $count = count($idsValidos);
 
+        app(MallaVisualizerService::class)->forgetAll($malla->ID_Programa, $mallaId);
+
         return response()->json([
             'ok' => true,
             'message' => "{$count} optativas asignadas correctamente a '{$agrupacionReal->Nombre_Agrupacion}'.",
@@ -578,11 +483,15 @@ class MallaController extends Controller
             'ID_Asignatura' => 'required|integer|exists:asignaturas,ID_Asignatura',
         ]);
 
+        $malla = MallaCurricular::findOrFail($mallaId);
+
         AgrupacionAsignatura::where('ID_Malla', $mallaId)
             ->where('ID_Agrupacion', $validated['ID_Agrupacion'])
             ->where('ID_Asignatura', $validated['ID_Asignatura'])
             ->whereRaw('LOWER(Tipo_Asignatura) = ?', ['optativa'])
             ->delete();
+
+        app(MallaVisualizerService::class)->forgetAll($malla->ID_Programa, $mallaId);
 
         return response()->json(['ok' => true, 'message' => 'Optativa removida de la agrupación.']);
     }
@@ -598,11 +507,15 @@ class MallaController extends Controller
             'ID_Asignaturas.*' => 'required|integer|exists:asignaturas,ID_Asignatura',
         ]);
 
+        $malla = MallaCurricular::findOrFail($mallaId);
+
         $deleted = AgrupacionAsignatura::where('ID_Malla', $mallaId)
             ->where('ID_Agrupacion', $validated['ID_Agrupacion'])
             ->whereIn('ID_Asignatura', $validated['ID_Asignaturas'])
             ->whereRaw('LOWER(Tipo_Asignatura) = ?', ['optativa'])
             ->delete();
+
+        app(MallaVisualizerService::class)->forgetAll($malla->ID_Programa, $mallaId);
 
         return response()->json([
             'ok' => true,

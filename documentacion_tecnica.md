@@ -8,19 +8,19 @@ Sistema de Gestión de Mallas Académicas — UNAL Manizales
 
 _Documento técnico para desarrollo y mantenimiento_
 
-Versión 5.2 | Junio 2026
+Versión 5.4 | Julio 2026
 
 ---
 
-| **Campo**         | **Valor**                                                        |
-| ----------------- | ---------------------------------------------------------------- |
-| Proyecto          | Sistema de Gestión de Mallas Académicas                          |
-| Cliente           | Universidad Nacional de Colombia - Sede Manizales                |
-| Stack             | Laravel 12 + React 19 + MySQL 8 + Apache 2.4 + Inertia.js 2.0    |
-| Arquitectura      | Monolito modular (Laravel + Inertia + React) + MySQL 8           |
-| Autenticación     | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña) |
-| Tipo de sistema   | Panel administrativo cerrado, usuarios contados                  |
-| Documento versión | 5.2 — Junio 2026                                                 |
+| **Campo**         | **Valor**                                                           |
+| ----------------- | ------------------------------------------------------------------- |
+| Proyecto          | Sistema de Gestión de Mallas Académicas                             |
+| Cliente           | Universidad Nacional de Colombia - Sede Manizales                   |
+| Stack             | Laravel 12 + React 19 + MySQL 8 + Apache 2.4/nginx + Inertia.js 2.0 |
+| Arquitectura      | Monolito modular (Laravel + Inertia + React) + MySQL 8              |
+| Autenticación     | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña)    |
+| Tipo de sistema   | Panel administrativo cerrado, usuarios contados                     |
+| Documento versión | 5.4 — Julio 2026                                                    |
 
 ### Historial de cambios
 
@@ -32,6 +32,7 @@ Versión 5.2 | Junio 2026
 | 5.1     | Abril 2026 | Alineación del modelo de BD con la BD real implementada: FKs basadas en códigos institucionales (`Codigo_Sede`, `Codigo_Facultad`, `Codigo_Programa`) en lugar de IDs auto_increment; se agrega `Codigo_Sede` a tabla `sede`; se documenta mapeo de Excel de agrupaciones (columna COMPONENTE → `Tipo_Agrupacion`, columna TIPO AGRUPACIÓN → `Es_Obligatoria`); se actualiza estructura del Excel de malla (IDs numéricos como identificadores cruzados); se documenta archivo OPTATIVA; se corrige afirmación de asignaturas en múltiples agrupaciones; se agrega nota sobre limpieza de floats en códigos |
 | 5.2     | Abril 2026 | Se integra el archivo OPTATIVA como cuarto paso opcional del Job de procesamiento. `carga_malla` recibe `ID_Archivo_Optativas` (nullable). Nuevo RF-CE-13 y RF-CM-07. El OPTATIVA se procesa después de la malla, extrayendo solo filas del programa en carga, creando `agrupacion_asignatura` adicionales y sus requisitos. Actualización del §8.4 con tipo `optativas`                                                                                                                                                                                                                                    |
 | 5.3     | Junio 2026 | Migración a Inertia.js 2.0 para integración frontend-backend. Catálogos CRUD migrados a vistas Inertia. Endpoint público de visualización de mallas. Mejoras en validación y manejo de errores. Optimización del parser de Excel para optativas.                                                                                                                                                                                                                                                                                                                                                            |
+| 5.4     | Julio 2026 | Refactor: `MallaVisualizerService` extraído de `MallaController` con cache de 24h y métodos `forPrograma()`/`byVersion()`/`forgetAll()`. Nuevo `MallaPublicaController` extraído de closure de ruta. Cache invalidado automáticamente en mutaciones (reordenar, asignar/remover optativas). Tests E2E: `CargaE2ETest`, `CargaErroresHumanosE2ETest`, `MallaLifecycleE2ETest`, `OptativasE2ETest`. 145 tests totales (285 assertions). Contenedor Docker con nginx + php-fpm + supervisor + queue worker.                                                                                                    |
 
 ---
 
@@ -77,37 +78,49 @@ Las entidades principales del dominio, de mayor a menor jerarquía, son:
 | Build tool       | Vite                        | 6.x         | Bundler y servidor de desarrollo                            |
 | Routing frontend | React Router                | 7.x         | Navegación entre vistas                                     |
 | HTTP client      | Axios                       | 1.x         | Llamadas a la API REST                                      |
-| Servidor web     | Apache                      | 2.4.62      | Producción (ya en el servidor)                              |
-| PHP              | PHP                         | 8.3.8       | Runtime del backend (ya en el servidor)                     |
-| OS               | FreeBSD                     | -           | Sistema operativo del servidor                              |
+| Servidor web     | nginx (contenedor)          | Alpine      | Contenedor Docker con supervisor                            |
+| PHP              | PHP-FPM                     | 8.3         | Contenedor Docker                                           |
+| OS               | Alpine Linux                | -           | contenedor base                                             |
+| Orquestación     | Docker Compose              | 3.8         | mysql + app                                                 |
+| Queue worker     | Supervisor                  | -           | Ejecuta `php artisan queue:work` automáticamente            |
 
-> El frontend React se compila localmente con Vite y se despliega como archivos estáticos en el servidor Apache. Node.js solo es necesario en la máquina de desarrollo, no en el servidor de producción.
+> El frontend React se compila dentro del Dockerfile multi-etapa con Vite y se sirve como archivos estáticos desde nginx. En desarrollo local se usa `npm run dev` con Vite.
 
 ### 2.1. Estructura de directorios del proyecto
 
 ```
-mallas-unal/
-  backend/
-    app/
-      Http/
-        Controllers/Api/
-        Resources/
-        Requests/
-      Models/
-      Services/
-      Jobs/
-    database/
-      migrations/
-      seeders/
-    routes/
-      api.php
-  frontend/
-    src/
-      components/
-      pages/
-      api/
-      hooks/
-      store/
+mallas/
+  app/                          # Backend Laravel
+    Http/
+      Controllers/              # Api/* (API REST), MallaPublicaController (Inertia)
+      Resources/                # API Resources (transformadores JSON)
+      Requests/                 # Form Requests (validación)
+    Models/                     # Modelos Eloquent
+    Services/                   # Lógica de negocio (ExcelUpload, ExcelParser, MallaVisualizer, etc.)
+    Jobs/                       # Procesamiento asincrónico (ProcesarExcelJob)
+  database/
+    migrations/                 # Migraciones de todas las tablas
+    seeders/                    # Datos iniciales
+  routes/
+    api.php                     # Todas las rutas de la API
+    web.php                     # Rutas web (Inertia)
+  resources/                    # Frontend React + Inertia + vistas Blade
+    js/
+      components/               # Componentes reutilizables
+      pages/                    # Vistas por ruta
+      api/                      # Funciones de llamada a la API
+      hooks/                    # Custom hooks
+      store/                    # Estado global (Context API)
+  tests/                        # Tests Pest/PHPUnit
+    Feature/Api/                # Tests E2E de API
+    Unit/                       # Tests unitarios
+  docker/                       # Configuración Docker (nginx, php-fpm, supervisor)
+    nginx.conf
+    php-fpm.conf
+    supervisord.conf
+  docker-compose.yml            # Orquestación Docker (mysql + app)
+  Dockerfile                    # Imagen Docker multi-etapa
+  docker-entrypoint.sh          # Script de entrada con migraciones y cache
 ```
 
 ---
@@ -707,6 +720,12 @@ ORDER BY ag.Tipo_Agrupacion, ag.Nombre_Agrupacion, aa.Semestre_Sugerido;
 
 Base URL: `/api`. Todas las rutas requieren `Authorization: Bearer {token}` excepto auth.
 
+### 8.0. Rutas web (Inertia)
+
+| **Método** | **Ruta**                     | **Controlador**             | **Descripción**                |
+| ---------- | ---------------------------- | --------------------------- | ------------------------------ |
+| GET        | /malla-publica/{id_programa} | MallaPublicaController@show | Visualización pública de malla |
+
 ### 8.1. Autenticación
 
 | **Método** | **Ruta**              | **Descripción**               | **Body**        |
@@ -908,7 +927,7 @@ El archivo se procesa **después** del archivo de malla (Paso 4), extrayendo **s
 
 - PascalCase clases, camelCase métodos, Snake_Case columnas BD
 - Cada entidad: Model, Migration, Controller, Resource, FormRequest
-- Services: `ExcelUploadService`, `ExcelParserService`, `DiffService`, `MallaAprobacionService`, `LogService`
+- Services: `ExcelUploadService`, `ExcelParserService`, `DiffService` (MallaDiffService), `MallaAprobacionService`, `LogService` (LogActividadService), `MallaVisualizerService`, `CodeNormalizationService`
 - Jobs en `app/Jobs/`. Observers en `app/Observers/`
 - Rutas en `routes/api.php` con prefijo `v1`
 - Respuestas: `{data, message, errors}`
@@ -985,3 +1004,27 @@ El archivo se procesa **después** del archivo de malla (Paso 4), extrayendo **s
 | PHP extension: pdo_mysql | Habilitada         | Laravel              |
 | PHP extension: fileinfo  | Habilitada         | Laravel Excel        |
 | PHP extension: zip       | Habilitada         | Laravel Excel        |
+| PHP extension: pcntl     | Habilitada         | queue worker         |
+
+### 12.5. Queue worker
+
+La aplicación usa `QUEUE_CONNECTION=database` para procesamiento asincrónico de cargas Excel.
+**El worker debe estar corriendo para que las cargas se procesen.**
+
+En **producción (Docker):** supervisor ejecuta automáticamente:
+
+```ini
+[program:queue-worker]
+command=php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+user=app
+autostart=true
+autorestart=true
+```
+
+En **local:** ejecutar manualmente:
+
+```bash
+php artisan queue:work --queue=default
+```
+
+En **testing:** `QUEUE_CONNECTION=sync` en `phpunit.xml` para ejecución síncrona.|

@@ -16,7 +16,7 @@
 | Arquitectura    | Monolito modular (Laravel + Inertia + React)                     |
 | Autenticación   | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña) |
 | Tipo de sistema | Panel administrativo cerrado, usuarios contados                  |
-| Versión actual  | 5.3 — Junio 2026                                                 |
+| Versión actual  | 5.4 — Julio 2026                                                 |
 
 ---
 
@@ -29,6 +29,7 @@
 | 5.0     | Abril 2026 | Carga masiva dividida en tres archivos separados; `carga_malla` reemplaza `ID_Archivo` único por tres FKs; flujo de subida en dos fases (subida progresiva + lanzamiento); nuevos estados `esperando_archivos` y `listo_para_procesar`; API de cargas dividida en tres endpoints |
 | 5.2     | Abril 2026 | Integración de archivo OPTATIVA como cuarto paso opcional del Job                                                                                                                                                                                                                |
 | 5.3     | Junio 2026 | Migración a Inertia.js 2.0; catálogos CRUD migrados a vistas Inertia; endpoint público de visualización; mejoras en validación y parser de Excel                                                                                                                                 |
+| 5.4     | Julio 2026 | Refactor visualizador a `MallaVisualizerService` con cache; `MallaPublicaController` extraído; tests E2E de carga, errores humanos, lifecycle y optativas (145 tests, 285 assertions); Docker + supervisor + queue worker                                                        |
 
 ---
 
@@ -53,26 +54,32 @@
 ## Estructura del repositorio
 
 ```
-mallas-unal/
-  backend/                        # Proyecto Laravel 12
-    app/
-      Http/Controllers/Api/       # Controladores de la API REST
-      Http/Resources/             # API Resources (transformadores JSON)
-      Http/Requests/              # Form Requests (validación)
-      Models/                     # Modelos Eloquent
-      Services/                   # Lógica de negocio
-      Jobs/                       # Procesamiento asincrónico de cargas
-    database/
-      migrations/                 # Migraciones de todas las tablas
-      seeders/                    # Datos iniciales
-    routes/api.php                # Todas las rutas de la API
-  frontend/                       # Proyecto React 19 + Vite
-    src/
-      components/                 # Componentes reutilizables
-      pages/                      # Vistas por ruta
-      api/                        # Funciones de llamada a la API
-      hooks/                      # Custom hooks
-      store/                      # Estado global (Context API)
+mallas/
+  app/                        # Backend Laravel 12
+    Http/Controllers/         # Api/* (API REST), MallaPublicaController (Inertia)
+    Http/Resources/           # API Resources
+    Http/Requests/            # Form Requests
+    Models/                   # Modelos Eloquent
+    Services/                 # Lógica de negocio
+    Jobs/                     # Procesamiento asincrónico (ProcesarExcelJob)
+  database/
+    migrations/               # Migraciones de todas las tablas
+    seeders/                  # Datos iniciales
+  routes/
+    api.php                   # Rutas API REST
+    web.php                   # Rutas web (Inertia)
+  resources/js/               # Frontend React 19 + Vite + Inertia
+    components/
+    pages/
+    api/
+    hooks/
+    store/
+  tests/                      # Tests Pest/PHPUnit
+    Feature/Api/              # Tests E2E de API
+    Unit/                     # Tests unitarios
+  docker/                     # Config Docker (nginx, php-fpm, supervisor)
+  docker-compose.yml          # Orquestación (mysql + app)
+  Dockerfile                  # Imagen multi-etapa
 ```
 
 ---
@@ -88,6 +95,27 @@ Antes de implementar, revisar estos cambios en el documento de requerimientos (s
 | `facultad`              | Nuevo campo `Codigo_Facultad VARCHAR(20) UNIQUE`                                    |
 | `archivo_excel`         | Nuevo campo `Tipo_Archivo VARCHAR(20)`                                              |
 | `carga_malla`           | `ID_Archivo` reemplazado por tres FKs + nuevos campos `ID_Programa`, `ID_Normativa` |
+
+---
+
+## Despliegue con Docker
+
+```bash
+docker-compose up -d     # Inicia MySQL + app con nginx + php-fpm + queue worker
+docker-compose down      # Detiene todo
+```
+
+El queue worker corre automáticamente via supervisor dentro del contenedor `app`.
+
+### Entorno local
+
+Si no usas Docker, necesitas:
+
+1. Servidor web apuntando a `public/`
+2. MySQL 8 corriendo
+3. `php artisan migrate`
+4. `npm run dev` para el frontend
+5. **`php artisan queue:work --queue=default`** para procesar cargas Excel
 
 ---
 
@@ -108,12 +136,29 @@ El Job procesa en orden estricto: **asignaturas → electivas → malla**. Ver s
 
 ---
 
+## Tests
+
+145 tests (285 assertions) — Pest PHP v4 con MySQL real.
+
+```bash
+php artisan test
+```
+
 ## Datos de prueba
 
-- **Archivo Excel:** `Plan_Ingenieri_a_Civil_2.xlsx`
-- **Hojas relevantes:** Asignaturas, Electivas, MALLA
-- **Para Fase 3:** separar el Excel en tres archivos individuales (uno por hoja)
-- **Créditos totales reales del programa:** 179 (el Excel reporta 227 por asignaturas repetidas en múltiples agrupaciones)
+Archivos Excel en `files_tests/`:
+
+- `FORMATO - SEDES.xlsx` (1 registro)
+- `FORMATO - FACULTADES.xlsx` (4 registros)
+- `FORMATO - PROGRAMAS.xlsx` (15 programas)
+- `FORMATO - AGRUPACIONES ING. CIVIL_.xlsx` (18 agrupaciones)
+- `FORMATO - NORMATIVA.xlsx` (11 normativas)
+- `FORMATO DE CARGA - ASIGNATURAS.xlsx` (2464 asignaturas)
+- `FORMATO DE CARGA - ELECTIVAS.xlsx` (1000 electivas)
+- `FORMATO DE CARGA - ING. CIVIL .xlsx` (75 filas de malla)
+- `FORMATO DE CARGA - OPTATIVA.xlsx` (archivo complementario)
+
+**Créditos totales reales del programa:** 179 (el Excel reporta 227 por asignaturas repetidas en múltiples agrupaciones)
 
 ---
 
