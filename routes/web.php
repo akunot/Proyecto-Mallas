@@ -627,17 +627,16 @@ Route::middleware(['auth'])->group(function () {
     })->name('mallas.show');
 
     Route::get('/mallas/{id}/grafica', function ($id) {
-        $malla = MallaCurricular::with([
-            'programa',
-            'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
-            'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
-            'agrupaciones.asignaturas.requisitos.asignaturaRequerida',
-            'agrupaciones.componente',
-            'agrupaciones.slots',
-        ])->findOrFail($id);
+        $malla = MallaCurricular::findOrFail($id);
+        $idPrograma = $malla->programa->ID_Programa;
+
+        $malla->load(MallaController::visualizerEagerLoads($idPrograma));
+
+        $payload = MallaController::mallaToVisualizerPayload($malla);
+        $payload['programa']['Facultad'] = $malla->programa->facultad->Nombre_Facultad ?? null;
 
         return Inertia::render('Mallas/Visualizer', [
-            'malla' => $malla,
+            'malla' => $payload,
         ]);
     })->name('mallas.visualizer');
 

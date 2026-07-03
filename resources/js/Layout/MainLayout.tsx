@@ -296,7 +296,7 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </header>
 
                 {/* Main View */}
-                <main className="overflow-x-hidden overflow-y-auto p-4 sm:p-8">
+                <main className="overflow-y-auto bg-[#f8fafc] p-4 sm:p-8">
                     <div className="animate-in fade-in">{children}</div>
                 </main>
             </div>

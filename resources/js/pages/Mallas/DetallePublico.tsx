@@ -1405,7 +1405,7 @@ export default function DetallePublico({
             {selectedAsig && selectedAsigData && (
                 <>
                     <div
-                        className="fixed inset-0 z-[99] bg-black/20 sm:bg-transparent"
+                        className="fixed inset-0 z-[99] bg-black/20 sm:pointer-events-none sm:bg-transparent"
                         onClick={() => setSelectedAsig(null)}
                         aria-hidden="true"
                     />

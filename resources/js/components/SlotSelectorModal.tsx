@@ -26,6 +26,7 @@ interface Slot {
     Nombre_Slot: string;
     Tipo_Slot: 'optativa' | 'libre' | 'nivelatorio';
     Semestre: number | null;
+    Nombre_Agrupacion?: string;
 }
 
 interface SlotSelectorModalProps {
@@ -125,8 +126,10 @@ export default function SlotSelectorModal({
 
     if (!open) return null;
 
-    const headerColor = type === 'optativa' ? '#00236f' : '#047857';
-    const headerDark = type === 'optativa' ? '#001a54' : '#065f46';
+    const headerColor = type === 'optativa' ? '#fff8e1' : '#e1f5fe';
+    const headerDark = type === 'optativa' ? '#ffecb3' : '#b3e5fc';
+    const headerTextColor = type === 'optativa' ? '#3d1a00' : '#001a4b';
+    const accentColor = type === 'optativa' ? '#f9a825' : '#4fc3f7';
 
     return (
         <>
@@ -144,6 +147,8 @@ export default function SlotSelectorModal({
                         className="modal-header"
                         style={{
                             background: `linear-gradient(135deg, ${headerColor} 0%, ${headerDark} 100%)`,
+                            color: headerTextColor,
+                            borderBottom: `3px solid ${accentColor}`,
                         }}
                     >
                         <div>
@@ -152,29 +157,40 @@ export default function SlotSelectorModal({
                                     margin: 0,
                                     fontSize: '1.25rem',
                                     fontWeight: 600,
+                                    color: headerTextColor,
                                 }}
                             >
                                 {type === 'optativa'
                                     ? 'Catálogo de Optativas'
                                     : 'Catálogo de Libre Elección'}
                             </h2>
-                            {slot && (
+                            {slot?.Nombre_Agrupacion && (
                                 <p
                                     style={{
                                         margin: '0.5rem 0 0 0',
                                         fontSize: '0.875rem',
                                         opacity: 0.9,
+                                        color: headerTextColor,
                                     }}
                                 >
-                                    Slot: <strong>{slot.Nombre_Slot}</strong>
-                                    {slot.Semestre &&
-                                        ` | Semestre ${slot.Semestre}`}
+                                    Agrupación:{' '}
+                                    <strong>{slot.Nombre_Agrupacion}</strong>
                                 </p>
                             )}
                         </div>
                         <button
                             onClick={onClose}
                             className="modal-close-btn"
+                            style={{
+                                color: headerTextColor,
+                                transition: 'color 200ms',
+                            }}
+                            onMouseEnter={(e) => {
+                                e.currentTarget.style.color = accentColor;
+                            }}
+                            onMouseLeave={(e) => {
+                                e.currentTarget.style.color = headerTextColor;
+                            }}
                             aria-label="Cerrar"
                         >
                             ✕
@@ -744,16 +760,9 @@ export default function SlotSelectorModal({
                         <div style={{ display: 'flex', gap: '0.75rem' }}>
                             <button
                                 onClick={onClose}
-                                className="modal-btn-secondary"
-                                style={{ fontSize: '0.95rem' }}
-                            >
-                                Cerrar
-                            </button>
-                            <button
-                                onClick={onClose}
                                 className="modal-btn-primary"
                                 style={{
-                                    backgroundColor: headerColor,
+                                    backgroundColor: accentColor,
                                     fontSize: '0.95rem',
                                 }}
                                 aria-label="Cerrar catálogo"

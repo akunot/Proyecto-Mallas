@@ -185,10 +185,11 @@ class MallaController extends Controller
         return self::mallaToVisualizerPayload($malla);
     }
 
-    private static function visualizerEagerLoads(?int $idPrograma = null): array
+    public static function visualizerEagerLoads(?int $idPrograma = null): array
     {
         return [
             'programa',
+            'programa.facultad',
             'normativa',
             'agrupaciones' => fn ($q) => $q->orderBy('ID_Agrupacion'),
             'agrupaciones.asignaturas' => fn ($q) => $q->orderBy('agrupacion_asignatura.Orden'),
@@ -201,7 +202,7 @@ class MallaController extends Controller
         ];
     }
 
-    private static function mallaToVisualizerPayload(MallaCurricular $malla): array
+    public static function mallaToVisualizerPayload(MallaCurricular $malla): array
     {
         $idPrograma = $malla->programa->ID_Programa ?? 0;
 
@@ -211,6 +212,11 @@ class MallaController extends Controller
             'programa' => [
                 'ID_Programa' => $idPrograma,
                 'Nombre_Programa' => $malla->programa->Nombre_Programa ?? '',
+                'Creditos_Totales' => $malla->programa->Creditos_Totales ?? null,
+                'Duracion_Semestres' => $malla->programa->Duracion_Semestres ?? null,
+                'Nivel_Formacion' => $malla->programa->Nivel_Formacion ?? null,
+                'Codigo_SNIES' => $malla->programa->Codigo_SNIES ?? null,
+                'Titulo_Otorgado' => $malla->programa->Titulo_Otorgado ?? null,
             ],
             'normativa' => $malla->normativa ? [
                 'Tipo_Normativa' => $malla->normativa->Tipo_Normativa,
