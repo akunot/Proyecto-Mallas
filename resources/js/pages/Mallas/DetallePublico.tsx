@@ -1708,7 +1708,7 @@ export default function DetallePublico({
                                                 {(() => {
                                                     // Separar filas en tres grupos:
                                                     // - obligatorias puras (sin optativos internos)
-                                                    // - obligatorias con optativos internos (se muestran en ambos lugares)
+                                                    // - obligatorias con optativos internos (solo en sección mixta)
                                                     // - puramente optativas
                                                     const rowsObligPuras =
                                                         rows.filter(
@@ -1756,6 +1756,37 @@ export default function DetallePublico({
                                                             r.creditosOptativos >
                                                             0;
 
+                                                        // Para agrupaciones mixtas, desglosamos el Creditos_Requeridos
+                                                        // en la parte obligatoria y la optativa que el estudiante debe cursar.
+                                                        // creditosOptativos es lo disponible; lo requerido es el remanente.
+                                                        const obligReq =
+                                                            r.Es_Mixta
+                                                                ? Math.max(
+                                                                      0,
+                                                                      refCreditos -
+                                                                          r.creditosOptativos,
+                                                                  )
+                                                                : r.creditosEnGrid;
+                                                        const optReq =
+                                                            r.Es_Mixta
+                                                                ? Math.min(
+                                                                      r.creditosOptativos,
+                                                                      refCreditos,
+                                                                  )
+                                                                : r.creditosOptativos;
+                                                        const pctOblig =
+                                                            refCreditos > 0
+                                                                ? (obligReq /
+                                                                      refCreditos) *
+                                                                  100
+                                                                : 0;
+                                                        const pctOpt =
+                                                            refCreditos > 0
+                                                                ? (optReq /
+                                                                      refCreditos) *
+                                                                  100
+                                                                : 0;
+
                                                         // Cuando showAsOptativa es true, mostramos solo el badge de créditos optativos
                                                         if (
                                                             showAsOptativa &&
@@ -1764,17 +1795,17 @@ export default function DetallePublico({
                                                             return (
                                                                 <div
                                                                     key={i}
-                                                                    className="rounded-xl border border-blue-100 bg-blue-50/30 p-3"
+                                                                    className="rounded-xl border border-blue-200 bg-white shadow-xs"
                                                                 >
-                                                                    <div className="mb-1.5 flex items-center justify-between">
-                                                                        <span className="min-w-0 truncate pr-2 text-[11px] font-semibold text-slate-700">
+                                                                    <div className="flex items-center justify-between border-b border-blue-100 px-3 py-2.5">
+                                                                        <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-slate-700">
                                                                             {
                                                                                 r.Nombre_Agrupacion
                                                                             }
                                                                         </span>
-                                                                        <span className="text-[10px] font-bold text-blue-500">
+                                                                        <span className="shrink-0 text-[10px] font-bold text-blue-500 tabular-nums">
                                                                             {Math.round(
-                                                                                r.creditosOptativos,
+                                                                                optReq,
                                                                             )}{' '}
                                                                             <span className="text-[9px] font-medium text-blue-400">
                                                                                 cr.
@@ -1782,16 +1813,18 @@ export default function DetallePublico({
                                                                             </span>
                                                                         </span>
                                                                     </div>
-                                                                    <div
-                                                                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
-                                                                        title={`${Math.round(r.creditosOptativos)} créditos optativos`}
-                                                                    >
+                                                                    <div className="px-3 py-2.5">
                                                                         <div
-                                                                            className="h-1.5 rounded-full bg-blue-400 transition-all duration-500"
-                                                                            style={{
-                                                                                width: '100%',
-                                                                            }}
-                                                                        />
+                                                                            className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                            title={`${Math.round(optReq)} créditos optativos`}
+                                                                        >
+                                                                            <div
+                                                                                className="h-1.5 rounded-full bg-blue-400 transition-all duration-500"
+                                                                                style={{
+                                                                                    width: '100%',
+                                                                                }}
+                                                                            />
+                                                                        </div>
                                                                     </div>
                                                                 </div>
                                                             );
@@ -1800,17 +1833,17 @@ export default function DetallePublico({
                                                         return (
                                                             <div
                                                                 key={i}
-                                                                className="rounded-xl border border-slate-100 bg-white p-3"
+                                                                className="rounded-xl border border-slate-200 bg-white shadow-xs transition-shadow hover:shadow-sm"
                                                             >
-                                                                <div className="mb-1.5 flex items-center justify-between">
-                                                                    <span className="min-w-0 truncate pr-2 text-[11px] font-semibold text-slate-700">
+                                                                <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
+                                                                    <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-slate-700">
                                                                         {
                                                                             r.Nombre_Agrupacion
                                                                         }
                                                                     </span>
                                                                     <div className="shrink-0 text-right">
                                                                         <span
-                                                                            className={`text-sm font-black ${style.text}`}
+                                                                            className={`text-sm font-black tabular-nums ${style.text}`}
                                                                         >
                                                                             {
                                                                                 refCreditos
@@ -1819,71 +1852,74 @@ export default function DetallePublico({
                                                                                 cr.
                                                                             </span>
                                                                         </span>
-                                                                        {tieneOptRow && (
-                                                                            <div className="mt-1 space-y-1">
-                                                                                <div className="flex h-1 overflow-hidden rounded-full bg-slate-100">
-                                                                                    <div
-                                                                                        className="bg-rose-400"
-                                                                                        style={{
-                                                                                            width: `${Math.max((r.creditosEnGrid / refCreditos) * 100, 0)}%`,
-                                                                                        }}
-                                                                                    />
-                                                                                    {r.Es_Mixta ? (
-                                                                                        <div
-                                                                                            className="bg-gray-300"
-                                                                                            style={{
-                                                                                                width: `${Math.max((r.creditosOptativos / refCreditos) * 100, 0)}%`,
-                                                                                            }}
-                                                                                        />
-                                                                                    ) : (
-                                                                                        <div
-                                                                                            className="bg-blue-400"
-                                                                                            style={{
-                                                                                                width: `${Math.max((r.creditosOptativos / refCreditos) * 100, 0)}%`,
-                                                                                            }}
-                                                                                        />
-                                                                                    )}
-                                                                                </div>
-                                                                                <span className="text-[9px] font-bold text-slate-400 tabular-nums">
-                                                                                    {Math.round(
-                                                                                        r.creditosEnGrid,
-                                                                                    )}{' '}
-                                                                                    oblig
-                                                                                    {r.Es_Mixta ? (
-                                                                                        <span>
-                                                                                            {' '}
-                                                                                            ·{' '}
-                                                                                            {Math.round(
-                                                                                                r.creditosOptativos,
-                                                                                            )}{' '}
-                                                                                            opt
-                                                                                            (interno)
-                                                                                        </span>
-                                                                                    ) : (
-                                                                                        <span>
-                                                                                            {' '}
-                                                                                            ·{' '}
-                                                                                            {Math.round(
-                                                                                                r.creditosOptativos,
-                                                                                            )}{' '}
-                                                                                            opt
-                                                                                        </span>
-                                                                                    )}
-                                                                                </span>
-                                                                            </div>
-                                                                        )}
                                                                     </div>
                                                                 </div>
-                                                                <div
-                                                                    className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
-                                                                    title={`${rowPct}% del componente`}
-                                                                >
+                                                                <div className="px-3 py-2">
+                                                                    {tieneOptRow && (
+                                                                        <div className="mb-2">
+                                                                            <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                                                                {obligReq >
+                                                                                    0 && (
+                                                                                    <div
+                                                                                        className="bg-rose-400 transition-all duration-500"
+                                                                                        style={{
+                                                                                            width: `${pctOblig}%`,
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                                {optReq >
+                                                                                    0 && (
+                                                                                    <div
+                                                                                        className={
+                                                                                            r.Es_Mixta
+                                                                                                ? 'bg-amber-300 transition-all duration-500'
+                                                                                                : 'bg-blue-400 transition-all duration-500'
+                                                                                        }
+                                                                                        style={{
+                                                                                            width: `${pctOpt}%`,
+                                                                                        }}
+                                                                                    />
+                                                                                )}
+                                                                            </div>
+                                                                            <span className="mt-1 block text-[9px] font-bold tracking-tight text-slate-400 tabular-nums">
+                                                                                {Math.round(
+                                                                                    obligReq,
+                                                                                )}{' '}
+                                                                                oblig
+                                                                                {optReq >
+                                                                                    0 && (
+                                                                                    <span>
+                                                                                        {' '}
+                                                                                        ·{' '}
+                                                                                        {Math.round(
+                                                                                            optReq,
+                                                                                        )}{' '}
+                                                                                        opt
+                                                                                    </span>
+                                                                                )}
+                                                                            </span>
+                                                                        </div>
+                                                                    )}
                                                                     <div
-                                                                        className={`h-1.5 rounded-full ${style.dot} transition-all duration-500`}
-                                                                        style={{
-                                                                            width: `${Math.min(rowPct, 100)}%`,
-                                                                        }}
-                                                                    />
+                                                                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                        title={`${rowPct}% del componente`}
+                                                                    >
+                                                                        <div
+                                                                            className={`h-1.5 rounded-full ${style.dot} transition-all duration-500`}
+                                                                            style={{
+                                                                                width: `${Math.min(rowPct, 100)}%`,
+                                                                            }}
+                                                                        />
+                                                                    </div>
+                                                                    {rowPct >
+                                                                        0 && (
+                                                                        <span className="mt-1 block text-right text-[8px] font-bold text-slate-300 tabular-nums">
+                                                                            {
+                                                                                rowPct
+                                                                            }
+                                                                            %
+                                                                        </span>
+                                                                    )}
                                                                 </div>
                                                             </div>
                                                         );
@@ -1895,13 +1931,15 @@ export default function DetallePublico({
                                                             {rowsObligPuras.length >
                                                                 0 && (
                                                                 <div>
-                                                                    <div className="mb-1.5 flex items-center gap-2">
-                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-                                                                        <span className="text-[10px] font-black tracking-widest text-rose-500 uppercase">
+                                                                    <div className="mb-2 flex items-center gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-rose-50">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-rose-400" />
+                                                                        </span>
+                                                                        <span className="text-[10px] font-black tracking-wider text-rose-600 uppercase">
                                                                             Agrupaciones
                                                                             Obligatorias
                                                                         </span>
-                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                        <span className="ml-auto rounded-md bg-rose-50 px-1.5 py-0.5 text-[10px] font-bold text-rose-500 tabular-nums">
                                                                             {Math.round(
                                                                                 totalOblig,
                                                                             )}{' '}
@@ -1931,18 +1969,20 @@ export default function DetallePublico({
                                                                 </div>
                                                             )}
 
-                                                            {/* Agrupaciones Obligatorias con Optativos internos — también en sección Optativas */}
+                                                            {/* Agrupaciones Obligatorias con Optativos internos */}
                                                             {rowsObligConOpt.length >
                                                                 0 && (
                                                                 <div>
-                                                                    <div className="mb-1.5 flex items-center gap-2">
-                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400" />
-                                                                        <span className="text-[10px] font-black tracking-widest text-rose-500 uppercase">
+                                                                    <div className="mb-2 flex items-center gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-amber-400" />
+                                                                        </span>
+                                                                        <span className="text-[10px] font-black tracking-wider text-amber-600 uppercase">
                                                                             Obligatorias
                                                                             con
                                                                             Optativos
                                                                         </span>
-                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                        <span className="ml-auto rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-bold text-amber-500 tabular-nums">
                                                                             {Math.round(
                                                                                 rowsObligConOpt.reduce(
                                                                                     (
@@ -1973,9 +2013,6 @@ export default function DetallePublico({
                                                                                     i={
                                                                                         i
                                                                                     }
-                                                                                    showAsOptativa={
-                                                                                        true
-                                                                                    }
                                                                                 />
                                                                             ),
                                                                         )}
@@ -2002,18 +2039,18 @@ export default function DetallePublico({
                                                                 )}
 
                                                             {/* Sección: Agrupaciones Optativas */}
-                                                            {(rowsOpt.length >
-                                                                0 ||
-                                                                rowsObligConOpt.length >
-                                                                    0) && (
+                                                            {rowsOpt.length >
+                                                                0 && (
                                                                 <div>
-                                                                    <div className="mb-1.5 flex items-center gap-2">
-                                                                        <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-blue-400" />
-                                                                        <span className="text-[10px] font-black tracking-widest text-blue-500 uppercase">
+                                                                    <div className="mb-2 flex items-center gap-2">
+                                                                        <span className="flex h-4 w-4 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50">
+                                                                            <span className="h-1.5 w-1.5 rounded-full bg-blue-400" />
+                                                                        </span>
+                                                                        <span className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
                                                                             Agrupaciones
                                                                             Optativas
                                                                         </span>
-                                                                        <span className="ml-auto text-[10px] font-bold text-slate-400">
+                                                                        <span className="ml-auto rounded-md bg-blue-50 px-1.5 py-0.5 text-[10px] font-bold text-blue-500 tabular-nums">
                                                                             {Math.round(
                                                                                 rowsOpt.reduce(
                                                                                     (
@@ -2024,17 +2061,7 @@ export default function DetallePublico({
                                                                                         (r.creditosOptativos ||
                                                                                             0),
                                                                                     0,
-                                                                                ) +
-                                                                                    rowsObligConOpt.reduce(
-                                                                                        (
-                                                                                            s,
-                                                                                            r,
-                                                                                        ) =>
-                                                                                            s +
-                                                                                            (r.creditosOptativos ||
-                                                                                                0),
-                                                                                        0,
-                                                                                    ),
+                                                                                ),
                                                                             )}{' '}
                                                                             cr.
                                                                         </span>
@@ -2058,25 +2085,6 @@ export default function DetallePublico({
                                                                                 />
                                                                             ),
                                                                         )}
-                                                                        {rowsObligConOpt.map(
-                                                                            (
-                                                                                r,
-                                                                                i,
-                                                                            ) => (
-                                                                                <AgrupRow
-                                                                                    key={`opt-${i}`}
-                                                                                    r={
-                                                                                        r
-                                                                                    }
-                                                                                    i={
-                                                                                        i
-                                                                                    }
-                                                                                    showAsOptativa={
-                                                                                        true
-                                                                                    }
-                                                                                />
-                                                                            ),
-                                                                        )}
                                                                     </div>
                                                                 </div>
                                                             )}
@@ -2086,12 +2094,12 @@ export default function DetallePublico({
 
                                                 {/* Fila totales del componente */}
                                                 <div
-                                                    className={`rounded-xl border p-3 ${style.bg} mt-2 flex items-center justify-between border-current/10`}
+                                                    className={`rounded-xl border ${style.bg} mt-2 flex items-center justify-between border-current/20 p-3 shadow-xs`}
                                                 >
                                                     <span className="text-[10px] font-black tracking-wider text-slate-600 uppercase">
                                                         Total del componente
                                                     </span>
-                                                    <div className="flex items-center gap-3 text-xs font-black">
+                                                    <div className="flex items-center gap-3 text-xs font-black tabular-nums">
                                                         {totalOblig > 0 && (
                                                             <span className="text-slate-500">
                                                                 {Math.round(
@@ -2210,7 +2218,7 @@ export default function DetallePublico({
                 </footer>
             </div>
 
-            {/* MODAL: ¿Cómo leer la malla? */}
+            {/* MODAL: ¿Cómo leer la malla? — Guía visual rediseñada con explicación de agrupaciones */}
             {showGuideModal && (
                 <div
                     className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4"
@@ -2239,40 +2247,265 @@ export default function DetallePublico({
                             </button>
                         </div>
                         <div className="max-h-[75vh] overflow-y-auto">
-                            {/* Ejemplo visual de card */}
-                            <div className="border-b border-slate-100 bg-slate-50 px-8 pt-6 pb-5">
+                            {/* 1. Jerarquía del plan de estudios — Diagrama visual */}
+                            <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white px-8 pt-6 pb-5">
                                 <p className="mb-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
-                                    Ejemplo de tarjeta de asignatura
+                                    Niveles del plan de estudios
                                 </p>
-                                <div className="flex items-start gap-8">
-                                    <div className="w-44 shrink-0 overflow-hidden rounded-xl border-l-[5px] border-l-[#8bc34a] bg-white shadow-md">
-                                        <div className="flex justify-around border-b border-white/50 bg-[#f1f8e9] py-1 text-[8px] font-black text-slate-500">
-                                            <span>3 CR</span>
-                                            <span>4 HP</span>
-                                            <span>5 HE</span>
-                                        </div>
-                                        <div className="flex h-14 items-center justify-center px-3 py-3 text-center">
-                                            <h4 className="text-[10px] leading-tight font-bold text-slate-800">
-                                                Bases de Datos I
-                                            </h4>
-                                        </div>
-                                        <div className="flex items-center justify-between bg-slate-50/50 px-2 py-1">
-                                            <span className="font-mono text-[8px] font-bold text-slate-400">
-                                                4100552
+                                <div className="space-y-2.5 text-xs">
+                                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#00236f] text-[9px] font-black text-white">
+                                            1
+                                        </span>
+                                        <div>
+                                            <span className="font-bold text-slate-800">
+                                                Programa Académico
                                             </span>
-                                            <div className="flex items-center gap-1">
-                                                <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white">
-                                                    <span className="text-[7px] font-bold text-white">
-                                                        P
-                                                    </span>
-                                                </div>
-                                                <span className="material-symbols-outlined !text-sm text-rose-500">
-                                                    verified
+                                            <span className="ml-2 text-slate-400">
+                                                {programa.Nombre_Programa}
+                                            </span>
+                                        </div>
+                                    </div>
+                                    <div className="ml-3 border-l-2 border-dashed border-slate-200 pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f9a825] text-[9px] font-black text-white">
+                                                2
+                                            </span>
+                                            <div>
+                                                <span className="font-bold text-slate-800">
+                                                    Componente de Formación
+                                                </span>
+                                                <span className="ml-2 text-slate-400">
+                                                    ej: Disciplinar — 84
+                                                    créditos
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-1 space-y-3 text-xs text-slate-700">
+                                    <div className="ml-6 border-l-2 border-dashed border-slate-200 pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#8bc34a] text-[9px] font-black text-white">
+                                                3
+                                            </span>
+                                            <div>
+                                                <span className="font-bold text-slate-800">
+                                                    Agrupación
+                                                </span>
+                                                <span className="ml-2 text-slate-400">
+                                                    ej: Finanzas — 14 créditos
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="ml-9 border-l-2 border-dashed border-slate-200 pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                            <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#4fc3f7] text-[9px] font-black text-white">
+                                                4
+                                            </span>
+                                            <div>
+                                                <span className="font-bold text-slate-800">
+                                                    Asignatura
+                                                </span>
+                                                <span className="ml-2 text-slate-400">
+                                                    cada curso individual en la
+                                                    malla
+                                                </span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                                <p className="mt-3 text-[10px] leading-relaxed text-slate-400 italic">
+                                    Cada nivel agrupa al siguiente. Una
+                                    agrupación es un conjunto de asignaturas
+                                    afines dentro de un mismo componente de
+                                    formación.
+                                </p>
+                            </div>
+
+                            {/* 2. Tipos de agrupación — Nuevo */}
+                            <div className="border-b border-slate-100 px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                    Tipos de agrupación
+                                </p>
+                                <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
+                                    <div className="rounded-xl border border-rose-100 bg-rose-50/40 p-3.5">
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                            <span className="h-2 w-2 rounded-full bg-rose-400" />
+                                            <span className="text-[10px] font-black tracking-wider text-rose-600 uppercase">
+                                                Obligatorias
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                            Todas las asignaturas son
+                                            obligatorias. Debes cursarlas para
+                                            completar el componente.
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-amber-100 bg-amber-50/40 p-3.5">
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                            <span className="h-2 w-2 rounded-full bg-amber-400" />
+                                            <span className="text-[10px] font-black tracking-wider text-amber-600 uppercase">
+                                                Mixtas
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                            Combinan asignaturas obligatorias y
+                                            optativas. Las optativas aparecen
+                                            como botón "Ver optativas de..." en
+                                            la malla.
+                                        </p>
+                                    </div>
+                                    <div className="rounded-xl border border-blue-100 bg-blue-50/40 p-3.5">
+                                        <div className="mb-1.5 flex items-center gap-2">
+                                            <span className="h-2 w-2 rounded-full bg-blue-400" />
+                                            <span className="text-[10px] font-black tracking-wider text-blue-600 uppercase">
+                                                Optativas
+                                            </span>
+                                        </div>
+                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                            Agrupaciones donde tú eliges qué
+                                            cursos tomar entre una oferta
+                                            disponible.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 3. El panel de distribución de créditos — Nuevo */}
+                            <div className="border-b border-slate-100 bg-slate-50/60 px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                    Cómo leer la distribución de créditos
+                                </p>
+                                <div className="space-y-2.5 text-xs text-slate-600">
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-rose-50">
+                                            <span className="material-symbols-outlined !text-[12px] text-rose-500">
+                                                verified
+                                            </span>
+                                        </div>
+                                        <p>
+                                            <span className="font-bold text-rose-600">
+                                                Obligatorios
+                                            </span>{' '}
+                                            — créditos de asignaturas que todos
+                                            los estudiantes deben cursar. Son la
+                                            base del componente.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-blue-200 bg-blue-50">
+                                            <span className="material-symbols-outlined !text-[12px] text-blue-500">
+                                                star
+                                            </span>
+                                        </div>
+                                        <p>
+                                            <span className="font-bold text-blue-600">
+                                                Optativos
+                                            </span>{' '}
+                                            — créditos que eliges entre varias
+                                            opciones. Aparecen desglosados por
+                                            agrupación en el panel.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-amber-200 bg-amber-50">
+                                            <span className="material-symbols-outlined !text-[12px] text-amber-500">
+                                                call_split
+                                            </span>
+                                        </div>
+                                        <p>
+                                            <span className="font-bold text-amber-600">
+                                                Agrupaciones Mixtas
+                                            </span>{' '}
+                                            — en el panel de distribución, las
+                                            agrupaciones con optativos muestran
+                                            el desglose: créditos obligatorios y
+                                            optativos separados por colores.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white">
+                                            <span className="material-symbols-outlined !text-[12px] text-slate-500">
+                                                bar_chart
+                                            </span>
+                                        </div>
+                                        <p>
+                                            Las{' '}
+                                            <span className="font-bold">
+                                                barras de progreso
+                                            </span>{' '}
+                                            en cada agrupación muestran su peso
+                                            dentro del componente. Las barras
+                                            divididas (rosa + azul/gris) indican
+                                            la proporción entre obligatorio y
+                                            optativo.
+                                        </p>
+                                    </div>
+                                    <div className="flex items-start gap-3">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-violet-200 bg-violet-50">
+                                            <span className="material-symbols-outlined !text-[12px] text-violet-500">
+                                                calculate
+                                            </span>
+                                        </div>
+                                        <p>
+                                            En{' '}
+                                            <span className="font-bold text-violet-600">
+                                                agrupaciones mixtas
+                                            </span>
+                                            , el total de créditos requeridos se
+                                            reparte: los{' '}
+                                            <span className="font-bold">
+                                                obligatorios
+                                            </span>{' '}
+                                            son el total menos los créditos
+                                            optativos disponibles, y los{' '}
+                                            <span className="font-bold">
+                                                optativos
+                                            </span>{' '}
+                                            son lo que debes escoger del listado
+                                            ofertado. Ambos suman el total de la
+                                            agrupación.
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* 4. Ejemplo visual de tarjeta de asignatura */}
+                            <div className="border-b border-slate-100 bg-white px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                                    Ejemplo de tarjeta de asignatura
+                                </p>
+                                <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-start sm:gap-8">
+                                    <div className="w-full shrink-0 sm:w-44">
+                                        <div className="overflow-hidden rounded-xl border-l-[5px] border-l-[#8bc34a] bg-white shadow-md">
+                                            <div className="flex justify-around border-b border-white/50 bg-[#f1f8e9] py-1 text-[8px] font-black text-slate-500">
+                                                <span>3 CR</span>
+                                                <span>4 HP</span>
+                                                <span>5 HE</span>
+                                            </div>
+                                            <div className="flex h-14 items-center justify-center px-3 py-3 text-center">
+                                                <h4 className="text-[10px] leading-tight font-bold text-slate-800">
+                                                    Bases de Datos I
+                                                </h4>
+                                            </div>
+                                            <div className="flex items-center justify-between bg-slate-50/50 px-2 py-1">
+                                                <span className="font-mono text-[8px] font-bold text-slate-400">
+                                                    4100552
+                                                </span>
+                                                <div className="flex items-center gap-1">
+                                                    <div className="flex h-3.5 w-3.5 items-center justify-center rounded-full bg-rose-500 ring-2 ring-white">
+                                                        <span className="text-[7px] font-bold text-white">
+                                                            P
+                                                        </span>
+                                                    </div>
+                                                    <span className="material-symbols-outlined !text-sm text-rose-500">
+                                                        verified
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div className="flex-1 space-y-2.5 text-xs text-slate-700">
                                         <div className="flex items-start gap-2.5">
                                             <div className="mt-0.5 h-5 w-5 shrink-0 rounded border-l-4 border-[#8bc34a] bg-[#f1f8e9]" />
                                             <p>
@@ -2283,10 +2516,8 @@ export default function DetallePublico({
                                                 <span className="font-bold">
                                                     componente de formación
                                                 </span>
-                                                . Haz clic en los botones del
-                                                footer para ver la descripción
-                                                de cada componente y su tabla de
-                                                créditos.
+                                                . Cada componente tiene su
+                                                propio color (ver footer).
                                             </p>
                                         </div>
                                         <div className="flex items-start gap-2.5">
@@ -2346,18 +2577,15 @@ export default function DetallePublico({
                                                 <span className="font-bold text-amber-500">
                                                     C
                                                 </span>{' '}
-                                                = tiene correquisitos.{' '}
-                                                <span className="font-bold">
-                                                    Haz clic en la tarjeta
-                                                </span>{' '}
-                                                para resaltarlos en toda la
-                                                malla.
+                                                = tiene correquisitos. Haz clic
+                                                en la tarjeta para resaltarlos.
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
-                            {/* Acordeones */}
+
+                            {/* 5. Acordeones — contenido estático */}
                             <div className="divide-y divide-slate-100">
                                 {[
                                     {
