@@ -33,14 +33,19 @@ interface Props {
 const getTipoBadge = (tipo: string) => {
     const config: Record<string, { bg: string; text: string }> = {
         obligatoria: { bg: 'bg-gray-100', text: 'text-gray-700' },
-        optativa:    { bg: 'bg-gray-50',  text: 'text-gray-600' },
-        electiva:    { bg: 'bg-gray-50',  text: 'text-gray-600' },
-        libre:       { bg: 'bg-gray-50',  text: 'text-gray-600' },
+        optativa: { bg: 'bg-gray-50', text: 'text-gray-600' },
+        electiva: { bg: 'bg-gray-50', text: 'text-gray-600' },
+        libre: { bg: 'bg-gray-50', text: 'text-gray-600' },
     };
-    const c = config[tipo.toLowerCase()] ?? { bg: 'bg-gray-50', text: 'text-gray-600' };
+    const c = config[tipo.toLowerCase()] ?? {
+        bg: 'bg-gray-50',
+        text: 'text-gray-600',
+    };
 
     return (
-        <span className={`inline-flex px-2 py-0.5 rounded text-[11px] font-medium ${c.bg} ${c.text}`}>
+        <span
+            className={`inline-flex rounded px-2 py-0.5 text-[11px] font-medium ${c.bg} ${c.text}`}
+        >
             {tipo}
         </span>
     );
@@ -48,10 +53,10 @@ const getTipoBadge = (tipo: string) => {
 
 const StatusPill = ({ tipo }: { tipo: string }) => {
     const config: Record<string, string> = {
-        obligatoria: "bg-blue-50 text-blue-700 border-blue-100",
-        optativa: "bg-amber-50 text-amber-700 border-amber-100",
-        electiva: "bg-emerald-50 text-emerald-700 border-emerald-100",
-        libre: "bg-slate-100 text-slate-600 border-slate-200",
+        obligatoria: 'bg-blue-50 text-blue-700 border-blue-100',
+        optativa: 'bg-amber-50 text-amber-700 border-amber-100',
+        electiva: 'bg-emerald-50 text-emerald-700 border-emerald-100',
+        libre: 'bg-slate-100 text-slate-600 border-slate-200',
     };
     const style = config[tipo.toLowerCase()] || config.libre;
 
@@ -63,9 +68,11 @@ export default function MallaShow({ malla }: Props) {
     const stats = useMemo(() => {
         let totalCreditos = 0;
         let totalMaterias = 0;
-        malla.agrupaciones.forEach(ag => {
+        malla.agrupaciones.forEach((ag) => {
             totalMaterias += ag.asignaturas.length;
-            ag.asignaturas.forEach(as => totalCreditos += as.Creditos_Asignatura);
+            ag.asignaturas.forEach(
+                (as) => (totalCreditos += as.Creditos_Asignatura),
+            );
         });
 
         return { totalCreditos, totalMaterias };
@@ -73,28 +80,35 @@ export default function MallaShow({ malla }: Props) {
 
     return (
         <Layout>
-            <Head title={`Plan ${malla.Codigo_Plan} - ${malla.programa.Nombre_Programa}`} />
+            <Head
+                title={`${malla.programa.Nombre_Programa}${malla.Codigo_Plan ? ` - Plan ${malla.Codigo_Plan}` : ''}`}
+            />
 
-            <div className="max-w-[1400px] mx-auto space-y-8 pb-12">
-                
+            <div className="mx-auto max-w-[1400px] space-y-8 pb-12">
                 {/* 1. Header & Navigation */}
-                <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+                <div className="flex flex-col items-start justify-between gap-6 lg:flex-row lg:items-center">
                     <div className="flex items-center gap-4">
                         <Link
                             href="/mallas"
-                            className="w-10 h-10 flex items-center justify-center rounded-xl bg-white border border-slate-200 text-slate-400 hover:text-[#00236f] hover:border-[#00236f] transition-all shadow-sm active:scale-90"
+                            className="flex h-10 w-10 items-center justify-center rounded-xl border border-slate-200 bg-white text-slate-400 shadow-sm transition-all hover:border-[#00236f] hover:text-[#00236f] active:scale-90"
                         >
-                            <span className="material-symbols-outlined">arrow_back</span>
+                            <span className="material-symbols-outlined">
+                                arrow_back
+                            </span>
                         </Link>
                         <div>
-                            <div className="flex items-center gap-2 mb-1">
-                                <span className="bg-blue-100 text-[#00236f] text-[10px] font-black px-2 py-0.5 rounded uppercase tracking-widest">
+                            <div className="mb-1 flex items-center gap-2">
+                                <span className="rounded bg-blue-100 px-2 py-0.5 text-[10px] font-black tracking-widest text-[#00236f] uppercase">
                                     Plan {malla.Codigo_Plan}
                                 </span>
-                                <span className="text-slate-300 text-xs">|</span>
-                                <span className="text-slate-500 text-xs font-medium">Sede Manizales</span>
+                                <span className="text-xs text-slate-300">
+                                    |
+                                </span>
+                                <span className="text-xs font-medium text-slate-500">
+                                    Sede Manizales
+                                </span>
                             </div>
-                            <h1 className="text-3xl font-black text-slate-900 tracking-tight leading-none">
+                            <h1 className="text-3xl leading-none font-black tracking-tight text-slate-900">
                                 {malla.programa.Nombre_Programa}
                             </h1>
                         </div>
@@ -103,39 +117,55 @@ export default function MallaShow({ malla }: Props) {
                     <div className="flex items-center gap-3">
                         <Link
                             href={`/mallas/${malla.ID_Malla}/optativas-asignacion`}
-                            className="flex items-center gap-2 px-6 py-3 bg-amber-50 text-amber-700 rounded-xl font-bold hover:bg-amber-100 hover:scale-[1.02] active:scale-95 transition-all border border-amber-200"
+                            className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-6 py-3 font-bold text-amber-700 transition-all hover:scale-[1.02] hover:bg-amber-100 active:scale-95"
                         >
-                            <span className="material-symbols-outlined !text-xl">playlist_add_check</span>
+                            <span className="material-symbols-outlined !text-xl">
+                                playlist_add_check
+                            </span>
                             Asignar Optativas
                         </Link>
                         <Link
                             href={`/mallas/${malla.ID_Malla}/grafica`}
-                            className="flex items-center gap-2 px-6 py-3 bg-[#00236f] text-white rounded-xl font-bold hover:scale-[1.02] active:scale-95 transition-all shadow-lg shadow-blue-900/20"
+                            className="flex items-center gap-2 rounded-xl bg-[#00236f] px-6 py-3 font-bold text-white shadow-lg shadow-blue-900/20 transition-all hover:scale-[1.02] active:scale-95"
                         >
-                            <span className="material-symbols-outlined !text-xl">account_tree</span>
+                            <span className="material-symbols-outlined !text-xl">
+                                account_tree
+                            </span>
                             Visualizar Gráfica Malla
                         </Link>
                     </div>
                 </div>
 
                 {/* 2. Stats Dashboard (Resumen de Malla) */}
-                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-blue-50 flex items-center justify-center text-blue-600">
-                            <span className="material-symbols-outlined !text-3xl">school</span>
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
+                    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-blue-50 text-blue-600">
+                            <span className="material-symbols-outlined !text-3xl">
+                                school
+                            </span>
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Total Créditos</p>
-                            <p className="text-2xl font-black text-slate-900">{stats.totalCreditos}</p>
+                            <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                                Total Créditos
+                            </p>
+                            <p className="text-2xl font-black text-slate-900">
+                                {stats.totalCreditos}
+                            </p>
                         </div>
                     </div>
-                    <div className="bg-white p-5 rounded-2xl border border-slate-200 flex items-center gap-4">
-                        <div className="w-12 h-12 rounded-xl bg-emerald-50 flex items-center justify-center text-emerald-600">
-                            <span className="material-symbols-outlined !text-3xl">auto_stories</span>
+                    <div className="flex items-center gap-4 rounded-2xl border border-slate-200 bg-white p-5">
+                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-emerald-50 text-emerald-600">
+                            <span className="material-symbols-outlined !text-3xl">
+                                auto_stories
+                            </span>
                         </div>
                         <div>
-                            <p className="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Asignaturas</p>
-                            <p className="text-2xl font-black text-slate-900">{stats.totalMaterias}</p>
+                            <p className="text-[10px] font-bold tracking-widest text-slate-400 uppercase">
+                                Asignaturas
+                            </p>
+                            <p className="text-2xl font-black text-slate-900">
+                                {stats.totalMaterias}
+                            </p>
                         </div>
                     </div>
                 </div>
@@ -145,27 +175,41 @@ export default function MallaShow({ malla }: Props) {
                     {malla.agrupaciones
                         .filter((agrup) => agrup.asignaturas.length > 0)
                         .map((agrup) => {
-                            const areaCreditos = agrup.asignaturas.reduce((s, a) => s + a.Creditos_Asignatura, 0);
+                            const areaCreditos = agrup.asignaturas.reduce(
+                                (s, a) => s + a.Creditos_Asignatura,
+                                0,
+                            );
 
                             return (
-                                <section key={agrup.ID_Agrupacion} className="component-card">
+                                <section
+                                    key={agrup.ID_Agrupacion}
+                                    className="component-card"
+                                >
                                     {/* Cabecera del Componente */}
-                                    <div className="px-6 py-4 bg-slate-50 border-b border-slate-200 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                    <div className="flex flex-col justify-between gap-4 border-b border-slate-200 bg-slate-50 px-6 py-4 sm:flex-row sm:items-center">
                                         <div className="flex items-center gap-3">
-                                            <div className="w-2 h-8 bg-[#00236f] rounded-full" />
-                                            <h2 className="text-lg font-black text-slate-800 uppercase tracking-tight">
+                                            <div className="h-8 w-2 rounded-full bg-[#00236f]" />
+                                            <h2 className="text-lg font-black tracking-tight text-slate-800 uppercase">
                                                 {agrup.Nombre_Agrupacion}
                                             </h2>
                                         </div>
                                         <div className="flex items-center gap-4">
                                             <div className="text-right">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Subtotal Créditos</p>
-                                                <p className="text-lg font-black text-[#00236f] leading-none mt-1">{areaCreditos}</p>
+                                                <p className="text-[9px] leading-none font-black tracking-widest text-slate-400 uppercase">
+                                                    Subtotal Créditos
+                                                </p>
+                                                <p className="mt-1 text-lg leading-none font-black text-[#00236f]">
+                                                    {areaCreditos}
+                                                </p>
                                             </div>
-                                            <div className="h-8 w-[1px] bg-slate-200 hidden sm:block" />
+                                            <div className="hidden h-8 w-[1px] bg-slate-200 sm:block" />
                                             <div className="text-right">
-                                                <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest leading-none">Materias</p>
-                                                <p className="text-lg font-black text-slate-700 leading-none mt-1">{agrup.asignaturas.length}</p>
+                                                <p className="text-[9px] leading-none font-black tracking-widest text-slate-400 uppercase">
+                                                    Materias
+                                                </p>
+                                                <p className="mt-1 text-lg leading-none font-black text-slate-700">
+                                                    {agrup.asignaturas.length}
+                                                </p>
                                             </div>
                                         </div>
                                     </div>
@@ -175,43 +219,77 @@ export default function MallaShow({ malla }: Props) {
                                         <table className="w-full text-left">
                                             <thead>
                                                 <tr className="border-b border-slate-100 bg-white">
-                                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[2px]">Código</th>
-                                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[2px]">Asignatura</th>
-                                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[2px] text-center">Créditos</th>
-                                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[2px]">Naturaleza</th>
-                                                    <th className="px-8 py-3 text-[10px] font-black text-slate-400 uppercase tracking-[2px] text-right">Semestre Sugerido</th>
+                                                    <th className="px-8 py-3 text-[10px] font-black tracking-[2px] text-slate-400 uppercase">
+                                                        Código
+                                                    </th>
+                                                    <th className="px-8 py-3 text-[10px] font-black tracking-[2px] text-slate-400 uppercase">
+                                                        Asignatura
+                                                    </th>
+                                                    <th className="px-8 py-3 text-center text-[10px] font-black tracking-[2px] text-slate-400 uppercase">
+                                                        Créditos
+                                                    </th>
+                                                    <th className="px-8 py-3 text-[10px] font-black tracking-[2px] text-slate-400 uppercase">
+                                                        Naturaleza
+                                                    </th>
+                                                    <th className="px-8 py-3 text-right text-[10px] font-black tracking-[2px] text-slate-400 uppercase">
+                                                        Semestre Sugerido
+                                                    </th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-slate-50">
-                                                {agrup.asignaturas.map((asig) => (
-                                                    <tr key={asig.ID_Asignatura} className="asig-row group">
-                                                        <td className="px-8 py-4">
-                                                            <span className="font-mono text-sm text-slate-400 font-medium group-hover:text-blue-600">
-                                                                {asig.Codigo_Asignatura}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-8 py-4">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-sm font-bold text-slate-800">
-                                                                    {asig.Nombre_Asignatura}
+                                                {agrup.asignaturas.map(
+                                                    (asig) => (
+                                                        <tr
+                                                            key={
+                                                                asig.ID_Asignatura
+                                                            }
+                                                            className="asig-row group"
+                                                        >
+                                                            <td className="px-8 py-4">
+                                                                <span className="font-mono text-sm font-medium text-slate-400 group-hover:text-blue-600">
+                                                                    {
+                                                                        asig.Codigo_Asignatura
+                                                                    }
                                                                 </span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-8 py-4 text-center">
-                                                            <span className="inline-flex items-center justify-center w-8 h-8 rounded-lg bg-slate-100 text-slate-700 text-xs font-black ring-1 ring-slate-200">
-                                                                {asig.Creditos_Asignatura}
-                                                            </span>
-                                                        </td>
-                                                        <td className="px-8 py-4">
-                                                            <StatusPill tipo={asig.pivot.Tipo_Asignatura} />
-                                                        </td>
-                                                        <td className="px-8 py-4 text-right">
-                                                            <span className="text-xs font-bold text-slate-500 bg-slate-50 px-3 py-1 rounded-full border border-slate-100">
-                                                                Semestre {asig.pivot.Semestre_Sugerido}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
+                                                            </td>
+                                                            <td className="px-8 py-4">
+                                                                <div className="flex flex-col">
+                                                                    <span className="text-sm font-bold text-slate-800">
+                                                                        {
+                                                                            asig.Nombre_Asignatura
+                                                                        }
+                                                                    </span>
+                                                                </div>
+                                                            </td>
+                                                            <td className="px-8 py-4 text-center">
+                                                                <span className="inline-flex h-8 w-8 items-center justify-center rounded-lg bg-slate-100 text-xs font-black text-slate-700 ring-1 ring-slate-200">
+                                                                    {
+                                                                        asig.Creditos_Asignatura
+                                                                    }
+                                                                </span>
+                                                            </td>
+                                                            <td className="px-8 py-4">
+                                                                <StatusPill
+                                                                    tipo={
+                                                                        asig
+                                                                            .pivot
+                                                                            .Tipo_Asignatura
+                                                                    }
+                                                                />
+                                                            </td>
+                                                            <td className="px-8 py-4 text-right">
+                                                                <span className="rounded-full border border-slate-100 bg-slate-50 px-3 py-1 text-xs font-bold text-slate-500">
+                                                                    Semestre{' '}
+                                                                    {
+                                                                        asig
+                                                                            .pivot
+                                                                            .Semestre_Sugerido
+                                                                    }
+                                                                </span>
+                                                            </td>
+                                                        </tr>
+                                                    ),
+                                                )}
                                             </tbody>
                                         </table>
                                     </div>
