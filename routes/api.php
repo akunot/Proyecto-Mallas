@@ -190,8 +190,6 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
 
     // Auditoría y logs
     Route::get('/auditoria/logs', [AuditoriaController::class, 'index']);
-    Route::get('/auditoria/diffs/{id}', [AuditoriaController::class, 'diffs']);
-    Route::get('/auditoria/resumen-cambios/{id}', [AuditoriaController::class, 'resumenCambios']);
     Route::get('/auditoria/acciones-disponibles', [AuditoriaController::class, 'accionesDisponibles']);
     Route::get('/auditoria/entidades-disponibles', [AuditoriaController::class, 'entidadesDisponibles']);
     Route::get('/auditoria/estadisticas', [AuditoriaController::class, 'estadisticas']);

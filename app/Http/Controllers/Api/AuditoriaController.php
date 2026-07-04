@@ -4,11 +4,9 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\LogActividad;
-use App\Models\DiffMalla;
-use App\Models\CargaMalla;
-use App\Services\MallaDiffService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Http\Response;
 
 class AuditoriaController extends Controller
 {
@@ -52,37 +50,6 @@ class AuditoriaController extends Controller
                 'total' => $logs->total(),
                 'last_page' => $logs->lastPage(),
             ],
-        ]);
-    }
-
-    /**
-     * Obtiene los diffs de una carga específica.
-     */
-    public function diffs(CargaMalla $carga): JsonResponse
-    {
-        $diffService = new MallaDiffService();
-        $diffs = $diffService->obtenerDiffsAgrupados($carga);
-        $resumen = $diffService->generarResumenCambios($carga);
-
-        return response()->json([
-            'data' => [
-                'diffs' => $diffs,
-                'resumen' => $resumen,
-                'carga' => $carga->load(['malla', 'usuario', 'usuarioRevisor']),
-            ],
-        ]);
-    }
-
-    /**
-     * Obtiene el resumen de cambios de una carga.
-     */
-    public function resumenCambios(CargaMalla $carga): JsonResponse
-    {
-        $diffService = new MallaDiffService();
-        $resumen = $diffService->generarResumenCambios($carga);
-
-        return response()->json([
-            'data' => $resumen,
         ]);
     }
 
@@ -135,7 +102,7 @@ class AuditoriaController extends Controller
         }
 
         $totalLogs = $query->count();
-        
+
         $logsPorAccion = $query->select('Accion_Log')
             ->selectRaw('COUNT(*) as total')
             ->groupBy('Accion_Log')
@@ -190,7 +157,7 @@ class AuditoriaController extends Controller
     /**
      * Exporta logs a CSV.
      */
-    public function exportarLogs(Request $request): \Illuminate\Http\Response
+    public function exportarLogs(Request $request): Response
     {
         $query = LogActividad::with(['usuario']);
 
@@ -221,7 +188,7 @@ class AuditoriaController extends Controller
 
         return response($csv, 200, [
             'Content-Type' => 'text/csv',
-            'Content-Disposition' => 'attachment; filename="logs_actividad_' . date('Y-m-d') . '.csv"',
+            'Content-Disposition' => 'attachment; filename="logs_actividad_'.date('Y-m-d').'.csv"',
         ]);
     }
 
@@ -241,7 +208,7 @@ class AuditoriaController extends Controller
             'Fecha',
         ];
 
-        $csv = implode(',', $headers) . "\n";
+        $csv = implode(',', $headers)."\n";
 
         foreach ($logs as $log) {
             $row = [
@@ -256,14 +223,15 @@ class AuditoriaController extends Controller
             ];
 
             // Escapar comas y comillas
-            $row = array_map(function($value) {
+            $row = array_map(function ($value) {
                 if (str_contains($value, ',') || str_contains($value, '"')) {
-                    return '"' . str_replace('"', '""', $value) . '"';
+                    return '"'.str_replace('"', '""', $value).'"';
                 }
+
                 return $value;
             }, $row);
 
-            $csv .= implode(',', $row) . "\n";
+            $csv .= implode(',', $row)."\n";
         }
 
         return $csv;

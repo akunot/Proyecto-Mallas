@@ -256,25 +256,6 @@ class MallaAprobacionService
     }
 
     /**
-     * Compara dos versiones específicas de malla.
-     */
-    public function compararVersiones(MallaCurricular $malla1, MallaCurricular $malla2): array
-    {
-        $diffService = new MallaDiffService;
-
-        // Crear una carga temporal para generar diffs
-        $cargaTemporal = new CargaMalla([
-            'ID_Carga' => 0, // Temporal
-            'ID_Programa' => $malla1->ID_Programa,
-        ]);
-
-        // Generar diffs entre las dos versiones
-        $diffService->generarDiffs($malla1, $malla2, $cargaTemporal);
-
-        return $diffService->obtenerDiffsAgrupados($cargaTemporal);
-    }
-
-    /**
      * Registra una actividad en el log.
      */
     private function registrarLog(Usuario $usuario, string $accion, string $entidad, int $entidadId, array $detalle = []): void

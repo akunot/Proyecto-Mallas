@@ -4,22 +4,18 @@ namespace App\Http\Controllers\Api;
 
 use App\Http\Controllers\Controller;
 use App\Models\CargaMalla;
-use App\Models\MallaCurricular;
 use App\Services\MallaAprobacionService;
-use App\Services\MallaDiffService;
-use Illuminate\Http\Request;
 use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
 class MallaAprobacionController extends Controller
 {
     protected MallaAprobacionService $aprobacionService;
-    protected MallaDiffService $diffService;
 
-    public function __construct(MallaAprobacionService $aprobacionService, MallaDiffService $diffService)
+    public function __construct(MallaAprobacionService $aprobacionService)
     {
         $this->aprobacionService = $aprobacionService;
-        $this->diffService = $diffService;
     }
 
     /**
@@ -115,44 +111,6 @@ class MallaAprobacionController extends Controller
     }
 
     /**
-     * Compara dos versiones específicas de malla.
-     */
-    public function compararVersiones(Request $request): JsonResponse
-    {
-        $request->validate([
-            'malla1_id' => 'required|integer|exists:malla_curricular,ID_Malla',
-            'malla2_id' => 'required|integer|exists:malla_curricular,ID_Malla',
-        ]);
-
-        $malla1 = MallaCurricular::findOrFail($request->malla1_id);
-        $malla2 = MallaCurricular::findOrFail($request->malla2_id);
-
-        // Validar que pertenezcan al mismo programa
-        if ($malla1->ID_Programa !== $malla2->ID_Programa) {
-            return response()->json([
-                'message' => 'Las mallas deben pertenecer al mismo programa',
-            ], 400);
-        }
-
-        try {
-            $diffs = $this->aprobacionService->compararVersiones($malla1, $malla2);
-
-            return response()->json([
-                'data' => [
-                    'malla1' => $malla1->load(['normativa']),
-                    'malla2' => $malla2->load(['normativa']),
-                    'diffs' => $diffs,
-                ],
-            ]);
-        } catch (\Exception $e) {
-            return response()->json([
-                'message' => 'Error al comparar versiones',
-                'error' => $e->getMessage(),
-            ], 500);
-        }
-    }
-
-    /**
      * Obtiene estadísticas de aprobación por programa.
      */
     public function estadisticasPrograma(int $programaId): JsonResponse
@@ -221,7 +179,7 @@ class MallaAprobacionController extends Controller
             return 'La malla no está en estado borrador';
         }
 
-        if (!$carga->ID_Malla) {
+        if (! $carga->ID_Malla) {
             return 'No existe una malla asociada a esta carga';
         }
 
@@ -241,10 +199,6 @@ class MallaAprobacionController extends Controller
             'erroresCarga',
         ]);
 
-        // Obtener diffs
-        $diffs = $this->diffService->obtenerDiffsAgrupados($carga);
-        $resumen = $this->diffService->generarResumenCambios($carga);
-
         // Verificar permisos del usuario actual
         $usuario = auth()->user();
         $esPropietario = $carga->ID_Usuario === $usuario->ID_Usuario;
@@ -254,8 +208,6 @@ class MallaAprobacionController extends Controller
         return response()->json([
             'data' => [
                 'carga' => $carga,
-                'diffs' => $diffs,
-                'resumen' => $resumen,
                 'permisos' => [
                     'es_propietario' => $esPropietario,
                     'es_revisor' => $esRevisor,

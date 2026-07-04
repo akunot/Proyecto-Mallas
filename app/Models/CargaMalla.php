@@ -96,8 +96,4 @@ class CargaMalla extends Model
         return $this->hasMany(ErrorCarga::class, 'ID_Carga', 'ID_Carga');
     }
 
-    public function diffs(): HasMany
-    {
-        return $this->hasMany(DiffMalla::class, 'ID_Carga', 'ID_Carga');
-    }
 }
