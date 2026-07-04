@@ -1,6 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
-import MallaDiffView from '../../components/MallaDiffView';
+import MallaDiffView, {
+    type DiffResponse,
+    type CambioItem,
+    type CambioModificado,
+} from '../../components/MallaDiffView';
 import MallaHistoryModal from '../../components/MallaHistoryModal';
 import SlotSelectorModal from '../../components/SlotSelectorModal';
 import VersionBadge from '../../components/VersionBadge';
@@ -130,50 +134,6 @@ interface MallaVersion {
     Fecha_Vigencia: string;
     Fecha_Fin_Vigencia: string | null;
     created_at: string;
-}
-
-interface CambioItem {
-    ID_Asignatura: number;
-    ID_Agrupacion: number;
-    Codigo_Asignatura: string;
-    Nombre_Asignatura: string;
-    Creditos_Asignatura: number;
-    Semestre_Sugerido: number | null;
-    Tipo_Asignatura: string;
-    Nombre_Agrupacion: string;
-    ID_Componente: number;
-    Nombre_Componente: string;
-}
-
-interface CambioModificado {
-    old: CambioItem;
-    new: CambioItem;
-}
-
-interface DiffResponse {
-    malla1: {
-        ID_Malla: number;
-        Version_Numero: number;
-        Estado: string;
-        Fecha_Vigencia: string;
-    };
-    malla2: {
-        ID_Malla: number;
-        Version_Numero: number;
-        Estado: string;
-        Fecha_Vigencia: string;
-    };
-    resumen: {
-        agregadas: number;
-        eliminadas: number;
-        modificadas: number;
-        sin_cambios: number;
-    };
-    cambios: {
-        agregadas: CambioItem[];
-        eliminadas: CambioItem[];
-        modificadas: CambioModificado[];
-    };
 }
 
 interface Props {

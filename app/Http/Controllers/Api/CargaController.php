@@ -117,10 +117,16 @@ class CargaController extends Controller
     {
         $carga = CargaMalla::findOrFail($id);
 
-        if ($carga->Estado_Carga !== 'listo_para_procesar') {
+        $estadosPermitidos = ['listo_para_procesar', 'con_errores'];
+        if (! in_array($carga->Estado_Carga, $estadosPermitidos)) {
             return response()->json([
-                'message' => 'La carga debe estar en estado listo_para_procesar para iniciar el procesamiento.',
+                'message' => 'La carga debe estar en estado listo_para_procesar o con_errores para iniciar el procesamiento.',
             ], 409, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+
+        // Si se reintenta, limpiar errores anteriores
+        if ($carga->Estado_Carga === 'con_errores') {
+            ErrorCarga::where('ID_Carga', $id)->delete();
         }
 
         $carga->update(['Estado_Carga' => 'iniciado']);
@@ -131,7 +137,7 @@ class CargaController extends Controller
             'PROCESS_START',
             'carga_malla',
             $id,
-            ['estado_anterior' => 'listo_para_procesar']
+            ['estado_anterior' => $carga->Estado_Carga]
         );
 
         if (app()->isLocal()) {
@@ -174,7 +180,10 @@ class CargaController extends Controller
             $query->where('ID_Programa', $request->input('programa_id'));
         }
 
-        $cargas = $query->orderBy('Creacion_Carga', 'desc')
+        $cargas = $query->withCount([
+            'errores as errores_count' => fn ($q) => $q->where('Severidad_Error', 'error'),
+            'errores as advertencias_count' => fn ($q) => $q->where('Severidad_Error', 'advertencia'),
+        ])->orderBy('Creacion_Carga', 'desc')
             ->paginate(20);
 
         $items = array_map(function ($carga) {
@@ -268,17 +277,21 @@ class CargaController extends Controller
     {
         $carga = CargaMalla::with(['malla', 'mallaBase'])->findOrFail($id);
 
-        if (! $carga->ID_Malla_Base) {
+        if (! $carga->malla) {
             return response()->json([
-                'data' => [],
-                'message' => 'Esta carga no tiene una malla base para comparar.',
+                'data' => null,
+                'message' => 'La carga no tiene una malla asociada.',
             ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
         }
 
-        return response()->json([
-            'data' => [],
-            'message' => 'Diff no implementado aún.',
-        ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        if (! $carga->mallaBase) {
+            return response()->json([
+                'data' => null,
+                'message' => 'Primera versión — no hay malla base para comparar.',
+            ], 200, [], JSON_UNESCAPED_UNICODE | JSON_INVALID_UTF8_SUBSTITUTE);
+        }
+
+        return MallaController::publicDiff($carga->mallaBase->ID_Malla, $carga->malla->ID_Malla);
     }
 
     public function destroy(int $id, Request $request): JsonResponse

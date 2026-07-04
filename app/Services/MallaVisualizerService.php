@@ -68,7 +68,7 @@ final class MallaVisualizerService
     /**
      * @return array<int, mixed>
      */
-    private function eagerLoads(?int $idPrograma = null): array
+    public function eagerLoads(?int $idPrograma = null): array
     {
         return [
             'programa',
@@ -88,7 +88,7 @@ final class MallaVisualizerService
     /**
      * @return array<string, mixed>
      */
-    private function toPayload(MallaCurricular $malla): array
+    public function toPayload(MallaCurricular $malla): array
     {
         $idPrograma = $malla->programa?->ID_Programa ?? 0;
 

@@ -38,7 +38,6 @@ interface Props {
     };
 }
 
-// ─── Componente de barra de acción flotante ───────────────────────────────────
 function ActionBar({
     count,
     agrupaciones,
@@ -54,24 +53,25 @@ function ActionBar({
 }) {
     const [agrupacionId, setAgrupacionId] = useState<number | ''>('');
 
-    if (count === 0) {
-        return null;
-    }
+    if (count === 0) return null;
 
     return (
-        <div className="sticky bottom-4 z-20 mx-2">
-            <div className="flex items-center gap-3 rounded-2xl bg-[#00236f] px-4 py-3 text-white shadow-2xl shadow-[#00236f]/30">
-                <span className="rounded-lg bg-white/20 px-2.5 py-1 text-xs font-black text-white tabular-nums">
-                    {count} seleccionada{count !== 1 ? 's' : ''}
+        <div className="sticky bottom-4 z-20 mx-2 transition-all">
+            <div className="flex items-center gap-3 rounded-xl border border-brick/15 bg-white px-4 py-3 shadow-lg shadow-brick/8">
+                <span className="inline-flex items-center gap-1.5 rounded-lg bg-brick px-2.5 py-1 text-xs font-bold text-white tabular-nums">
+                    <span className="material-symbols-outlined !text-sm">
+                        checklist
+                    </span>
+                    {count}
                 </span>
                 <select
                     value={agrupacionId}
                     onChange={(e) =>
                         setAgrupacionId(Number(e.target.value) || '')
                     }
-                    className="min-w-0 flex-1 rounded-xl border border-white/20 bg-white/10 px-3 py-2 text-sm text-white focus:border-white/60 focus:outline-none"
+                    className="min-w-0 flex-1 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-sm text-slate-700 transition-colors focus:border-brick/50 focus:bg-white focus:outline-none"
                 >
-                    <option value="" className="text-slate-800">
+                    <option value="" className="text-slate-500">
                         Elegir agrupación destino…
                     </option>
                     {agrupaciones.map((ag) => (
@@ -89,13 +89,13 @@ function ActionBar({
                         agrupacionId && onAssign(Number(agrupacionId))
                     }
                     disabled={!agrupacionId || loading}
-                    className="shrink-0 rounded-xl bg-white px-4 py-2 text-sm font-black text-[#00236f] transition-all hover:bg-blue-50 disabled:cursor-not-allowed disabled:opacity-40"
+                    className="shrink-0 rounded-lg bg-brick px-4 py-2 text-sm font-bold text-white transition-all hover:bg-brick/90 disabled:cursor-not-allowed disabled:opacity-40"
                 >
                     {loading ? 'Asignando…' : 'Asignar'}
                 </button>
                 <button
                     onClick={onClear}
-                    className="shrink-0 p-2 text-white/60 transition-colors hover:text-white"
+                    className="shrink-0 p-1.5 text-slate-400 transition-colors hover:text-slate-600"
                     title="Cancelar selección"
                 >
                     <span className="material-symbols-outlined !text-lg">
@@ -107,7 +107,6 @@ function ActionBar({
     );
 }
 
-// ─── Barra de remoción masiva ─────────────────────────────────────────────────
 function RemoveBar({
     count,
     onConfirm,
@@ -119,26 +118,29 @@ function RemoveBar({
     onClear: () => void;
     loading: boolean;
 }) {
-    if (count === 0) {
-        return null;
-    }
+    if (count === 0) return null;
 
     return (
-        <div className="mb-3 flex items-center gap-2 rounded-xl border border-rose-200 bg-rose-50 px-3 py-2">
-            <span className="text-xs font-black text-rose-700 tabular-nums">
-                {count} seleccionada{count !== 1 ? 's' : ''}
+        <div className="mb-3 flex items-center gap-2 rounded-lg border border-brick/20 bg-brick-light/60 px-3 py-2">
+            <span className="inline-flex items-center gap-1 text-xs font-bold text-brick tabular-nums">
+                <span className="material-symbols-outlined !text-sm">
+                    remove_circle
+                </span>
+                {count}
             </span>
-            <span className="flex-1 text-xs text-rose-500">para remover</span>
+            <span className="flex-1 text-xs text-brick/70">
+                seleccionada{count !== 1 ? 's' : ''} para remover
+            </span>
             <button
                 onClick={onConfirm}
                 disabled={loading}
-                className="rounded-lg bg-rose-600 px-3 py-1 text-xs font-bold text-white transition-colors hover:bg-rose-700 disabled:opacity-40"
+                className="rounded-lg bg-brick px-3 py-1 text-xs font-bold text-white transition-colors hover:bg-brick/90 disabled:opacity-40"
             >
                 {loading ? 'Removiendo…' : 'Confirmar remoción'}
             </button>
             <button
                 onClick={onClear}
-                className="text-rose-400 transition-colors hover:text-rose-600"
+                className="text-brick/50 transition-colors hover:text-brick"
             >
                 <span className="material-symbols-outlined !text-sm">
                     close
@@ -148,7 +150,28 @@ function RemoveBar({
     );
 }
 
-// ─── Componente principal ─────────────────────────────────────────────────────
+function EmptyState({
+    icon,
+    message,
+    submessage,
+}: {
+    icon: string;
+    message: string;
+    submessage?: string;
+}) {
+    return (
+        <div className="flex flex-col items-center justify-center px-6 py-14 text-center">
+            <span className="material-symbols-outlined mb-3 block !text-5xl text-slate-300">
+                {icon}
+            </span>
+            <p className="text-sm font-medium text-slate-500">{message}</p>
+            {submessage && (
+                <p className="mt-1 text-xs text-slate-400">{submessage}</p>
+            )}
+        </div>
+    );
+}
+
 export default function OptativasAsignacion({ malla }: Props) {
     const [agrupaciones, setAgrupaciones] = useState<AgrupacionOptativa[]>([]);
     const [todasAgrupaciones, setTodasAgrupaciones] = useState<
@@ -163,20 +186,14 @@ export default function OptativasAsignacion({ malla }: Props) {
     const [successMsg, setSuccessMsg] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
 
-    // Selección para asignación masiva (panel izquierdo)
     const [selectedIds, setSelectedIds] = useState<Set<number>>(new Set());
-
-    // Selección para remoción masiva por agrupación (panel derecho)
-    // Map de ID_Agrupacion → Set de IDs a remover
     const [removeSelections, setRemoveSelections] = useState<
         Map<number, Set<number>>
     >(new Map());
 
-    // Búsqueda
     const [searchLeft, setSearchLeft] = useState('');
     const [searchRight, setSearchRight] = useState('');
 
-    // Asignación individual
     const [selectedAsignatura, setSelectedAsignatura] = useState<number | null>(
         null,
     );
@@ -186,9 +203,21 @@ export default function OptativasAsignacion({ malla }: Props) {
 
     const apiBase = `/api/v1/mallas/${malla.ID_Malla}`;
 
-    const fetchData = async () => {
+    const loadData = async () => {
         setLoading(true);
         setError(null);
+        try {
+            await refreshData();
+        } catch {
+            setError('Error de conexión al cargar datos.');
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const refreshData = async () => {
+        const controller = new AbortController();
+        const timeout = setTimeout(() => controller.abort(), 30000);
 
         try {
             const [
@@ -198,6 +227,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                 todasAgrupacionesRes,
             ] = await Promise.all([
                 fetch(`${apiBase}/optativas-por-agrupacion`, {
+                    signal: controller.signal,
                     headers: {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -205,6 +235,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                     credentials: 'same-origin',
                 }),
                 fetch(`${apiBase}/optativas`, {
+                    signal: controller.signal,
                     headers: {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -212,6 +243,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                     credentials: 'same-origin',
                 }),
                 fetch(`${apiBase}/optativas-sin-agrupacion`, {
+                    signal: controller.signal,
                     headers: {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -219,6 +251,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                     credentials: 'same-origin',
                 }),
                 fetch(`${apiBase}/agrupaciones`, {
+                    signal: controller.signal,
                     headers: {
                         Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
@@ -231,7 +264,6 @@ export default function OptativasAsignacion({ malla }: Props) {
                 const data = await agrupacionesRes.json();
                 setAgrupaciones(data.data ?? []);
             }
-
             if (catalogoRes.ok) {
                 const data = await catalogoRes.json();
                 const catalogo = (data.data ?? []).flatMap(
@@ -243,11 +275,8 @@ export default function OptativasAsignacion({ malla }: Props) {
                         (group.asignaturas ?? [])
                             .map((asig) => {
                                 const id = Number(asig.ID_Asignatura);
-
-                                if (!Number.isFinite(id) || id <= 0) {
+                                if (!Number.isFinite(id) || id <= 0)
                                     return null;
-                                }
-
                                 return {
                                     ...asig,
                                     ID_Asignatura: id,
@@ -266,14 +295,12 @@ export default function OptativasAsignacion({ malla }: Props) {
                 );
                 setCatalogoOptativas(catalogo);
             }
-
             if (sinAgrupacionRes.ok) {
                 const data = await sinAgrupacionRes.json();
                 setOptativasLibres(
                     (data.data ?? [])
                         .map((asig: Asignatura) => {
                             const id = Number(asig.ID_Asignatura);
-
                             return Number.isFinite(id) && id > 0
                                 ? { ...asig, ID_Asignatura: id }
                                 : null;
@@ -284,7 +311,6 @@ export default function OptativasAsignacion({ malla }: Props) {
                         ),
                 );
             }
-
             if (todasAgrupacionesRes.ok) {
                 const data = await todasAgrupacionesRes.json();
                 setTodasAgrupaciones(data.data ?? []);
@@ -292,20 +318,18 @@ export default function OptativasAsignacion({ malla }: Props) {
         } catch {
             setError('Error de conexión al cargar datos.');
         } finally {
-            setLoading(false);
+            clearTimeout(timeout);
         }
     };
 
     useEffect(() => {
-        fetchData();
+        loadData();
     }, []);
 
-    // ── Helpers de selección ──────────────────────────────────────────────────
     const toggleLeft = (id: number) => {
         setSelectedIds((prev) => {
             const next = new Set(prev);
             next.has(id) ? next.delete(id) : next.add(id);
-
             return next;
         });
     };
@@ -323,13 +347,8 @@ export default function OptativasAsignacion({ malla }: Props) {
             set.has(asignaturaId)
                 ? set.delete(asignaturaId)
                 : set.add(asignaturaId);
-
-            if (set.size === 0) {
-                next.delete(agrupacionId);
-            } else {
-                next.set(agrupacionId, set);
-            }
-
+            if (set.size === 0) next.delete(agrupacionId);
+            else next.set(agrupacionId, set);
             return next;
         });
     };
@@ -338,13 +357,9 @@ export default function OptativasAsignacion({ malla }: Props) {
         setRemoveSelections((prev) => {
             const next = new Map(prev);
             const current = next.get(agrupacionId);
-
-            if (current && current.size === ids.length) {
+            if (current && current.size === ids.length)
                 next.delete(agrupacionId);
-            } else {
-                next.set(agrupacionId, new Set(ids));
-            }
-
+            else next.set(agrupacionId, new Set(ids));
             return next;
         });
     };
@@ -353,25 +368,19 @@ export default function OptativasAsignacion({ malla }: Props) {
         setRemoveSelections((prev) => {
             const next = new Map(prev);
             next.delete(agrupacionId);
-
             return next;
         });
     };
 
-    // ── Acciones API ──────────────────────────────────────────────────────────
     const showSuccess = (msg: string) => {
         setSuccessMsg(msg);
         setTimeout(() => setSuccessMsg(null), 4000);
     };
 
     const handleAsignar = async () => {
-        if (!selectedAgrupacion || !selectedAsignatura) {
-            return;
-        }
-
+        if (!selectedAgrupacion || !selectedAsignatura) return;
         setActionLoading(true);
         setError(null);
-
         try {
             const res = await fetch(`${apiBase}/optativas/asignar`, {
                 method: 'POST',
@@ -386,11 +395,10 @@ export default function OptativasAsignacion({ malla }: Props) {
                     ID_Asignatura: Number(selectedAsignatura),
                 }),
             });
-
             if (res.ok) {
                 showSuccess('Optativa asignada correctamente.');
                 setSelectedAsignatura(null);
-                fetchData();
+                refreshData();
             } else {
                 const err = await res.json();
                 setError(err.message || 'Error al asignar.');
@@ -406,14 +414,9 @@ export default function OptativasAsignacion({ malla }: Props) {
         const ids = Array.from(selectedIds).filter(
             (id) => Number.isFinite(id) && id > 0,
         );
-
-        if (!agrupacionId || ids.length === 0) {
-            return;
-        }
-
+        if (!agrupacionId || ids.length === 0) return;
         setActionLoading(true);
         setError(null);
-
         try {
             const res = await fetch(`${apiBase}/optativas/asignar-batch`, {
                 method: 'POST',
@@ -428,14 +431,13 @@ export default function OptativasAsignacion({ malla }: Props) {
                     ID_Asignaturas: ids,
                 }),
             });
-
             if (res.ok) {
                 const data = await res.json();
                 showSuccess(
                     data.message || `${ids.length} optativas asignadas.`,
                 );
                 setSelectedIds(new Set());
-                fetchData();
+                refreshData();
             } else {
                 const err = await res.json();
                 setError(err.message || 'Error al asignar en lote.');
@@ -462,7 +464,6 @@ export default function OptativasAsignacion({ malla }: Props) {
     ) => {
         setActionLoading(true);
         setError(null);
-
         try {
             const res = await fetch(`${apiBase}/optativas/remover`, {
                 method: 'POST',
@@ -477,10 +478,9 @@ export default function OptativasAsignacion({ malla }: Props) {
                     ID_Asignatura: asignaturaId,
                 }),
             });
-
             if (res.ok) {
                 showSuccess('Optativa removida.');
-                fetchData();
+                refreshData();
             } else {
                 const err = await res.json();
                 setError(err.message || 'Error al remover.');
@@ -488,21 +488,15 @@ export default function OptativasAsignacion({ malla }: Props) {
         } catch {
             setError('Error de conexión.');
         } finally {
-            setActionLoading(false);
-            setConfirmRemove(null);
+            setLoading(false);
         }
     };
 
     const handleRemoverBatch = async (agrupacionId: number) => {
         const ids = Array.from(removeSelections.get(agrupacionId) ?? []);
-
-        if (ids.length === 0) {
-            return;
-        }
-
+        if (ids.length === 0) return;
         setActionLoading(true);
         setError(null);
-
         try {
             const res = await fetch(`${apiBase}/optativas/remover-batch`, {
                 method: 'POST',
@@ -517,14 +511,13 @@ export default function OptativasAsignacion({ malla }: Props) {
                     ID_Asignaturas: ids,
                 }),
             });
-
             if (res.ok) {
                 const data = await res.json();
                 showSuccess(
                     data.message || `${ids.length} optativas removidas.`,
                 );
                 clearRemove(agrupacionId);
-                fetchData();
+                refreshData();
             } else {
                 const err = await res.json();
                 setError(err.message || 'Error al remover lote.');
@@ -533,10 +526,10 @@ export default function OptativasAsignacion({ malla }: Props) {
             setError('Error de conexión.');
         } finally {
             setActionLoading(false);
+            setConfirmRemoveBatch(null);
         }
     };
 
-    // ── Filtrado ──────────────────────────────────────────────────────────────
     const filteredLibres = optativasLibres.filter(
         (a) =>
             !searchLeft ||
@@ -573,60 +566,72 @@ export default function OptativasAsignacion({ malla }: Props) {
     return (
         <Layout>
             <Head
-                title={`Asignación de Optativas - ${malla.programa.Nombre_Programa}`}
+                title={`Asignación de Optativas · ${malla.programa.Nombre_Programa}`}
             />
 
-            <div className="mx-auto max-w-[1440px] space-y-6 pb-10">
+            <div className="mx-auto max-w-[1440px] pb-12">
                 {/* ── Header ── */}
-                <div className="flex flex-col items-start justify-between gap-4 lg:flex-row lg:items-end">
-                    <div className="space-y-1">
-                        <div className="flex items-center gap-2 text-[11px] font-bold tracking-widest text-slate-400 uppercase">
+                <div className="mb-7 flex flex-col items-start justify-between gap-4 border-b border-slate-100 pb-6 lg:flex-row lg:items-end">
+                    <div className="space-y-2">
+                        <nav className="flex items-center gap-1.5 text-xs font-medium text-slate-400">
                             <Link
                                 href="/mallas"
-                                className="transition-colors hover:text-[#00236f]"
+                                className="transition-colors hover:text-slate-600"
                             >
                                 Mallas
                             </Link>
-                            <span className="material-symbols-outlined !text-xs">
+                            <span className="material-symbols-outlined !text-sm text-slate-300">
                                 chevron_right
                             </span>
                             <Link
                                 href={`/mallas/${malla.ID_Malla}`}
-                                className="transition-colors hover:text-[#00236f]"
+                                className="transition-colors hover:text-slate-600"
                             >
                                 {malla.programa.Nombre_Programa}
                             </Link>
-                            <span className="material-symbols-outlined !text-xs">
+                            <span className="material-symbols-outlined !text-sm text-slate-300">
                                 chevron_right
                             </span>
-                            <span className="text-[#00236f]">Optativas</span>
-                        </div>
-                        <h1 className="text-3xl font-black tracking-tight text-slate-900">
+                            <span className="font-semibold text-slate-700">
+                                Optativas
+                            </span>
+                        </nav>
+                        <h1 className="text-4xl leading-tight font-bold tracking-tight text-slate-900">
                             Asignación de Optativas
                         </h1>
-                        <p className="text-sm text-slate-500">
-                            Plan{' '}
-                            <strong className="text-slate-700">
-                                {malla.Codigo_Plan}
-                            </strong>
-                            {' · '}
-                            <span>{optativasLibres.length} sin asignar</span>
-                            {' · '}
-                            <span>{totalAsignadas} asignadas</span>
-                        </p>
+                        <div className="flex items-center gap-3 text-sm text-slate-500">
+                            <span>
+                                Plan{' '}
+                                <span className="font-semibold text-slate-700">
+                                    {malla.Codigo_Plan}
+                                </span>
+                            </span>
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full bg-brick" />
+                                {optativasLibres.length} sin asignar
+                            </span>
+                            <span className="h-1 w-1 rounded-full bg-slate-300" />
+                            <span className="inline-flex items-center gap-1.5">
+                                <span className="h-1.5 w-1.5 rounded-full text-transparent">
+                                    -
+                                </span>
+                                {totalAsignadas} asignadas
+                            </span>
+                        </div>
                     </div>
                 </div>
 
-                {/* ── Mensajes ── */}
+                {/* ── Messages ── */}
                 {error && (
-                    <div className="flex items-center gap-3 rounded-2xl border border-rose-200 bg-rose-50 px-5 py-3.5 text-sm font-medium text-rose-700">
+                    <div className="mb-5 flex items-center gap-3 rounded-lg border border-brick/20 bg-brick-light/70 px-4 py-3 text-sm font-medium text-brick">
                         <span className="material-symbols-outlined shrink-0 !text-lg">
                             error_outline
                         </span>
                         <span className="flex-1">{error}</span>
                         <button
                             onClick={() => setError(null)}
-                            className="shrink-0 text-rose-400 hover:text-rose-600"
+                            className="shrink-0 text-brick/50 hover:text-brick"
                         >
                             <span className="material-symbols-outlined !text-lg">
                                 close
@@ -635,7 +640,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                     </div>
                 )}
                 {successMsg && (
-                    <div className="flex items-center gap-3 rounded-2xl border border-emerald-200 bg-emerald-50 px-5 py-3.5 text-sm font-medium text-emerald-700">
+                    <div className="mb-5 flex items-center gap-3 rounded-lg border border-pine/20 bg-pine-light/70 px-4 py-3 text-sm font-medium text-pine">
                         <span className="material-symbols-outlined shrink-0 !text-lg">
                             check_circle
                         </span>
@@ -644,69 +649,74 @@ export default function OptativasAsignacion({ malla }: Props) {
                 )}
 
                 {loading ? (
-                    <div className="flex items-center justify-center py-24 text-slate-400">
-                        <div className="mr-3 h-7 w-7 animate-spin rounded-full border-2 border-slate-300 border-t-slate-600" />
+                    <div className="flex items-center justify-center gap-3 py-28 text-slate-400">
+                        <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-200 border-t-slate-500" />
                         <span className="text-sm">Cargando datos…</span>
                     </div>
                 ) : (
                     <div className="grid grid-cols-1 items-start gap-6 lg:grid-cols-5">
                         {/* ══════════════════════════════════════════════════════
-                            PANEL IZQUIERDO — Optativas sin agrupación
+                            PANEL IZQUIERDO — Disponibles
                         ══════════════════════════════════════════════════════ */}
-                        <div className="flex flex-col gap-4 lg:col-span-2">
-                            {/* Tabla principal */}
-                            <div className="flex flex-col overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                                {/* Cabecera */}
-                                <div className="border-b border-slate-100 px-5 pt-5 pb-3">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-amber-100">
-                                                <span className="material-symbols-outlined !text-base text-amber-600">
+                        <div className="flex flex-col gap-6 lg:col-span-2">
+                            {/* ── Tabla de disponibles ── */}
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-l-4 border-brick">
+                                    <div className="border-b border-slate-100 px-5 pt-4 pb-3">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined !text-lg text-brick">
                                                     inbox
                                                 </span>
+                                                <h2 className="text-sm font-bold tracking-tight text-slate-800">
+                                                    Disponibles
+                                                </h2>
                                             </div>
-                                            <h3 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                                                Sin agrupación
-                                            </h3>
+                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 tabular-nums">
+                                                {optativasLibres.length}
+                                            </span>
                                         </div>
-                                        <span className="text-[11px] font-bold text-slate-400 tabular-nums">
-                                            {optativasLibres.length} optativas
-                                        </span>
-                                    </div>
-                                    <div className="relative">
-                                        <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 !text-base text-slate-400">
-                                            search
-                                        </span>
-                                        <input
-                                            type="text"
-                                            placeholder="Buscar por nombre o código…"
-                                            value={searchLeft}
-                                            onChange={(e) =>
-                                                setSearchLeft(e.target.value)
-                                            }
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-sm transition-all focus:border-[#00236f]/50 focus:bg-white focus:outline-none"
-                                        />
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 !text-base text-slate-400">
+                                                search
+                                            </span>
+                                            <input
+                                                type="text"
+                                                placeholder="Buscar por nombre o código…"
+                                                value={searchLeft}
+                                                onChange={(e) =>
+                                                    setSearchLeft(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-sm transition-all focus:border-brick/40 focus:bg-white focus:ring-2 focus:ring-brick/8 focus:outline-none"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Tabla */}
                                 <div
                                     className="overflow-y-auto"
                                     style={{ maxHeight: '420px' }}
                                 >
                                     {filteredLibres.length === 0 ? (
-                                        <div className="p-10 text-center">
-                                            <span className="material-symbols-outlined mb-2 block !text-4xl text-slate-300">
-                                                {optativasLibres.length === 0
+                                        <EmptyState
+                                            icon={
+                                                optativasLibres.length === 0
                                                     ? 'check_circle'
-                                                    : 'search_off'}
-                                            </span>
-                                            <p className="text-sm text-slate-400">
-                                                {optativasLibres.length === 0
+                                                    : 'search_off'
+                                            }
+                                            message={
+                                                optativasLibres.length === 0
                                                     ? 'Todas las optativas están asignadas'
-                                                    : 'Sin resultados para esa búsqueda'}
-                                            </p>
-                                        </div>
+                                                    : 'Sin resultados para esa búsqueda'
+                                            }
+                                            submessage={
+                                                optativasLibres.length === 0
+                                                    ? 'Prueba agregando más optativas al plan de estudios'
+                                                    : undefined
+                                            }
+                                        />
                                     ) : (
                                         <table className="w-full text-left">
                                             <thead className="sticky top-0 z-10 border-b border-slate-100 bg-white">
@@ -728,86 +738,92 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                                     ),
                                                                 )
                                                             }
-                                                            className="cursor-pointer rounded border-slate-300 text-amber-500 focus:ring-amber-400"
+                                                            className="cursor-pointer rounded border-slate-300 text-brick focus:ring-brick/30"
                                                         />
                                                     </th>
-                                                    <th className="px-3 py-2.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
+                                                    <th className="px-3 py-2.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                                                         Código
                                                     </th>
-                                                    <th className="px-3 py-2.5 text-[10px] font-black tracking-wider text-slate-400 uppercase">
+                                                    <th className="px-3 py-2.5 text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                                                         Nombre
                                                     </th>
-                                                    <th className="px-3 py-2.5 text-center text-[10px] font-black tracking-wider text-slate-400 uppercase">
+                                                    <th className="px-3 py-2.5 text-center text-[10px] font-bold tracking-wider text-slate-400 uppercase">
                                                         Cr.
                                                     </th>
                                                 </tr>
                                             </thead>
                                             <tbody>
                                                 {filteredLibres.map(
-                                                    (asig, i) => (
-                                                        <tr
-                                                            key={
-                                                                asig.ID_Asignatura
-                                                            }
-                                                            onClick={() =>
-                                                                toggleLeft(
-                                                                    asig.ID_Asignatura,
-                                                                )
-                                                            }
-                                                            className={`cursor-pointer border-b border-slate-50 transition-colors last:border-0 ${
-                                                                selectedIds.has(
-                                                                    asig.ID_Asignatura,
-                                                                )
-                                                                    ? 'bg-amber-50 hover:bg-amber-50/80'
-                                                                    : i % 2 ===
-                                                                        0
-                                                                      ? 'bg-white hover:bg-slate-50'
-                                                                      : 'bg-slate-50/50 hover:bg-slate-100/50'
-                                                            }`}
-                                                        >
-                                                            <td
-                                                                className="px-4 py-2.5"
-                                                                onClick={(e) =>
-                                                                    e.stopPropagation()
+                                                    (asig, i) => {
+                                                        const isSelected =
+                                                            selectedIds.has(
+                                                                asig.ID_Asignatura,
+                                                            );
+                                                        return (
+                                                            <tr
+                                                                key={
+                                                                    asig.ID_Asignatura
                                                                 }
-                                                            >
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={selectedIds.has(
+                                                                onClick={() =>
+                                                                    toggleLeft(
                                                                         asig.ID_Asignatura,
-                                                                    )}
-                                                                    onChange={() =>
-                                                                        toggleLeft(
-                                                                            asig.ID_Asignatura,
-                                                                        )
+                                                                    )
+                                                                }
+                                                                className={`cursor-pointer border-b border-slate-50 transition-colors last:border-0 ${
+                                                                    isSelected
+                                                                        ? 'bg-brick-light/40'
+                                                                        : i %
+                                                                                2 ===
+                                                                            0
+                                                                          ? 'hover:bg-slate-50'
+                                                                          : 'bg-slate-50/40 hover:bg-slate-100/50'
+                                                                }`}
+                                                            >
+                                                                <td
+                                                                    className="px-4 py-2.5"
+                                                                    onClick={(
+                                                                        e,
+                                                                    ) =>
+                                                                        e.stopPropagation()
                                                                     }
-                                                                    className="cursor-pointer rounded border-slate-300 text-amber-500 focus:ring-amber-400"
-                                                                />
-                                                            </td>
-                                                            <td className="px-3 py-2.5 font-mono text-[11px] whitespace-nowrap text-slate-500">
-                                                                {
-                                                                    asig.Codigo_Asignatura
-                                                                }
-                                                            </td>
-                                                            <td className="px-3 py-2.5 text-sm font-medium text-slate-800">
-                                                                {
-                                                                    asig.Nombre_Asignatura
-                                                                }
-                                                            </td>
-                                                            <td className="px-3 py-2.5 text-center text-sm text-slate-500 tabular-nums">
-                                                                {
-                                                                    asig.Creditos_Asignatura
-                                                                }
-                                                            </td>
-                                                        </tr>
-                                                    ),
+                                                                >
+                                                                    <input
+                                                                        type="checkbox"
+                                                                        checked={
+                                                                            isSelected
+                                                                        }
+                                                                        onChange={() =>
+                                                                            toggleLeft(
+                                                                                asig.ID_Asignatura,
+                                                                            )
+                                                                        }
+                                                                        className="cursor-pointer rounded border-slate-300 text-brick focus:ring-brick/30"
+                                                                    />
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-[11px] whitespace-nowrap text-slate-500">
+                                                                    {
+                                                                        asig.Codigo_Asignatura
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-sm font-medium text-slate-800">
+                                                                    {
+                                                                        asig.Nombre_Asignatura
+                                                                    }
+                                                                </td>
+                                                                <td className="px-3 py-2.5 text-center text-sm text-slate-500 tabular-nums">
+                                                                    {
+                                                                        asig.Creditos_Asignatura
+                                                                    }
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    },
                                                 )}
                                             </tbody>
                                         </table>
                                     )}
                                 </div>
 
-                                {/* Barra de acción flotante */}
                                 <ActionBar
                                     count={selectedIds.size}
                                     agrupaciones={todasAgrupaciones}
@@ -817,14 +833,14 @@ export default function OptativasAsignacion({ malla }: Props) {
                                 />
                             </div>
 
-                            {/* Asignación individual */}
-                            <div className="space-y-3 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-                                <h4 className="flex items-center gap-1.5 text-[11px] font-black tracking-widest text-slate-500 uppercase">
-                                    <span className="material-symbols-outlined !text-sm">
+                            {/* ── Asignación individual ── */}
+                            <div className="rounded-xl border border-slate-200 bg-white px-5 py-4 shadow-sm">
+                                <h3 className="mb-3 flex items-center gap-1.5 text-xs font-bold tracking-wide text-slate-500 uppercase">
+                                    <span className="material-symbols-outlined !text-base">
                                         add_circle_outline
                                     </span>
                                     Asignación individual
-                                </h4>
+                                </h3>
                                 <div className="space-y-2">
                                     <select
                                         value={selectedAsignatura ?? ''}
@@ -833,7 +849,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                 Number(e.target.value) || null,
                                             )
                                         }
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm transition-all focus:border-[#00236f]/50 focus:bg-white focus:outline-none"
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm transition-all focus:border-brick/40 focus:bg-white focus:ring-2 focus:ring-brick/8 focus:outline-none"
                                     >
                                         <option value="">
                                             Seleccionar materia…
@@ -858,7 +874,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                 Number(e.target.value) || null,
                                             )
                                         }
-                                        className="w-full rounded-xl border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm transition-all focus:border-[#00236f]/50 focus:bg-white focus:outline-none"
+                                        className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2.5 text-sm transition-all focus:border-brick/40 focus:bg-white focus:ring-2 focus:ring-brick/8 focus:outline-none"
                                     >
                                         <option value="">
                                             Elegir agrupación destino…
@@ -879,7 +895,7 @@ export default function OptativasAsignacion({ malla }: Props) {
                                             !selectedAsignatura ||
                                             actionLoading
                                         }
-                                        className="w-full rounded-xl bg-[#00236f] px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-[#002d8a] disabled:cursor-not-allowed disabled:opacity-40"
+                                        className="w-full rounded-lg bg-navy px-4 py-2.5 text-sm font-bold text-white transition-all hover:bg-navy/90 disabled:cursor-not-allowed disabled:opacity-40"
                                     >
                                         {actionLoading
                                             ? 'Asignando…'
@@ -890,62 +906,70 @@ export default function OptativasAsignacion({ malla }: Props) {
                         </div>
 
                         {/* ══════════════════════════════════════════════════════
-                            PANEL DERECHO — Optativas por agrupación
+                            PANEL DERECHO — Por agrupación
                         ══════════════════════════════════════════════════════ */}
                         <div className="lg:col-span-3">
-                            <div className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-                                {/* Cabecera */}
-                                <div className="border-b border-slate-100 px-5 pt-5 pb-3">
-                                    <div className="mb-3 flex items-center justify-between">
-                                        <div className="flex items-center gap-2">
-                                            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-blue-100">
-                                                <span className="material-symbols-outlined !text-base text-[#00236f]">
+                            <div className="overflow-hidden rounded-xl border border-slate-200 bg-white shadow-sm">
+                                <div className="border-l-4 border-navy">
+                                    <div className="border-b border-slate-100 px-5 pt-4 pb-3">
+                                        <div className="mb-3 flex items-center justify-between">
+                                            <div className="flex items-center gap-2">
+                                                <span className="material-symbols-outlined !text-lg text-navy">
                                                     account_tree
                                                 </span>
+                                                <h2 className="text-sm font-bold tracking-tight text-slate-800">
+                                                    Por agrupación
+                                                </h2>
                                             </div>
-                                            <h3 className="text-sm font-black tracking-tight text-slate-800 uppercase">
-                                                Por agrupación
-                                            </h3>
+                                            <span className="rounded-md bg-slate-100 px-2 py-0.5 text-[11px] font-bold text-slate-500 tabular-nums">
+                                                {totalAsignadas} en{' '}
+                                                {agrupaciones.length} grupo
+                                                {agrupaciones.length !== 1
+                                                    ? 's'
+                                                    : ''}
+                                            </span>
                                         </div>
-                                        <span className="text-[11px] font-bold text-slate-400 tabular-nums">
-                                            {totalAsignadas} en{' '}
-                                            {agrupaciones.length} agrupaciones
-                                        </span>
-                                    </div>
-                                    <div className="relative">
-                                        <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 !text-base text-slate-400">
-                                            search
-                                        </span>
-                                        <input
-                                            type="text"
-                                            placeholder="Filtrar materias en agrupaciones…"
-                                            value={searchRight}
-                                            onChange={(e) =>
-                                                setSearchRight(e.target.value)
-                                            }
-                                            className="w-full rounded-xl border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-sm transition-all focus:border-[#00236f]/50 focus:bg-white focus:outline-none"
-                                        />
+                                        <div className="relative">
+                                            <span className="material-symbols-outlined absolute top-1/2 left-3 -translate-y-1/2 !text-base text-slate-400">
+                                                search
+                                            </span>
+                                            <input
+                                                type="text"
+                                                placeholder="Filtrar materias en agrupaciones…"
+                                                value={searchRight}
+                                                onChange={(e) =>
+                                                    setSearchRight(
+                                                        e.target.value,
+                                                    )
+                                                }
+                                                className="w-full rounded-lg border border-slate-200 bg-slate-50 py-2 pr-3 pl-9 text-sm transition-all focus:border-navy/40 focus:bg-white focus:ring-2 focus:ring-navy/8 focus:outline-none"
+                                            />
+                                        </div>
                                     </div>
                                 </div>
 
-                                {/* Lista de agrupaciones */}
                                 <div
                                     className="divide-y divide-slate-100 overflow-y-auto"
                                     style={{ maxHeight: '680px' }}
                                 >
                                     {filteredAgrupaciones.length === 0 ? (
-                                        <div className="p-12 text-center">
-                                            <span className="material-symbols-outlined mb-2 block !text-4xl text-slate-300">
-                                                {agrupaciones.length === 0
+                                        <EmptyState
+                                            icon={
+                                                agrupaciones.length === 0
                                                     ? 'category'
-                                                    : 'search_off'}
-                                            </span>
-                                            <p className="text-sm text-slate-400">
-                                                {agrupaciones.length === 0
+                                                    : 'search_off'
+                                            }
+                                            message={
+                                                agrupaciones.length === 0
                                                     ? 'No hay optativas asignadas a ninguna agrupación'
-                                                    : 'Sin resultados para esa búsqueda'}
-                                            </p>
-                                        </div>
+                                                    : 'Sin resultados para esa búsqueda'
+                                            }
+                                            submessage={
+                                                agrupaciones.length === 0
+                                                    ? 'Usa el panel de la izquierda para asignar optativas'
+                                                    : undefined
+                                            }
+                                        />
                                     ) : (
                                         filteredAgrupaciones.map((ag) => {
                                             const removeSet =
@@ -960,17 +984,18 @@ export default function OptativasAsignacion({ malla }: Props) {
                                             return (
                                                 <div
                                                     key={ag.ID_Agrupacion}
-                                                    className="p-5"
+                                                    className="px-5 py-4"
                                                 >
                                                     {/* Encabezado de agrupación */}
                                                     <div className="mb-3 flex items-center justify-between">
                                                         <div className="flex items-center gap-2">
-                                                            <h4 className="text-sm font-black text-slate-800">
+                                                            <div className="flex h-6 w-1 rounded-full bg-brick/60" />
+                                                            <h3 className="text-sm font-bold text-slate-800">
                                                                 {
                                                                     ag.Nombre_Agrupacion
                                                                 }
-                                                            </h4>
-                                                            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 tabular-nums">
+                                                            </h3>
+                                                            <span className="inline-flex items-center justify-center rounded-md bg-slate-100 px-2 py-0.5 text-[10px] font-bold text-slate-500 tabular-nums">
                                                                 {
                                                                     ag
                                                                         .asignaturas
@@ -987,13 +1012,13 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                                         allIds,
                                                                     )
                                                                 }
-                                                                className={`rounded-lg px-3 py-1 text-[11px] font-bold transition-colors ${
+                                                                className={`rounded-lg px-2.5 py-1 text-[11px] font-bold transition-colors ${
                                                                     removeCount ===
                                                                         allIds.length &&
                                                                     allIds.length >
                                                                         0
-                                                                        ? 'bg-rose-100 text-rose-700 hover:bg-rose-200'
-                                                                        : 'bg-slate-100 text-slate-500 hover:bg-rose-50 hover:text-rose-600'
+                                                                        ? 'bg-brick-light/80 text-brick'
+                                                                        : 'bg-slate-100 text-slate-500 hover:bg-brick-light/50 hover:text-brick'
                                                                 }`}
                                                             >
                                                                 {removeCount ===
@@ -1006,7 +1031,6 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                         )}
                                                     </div>
 
-                                                    {/* Barra de remoción */}
                                                     <RemoveBar
                                                         count={removeCount}
                                                         onConfirm={() =>
@@ -1026,12 +1050,12 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                         loading={actionLoading}
                                                     />
 
-                                                    {/* Tabla de materias */}
                                                     {ag.asignaturas.length ===
                                                     0 ? (
-                                                        <p className="text-xs text-slate-400 italic">
+                                                        <p className="py-3 text-xs text-slate-400 italic">
                                                             Sin optativas
-                                                            asignadas
+                                                            asignadas a esta
+                                                            agrupación
                                                         </p>
                                                     ) : (
                                                         <table className="w-full text-left">
@@ -1052,19 +1076,19 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                                                     allIds,
                                                                                 )
                                                                             }
-                                                                            className="cursor-pointer rounded border-slate-300 text-rose-500 focus:ring-rose-400"
+                                                                            className="cursor-pointer rounded border-slate-300 text-brick focus:ring-brick/30"
                                                                         />
                                                                     </th>
-                                                                    <th className="px-2 py-2 text-[9px] font-black text-slate-400 uppercase">
+                                                                    <th className="px-2 py-2 text-[9px] font-bold tracking-wider text-slate-400 uppercase">
                                                                         Código
                                                                     </th>
-                                                                    <th className="px-2 py-2 text-[9px] font-black text-slate-400 uppercase">
+                                                                    <th className="px-2 py-2 text-[9px] font-bold tracking-wider text-slate-400 uppercase">
                                                                         Nombre
                                                                     </th>
-                                                                    <th className="px-2 py-2 text-center text-[9px] font-black text-slate-400 uppercase">
+                                                                    <th className="px-2 py-2 text-center text-[9px] font-bold tracking-wider text-slate-400 uppercase">
                                                                         Cr.
                                                                     </th>
-                                                                    <th className="w-8 px-2 py-2"></th>
+                                                                    <th className="w-8 px-2 py-2" />
                                                                 </tr>
                                                             </thead>
                                                             <tbody>
@@ -1072,98 +1096,102 @@ export default function OptativasAsignacion({ malla }: Props) {
                                                                     (
                                                                         asig,
                                                                         i,
-                                                                    ) => (
-                                                                        <tr
-                                                                            key={
-                                                                                asig.ID_Asignatura
-                                                                            }
-                                                                            onClick={() =>
-                                                                                toggleRemove(
-                                                                                    ag.ID_Agrupacion,
-                                                                                    asig.ID_Asignatura,
-                                                                                )
-                                                                            }
-                                                                            className={`cursor-pointer border-b border-slate-50 transition-colors last:border-0 ${
-                                                                                removeSet.has(
-                                                                                    asig.ID_Asignatura,
-                                                                                )
-                                                                                    ? 'bg-rose-50/60 hover:bg-rose-50'
-                                                                                    : i %
-                                                                                            2 ===
-                                                                                        0
-                                                                                      ? 'hover:bg-slate-50'
-                                                                                      : 'bg-slate-50/40 hover:bg-slate-100/50'
-                                                                            }`}
-                                                                        >
-                                                                            <td
-                                                                                className="px-3 py-2"
-                                                                                onClick={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    e.stopPropagation()
+                                                                    ) => {
+                                                                        const isSelected =
+                                                                            removeSet.has(
+                                                                                asig.ID_Asignatura,
+                                                                            );
+                                                                        return (
+                                                                            <tr
+                                                                                key={
+                                                                                    asig.ID_Asignatura
                                                                                 }
-                                                                            >
-                                                                                <input
-                                                                                    type="checkbox"
-                                                                                    checked={removeSet.has(
+                                                                                onClick={() =>
+                                                                                    toggleRemove(
+                                                                                        ag.ID_Agrupacion,
                                                                                         asig.ID_Asignatura,
-                                                                                    )}
-                                                                                    onChange={() =>
-                                                                                        toggleRemove(
-                                                                                            ag.ID_Agrupacion,
-                                                                                            asig.ID_Asignatura,
-                                                                                        )
-                                                                                    }
-                                                                                    className="cursor-pointer rounded border-slate-300 text-rose-500 focus:ring-rose-400"
-                                                                                />
-                                                                            </td>
-                                                                            <td className="px-2 py-2 font-mono text-[11px] whitespace-nowrap text-slate-500">
-                                                                                {
-                                                                                    asig.Codigo_Asignatura
+                                                                                    )
                                                                                 }
-                                                                            </td>
-                                                                            <td className="px-2 py-2 text-sm font-medium text-slate-800">
-                                                                                {
-                                                                                    asig.Nombre_Asignatura
-                                                                                }
-                                                                            </td>
-                                                                            <td className="px-2 py-2 text-center text-sm text-slate-500 tabular-nums">
-                                                                                {
-                                                                                    asig.Creditos_Asignatura
-                                                                                }
-                                                                            </td>
-                                                                            <td
-                                                                                className="px-2 py-2 text-right"
-                                                                                onClick={(
-                                                                                    e,
-                                                                                ) =>
-                                                                                    e.stopPropagation()
-                                                                                }
+                                                                                className={`cursor-pointer border-b border-slate-50 transition-colors last:border-0 ${
+                                                                                    isSelected
+                                                                                        ? 'bg-brick-light/30'
+                                                                                        : i %
+                                                                                                2 ===
+                                                                                            0
+                                                                                          ? 'hover:bg-slate-50'
+                                                                                          : 'bg-slate-50/40 hover:bg-slate-100/50'
+                                                                                }`}
                                                                             >
-                                                                                <button
-                                                                                    onClick={() =>
-                                                                                        setConfirmRemove(
-                                                                                            {
-                                                                                                agrupacionId:
-                                                                                                    ag.ID_Agrupacion,
-                                                                                                asignaturaId:
-                                                                                                    asig.ID_Asignatura,
-                                                                                            },
-                                                                                        )
+                                                                                <td
+                                                                                    className="px-3 py-2"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        e.stopPropagation()
                                                                                     }
-                                                                                    disabled={
-                                                                                        actionLoading
-                                                                                    }
-                                                                                    title="Remover de esta agrupación"
-                                                                                    className="p-1 text-slate-300 transition-colors hover:text-rose-500 disabled:opacity-40"
                                                                                 >
-                                                                                    <span className="material-symbols-outlined !text-base">
-                                                                                        remove_circle_outline
-                                                                                    </span>
-                                                                                </button>
-                                                                            </td>
-                                                                        </tr>
-                                                                    ),
+                                                                                    <input
+                                                                                        type="checkbox"
+                                                                                        checked={
+                                                                                            isSelected
+                                                                                        }
+                                                                                        onChange={() =>
+                                                                                            toggleRemove(
+                                                                                                ag.ID_Agrupacion,
+                                                                                                asig.ID_Asignatura,
+                                                                                            )
+                                                                                        }
+                                                                                        className="cursor-pointer rounded border-slate-300 text-brick focus:ring-brick/30"
+                                                                                    />
+                                                                                </td>
+                                                                                <td className="px-2 py-2 text-[11px] whitespace-nowrap text-slate-500">
+                                                                                    {
+                                                                                        asig.Codigo_Asignatura
+                                                                                    }
+                                                                                </td>
+                                                                                <td className="px-2 py-2 text-sm font-medium text-slate-800">
+                                                                                    {
+                                                                                        asig.Nombre_Asignatura
+                                                                                    }
+                                                                                </td>
+                                                                                <td className="px-2 py-2 text-center text-sm text-slate-500 tabular-nums">
+                                                                                    {
+                                                                                        asig.Creditos_Asignatura
+                                                                                    }
+                                                                                </td>
+                                                                                <td
+                                                                                    className="px-2 py-2 text-right"
+                                                                                    onClick={(
+                                                                                        e,
+                                                                                    ) =>
+                                                                                        e.stopPropagation()
+                                                                                    }
+                                                                                >
+                                                                                    <button
+                                                                                        onClick={() =>
+                                                                                            setConfirmRemove(
+                                                                                                {
+                                                                                                    agrupacionId:
+                                                                                                        ag.ID_Agrupacion,
+                                                                                                    asignaturaId:
+                                                                                                        asig.ID_Asignatura,
+                                                                                                },
+                                                                                            )
+                                                                                        }
+                                                                                        disabled={
+                                                                                            actionLoading
+                                                                                        }
+                                                                                        title="Remover de esta agrupación"
+                                                                                        className="p-1 text-slate-300 transition-colors hover:text-brick disabled:opacity-40"
+                                                                                    >
+                                                                                        <span className="material-symbols-outlined !text-base">
+                                                                                            remove_circle_outline
+                                                                                        </span>
+                                                                                    </button>
+                                                                                </td>
+                                                                            </tr>
+                                                                        );
+                                                                    },
                                                                 )}
                                                             </tbody>
                                                         </table>
@@ -1178,22 +1206,28 @@ export default function OptativasAsignacion({ malla }: Props) {
                     </div>
                 )}
 
+                {/* ── Confirmar remoción individual ── */}
                 {confirmRemove && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
-                            <span className="material-symbols-outlined mb-3 !text-5xl text-red-500">
-                                warning
-                            </span>
-                            <h3 className="text-lg font-bold text-slate-900">
-                                ¿Remover optativa?
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Esta optativa será desasignada de la agrupación.
-                            </p>
-                            <div className="mt-6 flex justify-center gap-3">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+                        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+                            <div className="flex items-start gap-4">
+                                <span className="material-symbols-outlined !text-3xl text-brick">
+                                    warning
+                                </span>
+                                <div className="flex-1">
+                                    <h3 className="text-base font-bold text-slate-900">
+                                        ¿Remover optativa?
+                                    </h3>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Esta optativa será desasignada de la
+                                        agrupación.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="mt-5 flex justify-end gap-2">
                                 <button
                                     onClick={() => setConfirmRemove(null)}
-                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
                                 >
                                     Cancelar
                                 </button>
@@ -1204,32 +1238,43 @@ export default function OptativasAsignacion({ malla }: Props) {
                                             confirmRemove.asignaturaId,
                                         );
                                     }}
-                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
+                                    disabled={actionLoading}
+                                    className="rounded-lg bg-brick px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brick/90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    Remover
+                                    {actionLoading ? 'Removiendo…' : 'Remover'}
                                 </button>
                             </div>
                         </div>
                     </div>
                 )}
 
+                {/* ── Confirmar remoción masiva ── */}
                 {confirmRemoveBatch && (
-                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-                        <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
-                            <span className="material-symbols-outlined mb-3 !text-5xl text-red-500">
-                                warning
-                            </span>
-                            <h3 className="text-lg font-bold text-slate-900">
-                                ¿Remover {confirmRemoveBatch.count} optativas?
-                            </h3>
-                            <p className="mt-1 text-sm text-slate-500">
-                                Estas optativas serán desasignadas de la
-                                agrupación.
-                            </p>
-                            <div className="mt-6 flex justify-center gap-3">
+                    <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-sm">
+                        <div className="w-full max-w-sm rounded-xl border border-slate-200 bg-white p-6 shadow-xl">
+                            <div className="flex items-start gap-4">
+                                <span className="material-symbols-outlined !text-3xl text-brick">
+                                    warning
+                                </span>
+                                <div className="flex-1">
+                                    <h3 className="text-base font-bold text-slate-900">
+                                        ¿Remover {confirmRemoveBatch.count}{' '}
+                                        optativa
+                                        {confirmRemoveBatch.count !== 1
+                                            ? 's'
+                                            : ''}
+                                        ?
+                                    </h3>
+                                    <p className="mt-1 text-sm text-slate-500">
+                                        Estas optativas serán desasignadas de la
+                                        agrupación.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="mt-5 flex justify-end gap-2">
                                 <button
                                     onClick={() => setConfirmRemoveBatch(null)}
-                                    className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
+                                    className="rounded-lg border border-slate-200 px-4 py-2 text-sm font-medium text-slate-600 transition-colors hover:bg-slate-50"
                                 >
                                     Cancelar
                                 </button>
@@ -1239,9 +1284,10 @@ export default function OptativasAsignacion({ malla }: Props) {
                                             confirmRemoveBatch.agrupacionId,
                                         );
                                     }}
-                                    className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
+                                    disabled={actionLoading}
+                                    className="rounded-lg bg-brick px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-brick/90 disabled:cursor-not-allowed disabled:opacity-50"
                                 >
-                                    Remover
+                                    {actionLoading ? 'Removiendo…' : 'Remover'}
                                 </button>
                             </div>
                         </div>

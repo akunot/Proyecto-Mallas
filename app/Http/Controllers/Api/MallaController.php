@@ -122,13 +122,16 @@ class MallaController extends Controller
                 $added[] = $mapItem($a2);
             } else {
                 $a1 = $asig1[$id];
-                $changed = ($a1->Semestre_Sugerido !== $a2->Semestre_Sugerido)
-                    || ($a1->Tipo_Asignatura !== $a2->Tipo_Asignatura)
-                    || ($a1->ID_Agrupacion !== $a2->ID_Agrupacion);
+                $oldItem = $mapItem($a1);
+                $newItem = $mapItem($a2);
+                $changed = ($oldItem['Semestre_Sugerido'] !== $newItem['Semestre_Sugerido'])
+                    || ($oldItem['Tipo_Asignatura'] !== $newItem['Tipo_Asignatura'])
+                    || ($oldItem['Nombre_Agrupacion'] !== $newItem['Nombre_Agrupacion'])
+                    || ($oldItem['ID_Componente'] !== $newItem['ID_Componente']);
                 if ($changed) {
-                    $modified[] = ['old' => $mapItem($a1), 'new' => $mapItem($a2)];
+                    $modified[] = ['old' => $oldItem, 'new' => $newItem];
                 } else {
-                    $unchanged[] = $mapItem($a2);
+                    $unchanged[] = $newItem;
                 }
             }
         }
@@ -136,6 +139,28 @@ class MallaController extends Controller
         foreach ($asig1 as $id => $a1) {
             if (! $asig2->has($id)) {
                 $removed[] = $mapItem($a1);
+            }
+        }
+
+        // Comparar requisitos
+        $reqNuevos = $this->getRequisitosMalla($malla2Id);
+        $reqBase = $this->getRequisitosMalla($malla1Id);
+        $reqKeyFn = fn ($r) => $r['ID_Asignatura'].'|'.($r['ID_Asignatura_Requerida'] ?? 'NULL').'|'.$r['Tipo_Requisito'];
+        $reqBaseKeyed = collect($reqBase)->keyBy($reqKeyFn);
+        $reqNuevosKeyed = collect($reqNuevos)->keyBy($reqKeyFn);
+
+        $requisitosAgregados = [];
+        $requisitosEliminados = [];
+
+        foreach ($reqNuevosKeyed as $key => $r) {
+            if (! $reqBaseKeyed->has($key)) {
+                $requisitosAgregados[] = $r;
+            }
+        }
+
+        foreach ($reqBaseKeyed as $key => $r) {
+            if (! $reqNuevosKeyed->has($key)) {
+                $requisitosEliminados[] = $r;
             }
         }
 
@@ -158,14 +183,51 @@ class MallaController extends Controller
                     'eliminadas' => count($removed),
                     'modificadas' => count($modified),
                     'sin_cambios' => count($unchanged),
+                    'requisitos_agregados' => count($requisitosAgregados),
+                    'requisitos_eliminados' => count($requisitosEliminados),
                 ],
                 'cambios' => [
                     'agregadas' => $added,
                     'eliminadas' => $removed,
                     'modificadas' => $modified,
+                    'sin_cambios' => $unchanged,
+                    'requisitos_agregados' => $requisitosAgregados,
+                    'requisitos_eliminados' => $requisitosEliminados,
                 ],
             ],
         ]);
+    }
+
+    private function getRequisitosMalla(int $idMalla): array
+    {
+        $asignaturaIds = AgrupacionAsignatura::where('ID_Malla', $idMalla)
+            ->pluck('ID_Asignatura');
+
+        return Requisito::whereIn('ID_Asignatura', $asignaturaIds)
+            ->orWhereIn('ID_Asignatura_Requerida', $asignaturaIds)
+            ->with(['asignatura', 'asignaturaRequerida'])
+            ->get()
+            ->map(function ($item) {
+                return [
+                    'ID_Requisito' => $item->ID_Requisito,
+                    'ID_Asignatura' => $item->ID_Asignatura,
+                    'ID_Asignatura_Requerida' => $item->ID_Asignatura_Requerida,
+                    'Tipo_Requisito' => $item->Tipo_Requisito,
+                    'Descripcion_Requisito' => $item->Descripcion_Requisito,
+                    'asignatura_principal' => [
+                        'Codigo_Asignatura' => $item->asignatura?->Codigo_Asignatura,
+                        'Nombre_Asignatura' => $item->asignatura?->Nombre_Asignatura,
+                    ],
+                    'asignatura_requerida' => $item->asignaturaRequerida ? [
+                        'Codigo_Asignatura' => $item->asignaturaRequerida->Codigo_Asignatura,
+                        'Nombre_Asignatura' => $item->asignaturaRequerida->Nombre_Asignatura,
+                    ] : [
+                        'Codigo_Asignatura' => null,
+                        'Nombre_Asignatura' => $item->Descripcion_Requisito,
+                    ],
+                ];
+            })
+            ->toArray();
     }
 
     /**

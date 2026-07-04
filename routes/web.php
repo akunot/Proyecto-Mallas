@@ -5,7 +5,6 @@ use App\Http\Controllers\Api\AsignaturaController;
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\ComponenteController;
 use App\Http\Controllers\Api\FacultadController;
-use App\Http\Controllers\Api\MallaController;
 use App\Http\Controllers\Api\NormativaController;
 use App\Http\Controllers\Api\ProgramaController;
 use App\Http\Controllers\Api\SedeController;
@@ -22,6 +21,7 @@ use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
 use App\Models\Sede;
 use App\Models\Usuario;
+use App\Services\MallaVisualizerService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
@@ -592,9 +592,10 @@ Route::middleware(['auth'])->group(function () {
         $malla = MallaCurricular::findOrFail($id);
         $idPrograma = $malla->programa->ID_Programa;
 
-        $malla->load(MallaController::visualizerEagerLoads($idPrograma));
+        $service = app(MallaVisualizerService::class);
+        $malla->load($service->eagerLoads($idPrograma));
 
-        $payload = MallaController::mallaToVisualizerPayload($malla);
+        $payload = $service->toPayload($malla);
         $payload['programa']['Facultad'] = $malla->programa->facultad->Nombre_Facultad ?? null;
 
         return Inertia::render('Mallas/Visualizer', [

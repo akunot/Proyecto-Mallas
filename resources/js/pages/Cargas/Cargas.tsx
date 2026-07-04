@@ -928,50 +928,39 @@ export default function Cargas() {
             {/* ── Modal: Detalle de errores ────────────────────────────────────── */}
             {errorModal && (
                 <div
-                    className="fixed inset-0 z-50 flex items-center justify-center"
+                    className="fixed inset-0 z-50 flex items-center justify-center p-4"
                     style={{
-                        backgroundColor: 'rgba(25, 28, 30, 0.4)',
+                        backgroundColor: 'rgba(15, 17, 20, 0.55)',
                         backdropFilter: 'blur(8px)',
                     }}
                 >
-                    <div
-                        className="w-full max-w-2xl overflow-hidden rounded-xl shadow-2xl"
-                        style={{
-                            backgroundColor:
-                                'var(--unal-surface-container-lowest)',
-                            border: '1px solid var(--unal-outline-variant)',
-                        }}
-                    >
+                    <div className="flex w-full max-w-3xl flex-col overflow-hidden rounded-2xl bg-white shadow-2xl">
                         {/* Header */}
-                        <div
-                            className="flex items-center justify-between px-6 py-4"
-                            style={{
-                                borderBottom:
-                                    '1px solid var(--unal-outline-variant)',
-                            }}
-                        >
+                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-5">
                             <div>
-                                <h2
-                                    style={{
-                                        fontSize: '14px',
-                                        lineHeight: '20px',
-                                        fontWeight: 600,
-                                        color: 'var(--unal-on-surface)',
-                                    }}
-                                >
+                                <h2 className="text-lg font-bold tracking-tight text-slate-900">
                                     Detalle de problemas
                                 </h2>
-                                <p
-                                    style={{
-                                        fontSize: '12px',
-                                        lineHeight: '16px',
-                                        color: 'var(--unal-on-surface-variant)',
-                                    }}
-                                    className="mt-0.5"
-                                >
-                                    Carga #{errorModal.cargaId} —{' '}
+                                <p className="text-sm text-slate-500">
+                                    Carga #{errorModal.cargaId}{' '}
+                                    <span className="mx-1.5 text-slate-300">
+                                        ·
+                                    </span>
                                     {TIPO_LABELS[errorModal.tipo]?.label ??
                                         errorModal.tipo}
+                                    {errores.length > 0 && (
+                                        <>
+                                            <span className="mx-1.5 text-slate-300">
+                                                ·
+                                            </span>
+                                            <span className="font-semibold text-slate-600">
+                                                {errores.length} registro
+                                                {errores.length !== 1
+                                                    ? 's'
+                                                    : ''}
+                                            </span>
+                                        </>
+                                    )}
                                 </p>
                             </div>
                             <button
@@ -979,155 +968,151 @@ export default function Cargas() {
                                     setErrorModal(null);
                                     setErrores([]);
                                 }}
-                                className="flex h-8 w-8 items-center justify-center rounded-full transition-colors hover:bg-[var(--unal-surface-container-high)]"
-                                style={{
-                                    color: 'var(--unal-on-surface-variant)',
-                                }}
+                                className="flex h-8 w-8 items-center justify-center rounded-lg text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-600"
                             >
-                                <span
-                                    className="material-symbols-outlined"
-                                    style={{ fontSize: '20px' }}
-                                >
+                                <span className="material-symbols-outlined !text-xl">
                                     close
                                 </span>
                             </button>
                         </div>
 
+                        {/* Summary bar */}
+                        {errores.length > 0 && !loadingErrores && (
+                            <div className="flex gap-3 border-b border-slate-100 px-6 py-3">
+                                {(() => {
+                                    const errCount = errores.filter(
+                                        (e) => e.Severidad_Error === 'error',
+                                    ).length;
+                                    const warnCount = errores.filter(
+                                        (e) =>
+                                            e.Severidad_Error === 'advertencia',
+                                    ).length;
+                                    return (
+                                        <>
+                                            {errCount > 0 && (
+                                                <div className="flex items-center gap-1.5 rounded-lg bg-red-50 px-3 py-1.5">
+                                                    <span className="material-symbols-outlined !text-base text-red-600">
+                                                        error
+                                                    </span>
+                                                    <span className="text-xs font-bold text-red-700">
+                                                        {errCount} error
+                                                        {errCount !== 1
+                                                            ? 'es'
+                                                            : ''}
+                                                    </span>
+                                                </div>
+                                            )}
+                                            {warnCount > 0 && (
+                                                <div className="flex items-center gap-1.5 rounded-lg bg-amber-50 px-3 py-1.5">
+                                                    <span className="material-symbols-outlined !text-base text-amber-600">
+                                                        warning
+                                                    </span>
+                                                    <span className="text-xs font-bold text-amber-700">
+                                                        {warnCount} advertencia
+                                                        {warnCount !== 1
+                                                            ? 's'
+                                                            : ''}
+                                                    </span>
+                                                </div>
+                                            )}
+                                        </>
+                                    );
+                                })()}
+                            </div>
+                        )}
+
                         {/* Content */}
-                        <div className="max-h-[60vh] overflow-y-auto px-6 py-4">
+                        <div className="max-h-[55vh] overflow-y-auto">
                             {loadingErrores ? (
-                                <div
-                                    className="flex items-center justify-center gap-3 py-10"
-                                    style={{ color: 'var(--unal-outline)' }}
-                                >
-                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-gray-300 border-t-[var(--unal-primary)]" />
-                                    <span
-                                        style={{
-                                            fontSize: '14px',
-                                            lineHeight: '20px',
-                                        }}
-                                    >
+                                <div className="flex items-center justify-center gap-3 py-16 text-slate-400">
+                                    <div className="h-5 w-5 animate-spin rounded-full border-2 border-slate-200 border-t-blue-600" />
+                                    <span className="text-sm font-medium">
                                         Cargando errores…
                                     </span>
                                 </div>
                             ) : errores.length === 0 ? (
-                                <p
-                                    className="py-8 text-center"
-                                    style={{
-                                        fontSize: '14px',
-                                        lineHeight: '20px',
-                                        color: 'var(--unal-on-surface-variant)',
-                                    }}
-                                >
-                                    No se encontraron errores registrados.
-                                </p>
+                                <div className="py-16 text-center">
+                                    <span className="material-symbols-outlined !text-5xl text-emerald-200">
+                                        check_circle
+                                    </span>
+                                    <p className="mt-3 font-medium text-slate-500">
+                                        No se encontraron errores registrados.
+                                    </p>
+                                </div>
                             ) : (
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr
-                                            className="text-left"
-                                            style={{
-                                                fontSize: '12px',
-                                                lineHeight: '16px',
-                                                fontWeight: 700,
-                                                color: 'var(--unal-on-surface-variant)',
-                                            }}
+                                <div className="divide-y divide-slate-50">
+                                    {errores.map((err) => (
+                                        <div
+                                            key={err.ID_Error}
+                                            className={`px-6 py-4 transition-colors hover:bg-slate-50/50 ${
+                                                err.Severidad_Error === 'error'
+                                                    ? 'border-l-2 border-l-red-400'
+                                                    : 'border-l-2 border-l-amber-400'
+                                            }`}
                                         >
-                                            <th className="pr-4 pb-3 tracking-wider uppercase">
-                                                Severidad
-                                            </th>
-                                            <th className="pr-4 pb-3 tracking-wider uppercase">
-                                                Fila
-                                            </th>
-                                            <th className="pr-4 pb-3 tracking-wider uppercase">
-                                                Columna
-                                            </th>
-                                            <th className="pr-4 pb-3 tracking-wider uppercase">
-                                                Mensaje
-                                            </th>
-                                            <th className="pb-3 tracking-wider uppercase">
-                                                Valor recibido
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-[var(--unal-outline-variant)]">
-                                        {errores.map((err) => (
-                                            <tr
-                                                key={err.ID_Error}
-                                                className="align-top"
-                                            >
-                                                <td className="py-2 pr-4">
-                                                    {err.Severidad_Error ===
-                                                    'error' ? (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                                                            Error
-                                                        </span>
-                                                    ) : (
-                                                        <span className="inline-flex items-center gap-1 rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-700">
-                                                            Advertencia
-                                                        </span>
+                                            <div className="flex items-start justify-between gap-4">
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex items-center gap-2">
+                                                        {err.Severidad_Error ===
+                                                        'error' ? (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-red-50 px-2 py-0.5 text-[11px] font-bold tracking-wide text-red-700 uppercase">
+                                                                <span className="material-symbols-outlined !text-xs">
+                                                                    error
+                                                                </span>
+                                                                Error
+                                                            </span>
+                                                        ) : (
+                                                            <span className="inline-flex items-center gap-1 rounded-md bg-amber-50 px-2 py-0.5 text-[11px] font-bold tracking-wide text-amber-700 uppercase">
+                                                                <span className="material-symbols-outlined !text-xs">
+                                                                    warning
+                                                                </span>
+                                                                Advertencia
+                                                            </span>
+                                                        )}
+                                                        {(err.Fila_Error ||
+                                                            err.Columna_Error) && (
+                                                            <span className="font-mono text-[11px] text-slate-400">
+                                                                {err.Fila_Error &&
+                                                                    `Fila ${err.Fila_Error}`}
+                                                                {err.Fila_Error &&
+                                                                    err.Columna_Error &&
+                                                                    ' · '}
+                                                                {err.Columna_Error &&
+                                                                    err.Columna_Error}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
+                                                        {err.Mensaje_Error}
+                                                    </p>
+                                                    {err.Valor_Recibido && (
+                                                        <div className="mt-1.5 flex items-center gap-1.5">
+                                                            <span className="text-[11px] font-medium text-slate-400 uppercase">
+                                                                Valor:
+                                                            </span>
+                                                            <code className="max-w-full truncate rounded bg-slate-100 px-2 py-0.5 font-mono text-[11px] text-slate-600">
+                                                                {
+                                                                    err.Valor_Recibido
+                                                                }
+                                                            </code>
+                                                        </div>
                                                     )}
-                                                </td>
-                                                <td
-                                                    className="py-2 pr-4 font-mono"
-                                                    style={{
-                                                        color: 'var(--unal-outline)',
-                                                    }}
-                                                >
-                                                    {err.Fila_Error ?? '—'}
-                                                </td>
-                                                <td
-                                                    className="py-2 pr-4"
-                                                    style={{
-                                                        color: 'var(--unal-on-surface-variant)',
-                                                    }}
-                                                >
-                                                    {err.Columna_Error ?? '—'}
-                                                </td>
-                                                <td
-                                                    className="py-2 pr-4"
-                                                    style={{
-                                                        color: 'var(--unal-on-surface)',
-                                                    }}
-                                                >
-                                                    {err.Mensaje_Error}
-                                                </td>
-                                                <td
-                                                    className="max-w-[120px] truncate py-2 font-mono text-xs"
-                                                    style={{
-                                                        color: 'var(--unal-outline)',
-                                                    }}
-                                                    title={
-                                                        err.Valor_Recibido ?? ''
-                                                    }
-                                                >
-                                                    {err.Valor_Recibido ?? '—'}
-                                                </td>
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
                             )}
                         </div>
 
                         {/* Footer */}
-                        <div
-                            className="flex justify-end px-6 py-4"
-                            style={{
-                                borderTop:
-                                    '1px solid var(--unal-outline-variant)',
-                            }}
-                        >
+                        <div className="flex justify-end border-t border-slate-100 px-6 py-4">
                             <button
                                 onClick={() => {
                                     setErrorModal(null);
                                     setErrores([]);
                                 }}
-                                className="rounded-lg px-4 py-2 text-sm transition-colors"
-                                style={{
-                                    border: '1px solid var(--unal-outline)',
-                                    color: 'var(--unal-on-surface-variant)',
-                                }}
+                                className="rounded-lg border border-slate-200 px-5 py-2 text-sm font-semibold text-slate-600 transition-colors hover:bg-slate-50"
                             >
                                 Cerrar
                             </button>
@@ -1135,7 +1120,6 @@ export default function Cargas() {
                     </div>
                 </div>
             )}
-
             {/* ── Modal: Confirmar eliminación ──────────────────────────────────── */}
             {deleteConfirm && (
                 <div

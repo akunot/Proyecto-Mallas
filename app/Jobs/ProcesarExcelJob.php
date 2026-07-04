@@ -34,7 +34,6 @@ class ProcesarExcelJob implements ShouldQueue
     {
         $carga = CargaMalla::findOrFail($this->cargaId);
 
-
         $carga->update(['Estado_Carga' => 'validando']);
 
         try {

@@ -9,6 +9,11 @@
         'Instrument Sans', ui-sans-serif, system-ui, sans-serif,
         'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol',
         'Noto Color Emoji';
+    --color-navy: #00236f;
+    --color-brick: #c94f3a;
+    --color-brick-light: #f5e6e2;
+    --color-pine: #2d7d46;
+    --color-pine-light: #e6f2ea;
 }
 
 /* ==========================================================================

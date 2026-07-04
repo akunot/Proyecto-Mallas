@@ -250,6 +250,8 @@ class ExcelParserService
             return;
         }
 
+        $this->validateAsignaturasHeaders($rows[0]);
+
         $batch = []; // Batch de nuevas asignaturas para insertar
         $codigosProcesados = []; // Para detectar duplicados dentro del mismo Excel
 
@@ -341,6 +343,8 @@ class ExcelParserService
         if (count($rows) < 2) {
             return;
         }
+
+        $this->validateAsignaturasHeaders($rows[0]);
 
         $batch = [];
         $codigosProcesados = [];
@@ -978,6 +982,8 @@ class ExcelParserService
             return true;
         }
 
+        $this->validateMallaHeaders($rows[0]);
+
         $this->totalRows = count($rows) - 1;
 
         // === BATCHES ===
@@ -1099,19 +1105,46 @@ class ExcelParserService
         array &$compTempMap,
         array &$agrupTempMap
     ): void {
-        $componenteId = (int) $this->cleanCell($data[1] ?? '');
-        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? '');
+        $componenteRaw = $this->cleanCell($data[1] ?? '');
+        if ($componenteRaw !== null && ! is_numeric($componenteRaw)) {
+            $this->recordError($rowNumber, 'Componente', "El valor '{$componenteRaw}' no es un ID de componente válido (se esperaba un número).", $componenteRaw, 'error');
+
+            return;
+        }
+        $componenteId = (int) $componenteRaw;
+        $plantillaRaw = $this->cleanCell($data[2] ?? '');
         $codigoAsignatura = $this->cleanCodeCell($data[3] ?? '');
         $obligatoriaVal = $this->cleanCell($data[4] ?? '');
         $reqTipo = $this->cleanCell($data[5] ?? null);
         $reqCodigo = $this->cleanCodeCell($data[6] ?? null);
-        $semestre = ! empty($data[7]) ? (int) $data[7] : null;
+        $semestreRaw = $this->cleanCell($data[7] ?? null);
+        if ($semestreRaw !== null && $semestreRaw !== '') {
+            if (! is_numeric($semestreRaw)) {
+                $this->recordError($rowNumber, 'Semestre', "El valor de semestre '{$semestreRaw}' no es un número válido.", $semestreRaw, 'error');
+                $semestre = null;
+            } else {
+                $semestre = (int) $semestreRaw;
+                if ($semestre < 1 || $semestre > 20) {
+                    $this->recordError($rowNumber, 'Semestre', "El semestre {$semestre} está fuera del rango permitido (1-20).", (string) $semestre, 'advertencia');
+                }
+            }
+        } else {
+            $semestre = null;
+        }
 
         if (empty($codigoAsignatura)) {
             $this->recordError($rowNumber, 'Codigo Asignatura', 'Fila sin codigo de asignatura', '', 'error');
 
             return;
         }
+
+        if (empty($plantillaRaw) || ! is_numeric($plantillaRaw)) {
+            $this->recordError($rowNumber, 'Plantilla Agrupacion', "El valor '{$plantillaRaw}' no es un ID de plantilla válido (se esperaba un número).", $codigoAsignatura, 'error');
+
+            return;
+        }
+
+        $plantillaAgrupacionId = (int) $plantillaRaw;
 
         // Placeholders (OPTATIVA*, LIBRE*, NIVELATORIO*) are processed in the second pass
         if ($this->esPlaceholder($codigoAsignatura)) {
@@ -1156,6 +1189,12 @@ class ExcelParserService
             $this->agrupacionesCache[$agrupKey] = $tempAgrupId;
         }
 
+        if ($obligatoriaVal !== null) {
+            $obligatoriaUpper = strtoupper($obligatoriaVal);
+            if ($obligatoriaUpper !== 'SI' && $obligatoriaUpper !== 'NO') {
+                $this->recordError($rowNumber, 'Obligatoria', "Valor '{$obligatoriaVal}' no reconocido. Se esperaba 'SI' o 'NO'. Se usará 'NO' por defecto.", $obligatoriaVal, 'advertencia');
+            }
+        }
         $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
 
         // Procesar requisitos ANTES del dedup: así si una materia tiene
@@ -1177,13 +1216,29 @@ class ExcelParserService
             }
         }
 
-        // Prevenir duplicados en el mismo batch antes de insert
+        // Prevenir duplicados en el mismo batch antes de insert,
+        // y detectar contradicciones en el campo Obligatoria.
+        // NOTA: una misma asignatura puede aparecer en múltiples filas
+        // dentro de la misma agrupación (requisitos múltiples). El dedup
+        // evita duplicar agrupacion_asignatura sin perder los requisitos.
         $relKey = $agrupKey.'|'.$asignaturaReqId;
         static $processedRels = [];
         if (isset($processedRels[$relKey])) {
+            if ($processedRels[$relKey] !== $tipoAsignatura) {
+                $this->recordError(
+                    $rowNumber,
+                    'Obligatoria',
+                    "La asignatura {$codigoAsignatura} aparece con valor Obligatoria '{$obligatoriaVal}' ".
+                    "contradictorio al valor anterior '".($processedRels[$relKey] === 'obligatoria' ? 'SI' : 'NO').
+                    "' en la misma agrupación.",
+                    $obligatoriaVal,
+                    'error'
+                );
+            }
+
             return;
         }
-        $processedRels[$relKey] = true;
+        $processedRels[$relKey] = $tipoAsignatura;
 
         $batchRelaciones[] = [
             'ID_Malla' => $this->malla->ID_Malla,
@@ -1207,6 +1262,62 @@ class ExcelParserService
         }
 
         return true;
+    }
+
+    private function validateHeaders(array $headerRow, array $expectedPatterns, string $sheetName): void
+    {
+        $headerRow = array_map(fn ($v) => strtolower(trim((string) $v)), $headerRow);
+
+        foreach ($expectedPatterns as $colIndex => $patterns) {
+            if (! isset($headerRow[$colIndex])) {
+                continue;
+            }
+
+            $headerValue = $headerRow[$colIndex];
+            if (empty($headerValue)) {
+                continue;
+            }
+
+            $matches = false;
+            foreach ($patterns as $pattern) {
+                if (str_contains($headerValue, $pattern)) {
+                    $matches = true;
+                    break;
+                }
+            }
+
+            if (! $matches) {
+                $this->recordError(
+                    1,
+                    $sheetName,
+                    "Encabezado inesperado en columna {$colIndex}: '{$headerValue}'. ".
+                    'Se esperaba un nombre que contenga: '.implode(', ', $patterns).'.',
+                    $headerValue,
+                    'advertencia'
+                );
+            }
+        }
+    }
+
+    private function validateMallaHeaders(array $headerRow): void
+    {
+        $this->validateHeaders($headerRow, [
+            1 => ['componente'],
+            2 => ['plantilla', 'agrupaci'],
+            3 => ['codigo', 'código'],
+            4 => ['obligatoria', 'tipo'],
+            5 => ['requisito', 'tipo'],
+            7 => ['semestre'],
+        ], 'MALLA');
+    }
+
+    private function validateAsignaturasHeaders(array $headerRow): void
+    {
+        $this->validateHeaders($headerRow, [
+            0 => ['codigo', 'código'],
+            1 => ['nombre'],
+            2 => ['credito', 'crédito'],
+        ], 'Asignaturas');
     }
 
     /**
@@ -1703,6 +1814,18 @@ class ExcelParserService
                 $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
 
                 if (! $asignaturaReqId) {
+                    if ($tipoMapeado === 'prerrequisito' || $tipoMapeado === 'correquisito') {
+                        $this->recordError(
+                            $rowNumber,
+                            'Requisito',
+                            "Asignatura requisito con código '{$codigoLimpio}' no encontrada en el catálogo.",
+                            $reqCodigoLimpiado,
+                            'error'
+                        );
+
+                        return;
+                    }
+
                     // 3. Si no es asignatura y es numérico, es requisito de créditos simple
                     if (is_numeric($codigoLimpio)) {
                         $valorCreditos = (int) $codigoLimpio;
@@ -1781,6 +1904,18 @@ class ExcelParserService
             $asignaturaReqId = $this->buscarAsignaturaPorCodigoBase($this->normalizeCodigo($codigoLimpio));
 
             if (! $asignaturaReqId) {
+                if ($tipoMapeado === 'prerrequisito' || $tipoMapeado === 'correquisito') {
+                    $this->recordError(
+                        $rowNumber,
+                        'Requisito',
+                        "Asignatura requisito con código '{$codigoLimpio}' no encontrada en el catálogo.",
+                        $reqCodigoLimpiado,
+                        'error'
+                    );
+
+                    return;
+                }
+
                 if (is_numeric($codigoLimpio)) {
                     $valorCreditos = (int) $codigoLimpio;
                     $tipoMapeado = 'creditos';
@@ -1820,7 +1955,7 @@ class ExcelParserService
             return 'prerrequisito';
         }
 
-        if (str_contains($tipoLimpio, 'CORREQUISITO') || str_contains($tipoLimpio, 'CO-REQUISITO')) {
+        if (str_contains($tipoLimpio, 'CORREQUISITO') || str_contains($tipoLimpio, 'COREQUISITO') || str_contains($tipoLimpio, 'CO-REQUISITO')) {
             return 'correquisito';
         }
 
@@ -2098,15 +2233,23 @@ class ExcelParserService
     private function procesarPlaceholder(array $data, int $rowNumber): void
     {
         $componenteId = (int) $this->cleanCell($data[1] ?? null);
-        $plantillaAgrupacionId = (int) $this->cleanCell($data[2] ?? null);
+        $plantillaRaw = $this->cleanCell($data[2] ?? null);
         $codigoPlaceholder = trim((string) $this->cleanCell($data[3] ?? null));
         $semestre = $this->cleanCell($data[7] ?? null);
 
-        if (! $componenteId || ! $plantillaAgrupacionId || empty($codigoPlaceholder)) {
+        if (! $componenteId || empty($plantillaRaw) || empty($codigoPlaceholder)) {
             $this->recordError($rowNumber, 'Malla', 'Fila de placeholder incompleta.', $codigoPlaceholder, 'error');
 
             return;
         }
+
+        if (! is_numeric($plantillaRaw)) {
+            $this->recordError($rowNumber, 'Plantilla Agrupacion', "El valor '{$plantillaRaw}' no es un ID de plantilla válido (se esperaba un número).", $codigoPlaceholder, 'error');
+
+            return;
+        }
+
+        $plantillaAgrupacionId = (int) $plantillaRaw;
 
         // Same PlantillaAgrupacion lookup used in accumulateMallaRow
         static $plantillasCache = null;
