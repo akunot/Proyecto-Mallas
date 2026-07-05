@@ -50,6 +50,18 @@ Route::prefix('v1/auth')->group(function () {
     Route::post('/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
 });
 
+// Health check endpoint (fuera de prefijos para ruta limpia)
+Route::get('/v1/health', function () {
+    $failedCount = Illuminate\Support\Facades\DB::table('failed_jobs')->count();
+    $status = $failedCount > 0 ? 'degraded' : 'healthy';
+
+    return response()->json([
+        'status' => $status,
+        'failed_jobs' => $failedCount,
+        'timestamp' => now()->toIso8601String(),
+    ]);
+});
+
 // Rutas públicas para visualizar mallas (sin login)
 // IMPORTANTE: Esta es la vista pública que anyone puede ver en mallas.manizales.unal.edu.co
 Route::prefix('v1/public')->group(function () {

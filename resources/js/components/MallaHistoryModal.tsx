@@ -153,7 +153,7 @@ export default function VersionHistoryModalMejorado({
                             {sortedVersiones.map((version) => {
                                 const isCurrentVersion =
                                     version.ID_Malla === currentVersionId;
-                                const isVigente = version.Es_Vigente === 1;
+                                const isVigente = !!version.Es_Vigente;
                                 const cambios =
                                     cambiosPorVersion[version.Version_Numero] ||
                                     {};

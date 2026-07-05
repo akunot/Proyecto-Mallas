@@ -21,7 +21,7 @@ class ProcesarExcelJob implements ShouldQueue
 
     public array $backoff = [30, 60, 120];
 
-    public int $timeout = 120;
+    public int $timeout = 300;
 
     private int $cargaId;
 

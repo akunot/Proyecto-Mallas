@@ -350,6 +350,19 @@ export default function AprobacionPage({
                             {selectedCarga.Estado_Carga ===
                             'pendiente_aprobacion' ? (
                                 <div className="decision-panel space-y-6">
+                                    {selectedCarga.Comentario_Carga && (
+                                        <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4">
+                                            <p className="mb-1 text-[9px] font-black tracking-widest text-blue-500 uppercase">
+                                                Justificación del Solicitante
+                                            </p>
+                                            <p className="text-sm font-medium text-blue-800">
+                                                {
+                                                    selectedCarga.Comentario_Carga
+                                                }
+                                            </p>
+                                        </div>
+                                    )}
+
                                     <h3 className="flex items-center gap-2 text-sm font-black tracking-widest text-slate-900 uppercase">
                                         <span className="material-symbols-outlined !text-lg">
                                             gavel
@@ -480,6 +493,31 @@ export default function AprobacionPage({
                                             ? 'PROCESANDO...'
                                             : 'REENVIAR A REVISIÓN'}
                                     </button>
+                                </div>
+                            ) : selectedCarga.Estado_Carga === 'aprobado' ? (
+                                <div className="decision-panel space-y-6">
+                                    <h3 className="flex items-center gap-2 text-sm font-black tracking-widest text-slate-900 uppercase">
+                                        <span className="material-symbols-outlined !text-lg text-emerald-600">
+                                            check_circle
+                                        </span>
+                                        Malla Aprobada
+                                    </h3>
+                                    {selectedCarga.Comentario_Revisor && (
+                                        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                                            <p className="mb-1 text-[9px] font-black tracking-widest text-emerald-500 uppercase">
+                                                Comentario del Revisor
+                                            </p>
+                                            <p className="text-sm font-medium text-emerald-800">
+                                                {
+                                                    selectedCarga.Comentario_Revisor
+                                                }
+                                            </p>
+                                        </div>
+                                    )}
+                                    <p className="text-sm font-medium text-slate-600">
+                                        Esta malla ha sido aprobada y ya se
+                                        encuentra vigente en el sistema.
+                                    </p>
                                 </div>
                             ) : (
                                 <div className="flex items-center gap-4 rounded-3xl border border-blue-100 bg-blue-50 p-6">

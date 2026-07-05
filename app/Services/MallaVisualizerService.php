@@ -35,7 +35,15 @@ final class MallaVisualizerService
         $cacheKey = "malla_visualizer:v:{$versionId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($versionId): ?array {
-            $malla = MallaCurricular::with($this->eagerLoads())
+            $programaId = MallaCurricular::whereIn('Estado', ['activa', 'archivada'])
+                ->where('ID_Malla', $versionId)
+                ->value('ID_Programa');
+
+            if (! $programaId) {
+                return null;
+            }
+
+            $malla = MallaCurricular::with($this->eagerLoads($programaId))
                 ->whereIn('Estado', ['activa', 'archivada'])
                 ->find($versionId);
 

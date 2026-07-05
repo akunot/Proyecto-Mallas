@@ -7,21 +7,24 @@ rm -rf /etc/nginx/conf.d/* /etc/nginx/http.d/* 2>/dev/null || true
 # Generate .env from environment if missing
 if [ ! -f /var/www/html/.env ]; then
     cat > /var/www/html/.env << EOF
-APP_NAME=\${APP_NAME:-Mallas}
-APP_ENV=\${APP_ENV:-production}
-APP_KEY=\${APP_KEY}
-APP_DEBUG=\${APP_DEBUG:-false}
-APP_URL=\${APP_URL:-http://localhost}
-DB_CONNECTION=\${DB_CONNECTION:-mysql}
-DB_HOST=\${DB_HOST:-mysql}
-DB_PORT=\${DB_PORT:-3306}
-DB_DATABASE=\${DB_DATABASE:-mallas_db}
-DB_USERNAME=\${DB_USERNAME:-root}
-DB_PASSWORD=\${DB_PASSWORD}
-SESSION_DRIVER=\${SESSION_DRIVER:-file}
-QUEUE_CONNECTION=\${QUEUE_CONNECTION:-database}
-CACHE_STORE=\${CACHE_STORE:-file}
-MAIL_MAILER=\${MAIL_MAILER:-log}
+APP_NAME=${APP_NAME:-Mallas}
+APP_ENV=${APP_ENV:-production}
+APP_KEY=${APP_KEY}
+APP_DEBUG=${APP_DEBUG:-false}
+APP_URL=${APP_URL:-http://localhost}
+DB_CONNECTION=${DB_CONNECTION:-mysql}
+DB_HOST=${DB_HOST:-mysql}
+DB_PORT=${DB_PORT:-3306}
+DB_DATABASE=${DB_DATABASE:-mallas_db}
+DB_USERNAME=${DB_USERNAME:-root}
+DB_PASSWORD=${DB_PASSWORD}
+SESSION_DRIVER=${SESSION_DRIVER:-database}
+QUEUE_CONNECTION=${QUEUE_CONNECTION:-database}
+CACHE_STORE=${CACHE_STORE:-database}
+LOG_CHANNEL=${LOG_CHANNEL:-daily}
+LOG_DAILY_DAYS=${LOG_DAILY_DAYS:-30}
+LOG_LEVEL=${LOG_LEVEL:-error}
+MAIL_MAILER=${MAIL_MAILER:-log}
 EOF
 fi
 
@@ -58,16 +61,53 @@ if [ -n "$DB_HOST" ]; then
 fi
 
 # Create storage link
-php /var/www/html/artisan storage:link --force --no-interaction 2>/dev/null || true
+php /var/www/html/artisan storage:link --force --no-interaction || true
+
+# Create storage/logs directory if missing (for supervisord/nginx logs)
+mkdir -p /var/www/html/storage/logs
+chown app:app /var/www/html/storage/logs
 
 # Run migrations
-php /var/www/html/artisan migrate --force --no-interaction 2>/dev/null || true
+echo ""
+echo "=============================================="
+echo "  Running database migrations..."
+echo "=============================================="
+php /var/www/html/artisan migrate --force --no-interaction || true
+
+# Run seeders only if no data exists (safe for restarts)
+echo ""
+echo "=============================================="
+echo "  Checking if seeders are needed..."
+echo "=============================================="
+HAS_DATA=$(php -r "
+    try {
+        \$pdo = new PDO('mysql:host=$DB_HOST;port=${DB_PORT:-3306};dbname=$DB_DATABASE', '$DB_USERNAME', '$DB_PASSWORD');
+        return \$pdo->query('SELECT COUNT(*) FROM sedes')->fetchColumn();
+    } catch (Exception \$e) {
+        return 0;
+    }
+" 2>/dev/null || echo 0)
+if [ "$HAS_DATA" = "0" ]; then
+    echo "  Database is empty, running seeders..."
+    php /var/www/html/artisan db:seed --force --no-interaction || true
+else
+    echo "  Database already has data, skipping seeders."
+fi
 
 # Cache config and routes for production
 if [ "${APP_ENV}" = "production" ]; then
-    php /var/www/html/artisan config:cache --no-interaction 2>/dev/null || true
-    php /var/www/html/artisan route:cache --no-interaction 2>/dev/null || true
-    php /var/www/html/artisan view:cache --no-interaction 2>/dev/null || true
+    echo ""
+    echo "=============================================="
+    echo "  Caching config, routes and views..."
+    echo "=============================================="
+    php /var/www/html/artisan config:cache --no-interaction || true
+    php /var/www/html/artisan route:cache --no-interaction || true
+    php /var/www/html/artisan view:cache --no-interaction || true
 fi
+
+echo ""
+echo "=============================================="
+echo "  Entrypoint completed - starting services"
+echo "=============================================="
 
 exec "$@"

@@ -2,8 +2,13 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Models\Agrupacion;
 use App\Models\Componente;
 use App\Models\PlantillaAgrupacion;
+use App\Models\Programa;
+use App\Services\MallaVisualizerService;
+use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class AgrupacionController extends CatalogoController
 {
@@ -96,5 +101,69 @@ class AgrupacionController extends CatalogoController
     protected function getInertiaComponent(): string
     {
         return 'Catalogos/AgrupacionesForm';
+    }
+
+    public function update(Request $request, int $id)
+    {
+        $plantilla = PlantillaAgrupacion::findOrFail($id);
+        $oldName = $plantilla->Nombre_Agrupacion;
+        $oldComponente = $plantilla->ID_Componente;
+        $oldPrograma = $plantilla->ID_Programa;
+
+        $result = parent::update($request, $id);
+
+        // Si cambió el nombre, sincronizar en todas las agrupaciones existentes
+        $plantilla->refresh();
+        if ($plantilla->Nombre_Agrupacion !== $oldName) {
+            DB::table('agrupaciones')
+                ->where('ID_Programa', $oldPrograma)
+                ->where('ID_Componente', $oldComponente)
+                ->where('Nombre_Agrupacion', $oldName)
+                ->update(['Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion]);
+
+            // Limpiar cache del visualizador
+            app(MallaVisualizerService::class)->forgetProgramaCache($oldPrograma);
+        }
+
+        return $result;
+    }
+
+    public function store(Request $request)
+    {
+        $result = parent::store($request);
+
+        // Limpiar cache del visualizador para el programa afectado
+        if ($programaId = $request->input('ID_Programa')) {
+            app(MallaVisualizerService::class)->forgetProgramaCache($programaId);
+        }
+
+        return $result;
+    }
+
+    public function destroy(int $id)
+    {
+        $plantilla = PlantillaAgrupacion::findOrFail($id);
+        $programaId = $plantilla->ID_Programa;
+
+        $result = parent::destroy($id);
+
+        app(MallaVisualizerService::class)->forgetProgramaCache($programaId);
+
+        return $result;
+    }
+
+    /**
+     * Activar/desactivar un registro (override para limpiar cache)
+     */
+    public function toggle(int $id)
+    {
+        $plantilla = PlantillaAgrupacion::findOrFail($id);
+        $programaId = $plantilla->ID_Programa;
+
+        $result = parent::toggle($id);
+
+        app(MallaVisualizerService::class)->forgetProgramaCache($programaId);
+
+        return $result;
     }
 }
