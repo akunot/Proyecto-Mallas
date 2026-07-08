@@ -23,6 +23,7 @@ use App\Models\Sede;
 use App\Models\Usuario;
 use App\Services\MallaVisualizerService;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Route;
 use Inertia\Inertia;
 
@@ -44,23 +45,26 @@ use Inertia\Inertia;
  * Lógica compartida para renderizar el listado de programas activos.
  */
 $renderProgramasActivos = function () {
-    // Obtener todas las facultades activas
-    $facultades = Facultad::where('Esta_Activo', 1)->orderBy('Nombre_Facultad')->get();
+    $data = Cache::remember('programas_activos', 300, function () {
+        $facultades = Facultad::where('Esta_Activo', 1)
+            ->orderBy('Nombre_Facultad')
+            ->get()
+            ->keyBy('Codigo_Facultad');
 
-    $data = $facultades->map(function ($facultad) {
-        // Programas que pertenecen a esta facultad y tienen al menos una malla ACTIVA
-        // Nota: Estado "activa" en minúsculas (valor real en BD)
-        $programas = Programa::where('Codigo_Facultad', $facultad->Codigo_Facultad)
+        $programas = Programa::with(['mallas' => function ($query) {
+                $query->whereIn('Estado', ['activa', 'ACTIVO'])->orderBy('Fecha_Vigencia', 'desc');
+            }])
+            ->whereIn('Codigo_Facultad', $facultades->keys())
             ->where('Esta_Activo', 1)
             ->whereHas('mallas', function ($query) {
                 $query->whereIn('Estado', ['activa', 'ACTIVO']);
             })
-            ->with(['mallas' => function ($query) {
-                $query->whereIn('Estado', ['activa', 'ACTIVO'])->orderBy('Fecha_Vigencia', 'desc');
-            }])
             ->orderBy('Nombre_Programa')
             ->get()
-            ->map(function ($programa) {
+            ->groupBy('Codigo_Facultad');
+
+        return $facultades->map(function ($facultad) use ($programas) {
+            $progs = collect($programas->get($facultad->Codigo_Facultad, []))->map(function ($programa) {
                 $mallaActiva = $programa->mallas->first();
 
                 return [
@@ -75,18 +79,17 @@ $renderProgramasActivos = function () {
                     'ID_Malla' => $mallaActiva ? $mallaActiva->ID_Malla : null,
                     'Estado_Malla' => $mallaActiva ? $mallaActiva->Estado : null,
                 ];
-            })
-            ->filter(fn ($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))
-            ->values();
+            })->filter(fn ($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))->values()->toArray();
 
-        return [
-            'ID_Facultad' => $facultad->ID_Facultad,
-            'Nombre_Facultad' => $facultad->Nombre_Facultad,
-            'Codigo_Facultad' => $facultad->Codigo_Facultad,
-            'Url_Facultad' => $facultad->Url_Facultad,
-            'programas' => $programas,
-        ];
-    })->filter(fn ($f) => $f['programas']->isNotEmpty())->values();
+            return [
+                'ID_Facultad' => $facultad->ID_Facultad,
+                'Nombre_Facultad' => $facultad->Nombre_Facultad,
+                'Codigo_Facultad' => $facultad->Codigo_Facultad,
+                'Url_Facultad' => $facultad->Url_Facultad,
+                'programas' => $progs,
+            ];
+        })->filter(fn ($f) => !empty($f['programas']))->values()->toArray();
+    });
 
     return Inertia::render('Inicio/ProgramasActivos', [
         'facultades' => $data,
@@ -103,8 +106,8 @@ Route::get('/inicio', $renderProgramasActivos);
 Route::inertia('/login', 'Auth/Login')->name('login');
 
 // Rutas de autenticación API vía web (para mantener sesión)
-Route::post('/auth/request-otp', [AuthController::class, 'requestOtp']);
-Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp']);
+Route::post('/auth/request-otp', [AuthController::class, 'requestOtp'])->middleware('throttle:otp-request');
+Route::post('/auth/verify-otp', [AuthController::class, 'verifyOtp'])->middleware('throttle:otp-verify');
 
 /**
  * Vista de Detalle — Malla Académica por Programa

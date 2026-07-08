@@ -18,6 +18,10 @@ RUN apk add --no-cache \
 RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
     && docker-php-ext-install pdo_mysql mbstring bcmath gd zip
 
+RUN apk add --no-cache build-base autoconf automake libtool \
+    && pecl install redis && docker-php-ext-enable redis \
+    && apk del build-base autoconf automake libtool
+
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
 WORKDIR /var/www/html

@@ -8,7 +8,7 @@ Sistema de Gestión de Mallas Académicas — UNAL Manizales
 
 _Documento técnico para desarrollo y mantenimiento_
 
-Versión 5.4 | Julio 2026
+Versión 5.5 | Julio 2026
 
 ---
 
@@ -16,11 +16,11 @@ Versión 5.4 | Julio 2026
 | ----------------- | ------------------------------------------------------------------- |
 | Proyecto          | Sistema de Gestión de Mallas Académicas                             |
 | Cliente           | Universidad Nacional de Colombia - Sede Manizales                   |
-| Stack             | Laravel 12 + React 19 + MySQL 8 + Apache 2.4/nginx + Inertia.js 2.0 |
-| Arquitectura      | Monolito modular (Laravel + Inertia + React) + MySQL 8              |
+| Stack             | Laravel 12 + React 19 + MySQL 8 + nginx + Inertia.js 2.0 + Redis 7 |
+| Arquitectura      | Monolito modular (Laravel + Inertia + React) + MySQL 8 + Redis 7   |
 | Autenticación     | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña)    |
 | Tipo de sistema   | Panel administrativo cerrado, usuarios contados                     |
-| Documento versión | 5.4 — Julio 2026                                                    |
+| Documento versión | 5.5 — Julio 2026                                                    |
 
 ### Historial de cambios
 
@@ -32,7 +32,8 @@ Versión 5.4 | Julio 2026
 | 5.1     | Abril 2026 | Alineación del modelo de BD con la BD real implementada: FKs basadas en códigos institucionales (`Codigo_Sede`, `Codigo_Facultad`, `Codigo_Programa`) en lugar de IDs auto_increment; se agrega `Codigo_Sede` a tabla `sede`; se documenta mapeo de Excel de agrupaciones (columna COMPONENTE → `Tipo_Agrupacion`, columna TIPO AGRUPACIÓN → `Es_Obligatoria`); se actualiza estructura del Excel de malla (IDs numéricos como identificadores cruzados); se documenta archivo OPTATIVA; se corrige afirmación de asignaturas en múltiples agrupaciones; se agrega nota sobre limpieza de floats en códigos |
 | 5.2     | Abril 2026 | Se integra el archivo OPTATIVA como cuarto paso opcional del Job de procesamiento. `carga_malla` recibe `ID_Archivo_Optativas` (nullable). Nuevo RF-CE-13 y RF-CM-07. El OPTATIVA se procesa después de la malla, extrayendo solo filas del programa en carga, creando `agrupacion_asignatura` adicionales y sus requisitos. Actualización del §8.4 con tipo `optativas`                                                                                                                                                                                                                                    |
 | 5.3     | Junio 2026 | Migración a Inertia.js 2.0 para integración frontend-backend. Catálogos CRUD migrados a vistas Inertia. Endpoint público de visualización de mallas. Mejoras en validación y manejo de errores. Optimización del parser de Excel para optativas.                                                                                                                                                                                                                                                                                                                                                            |
-| 5.4     | Julio 2026 | Refactor: `MallaVisualizerService` extraído de `MallaController` con cache de 24h y métodos `forPrograma()`/`byVersion()`/`forgetAll()`. Nuevo `MallaPublicaController` extraído de closure de ruta. Cache invalidado automáticamente en mutaciones (reordenar, asignar/remover optativas). Tests E2E: `CargaE2ETest`, `CargaErroresHumanosE2ETest`, `MallaLifecycleE2ETest`, `OptativasE2ETest`. 145 tests totales (285 assertions). Contenedor Docker con nginx + php-fpm + supervisor + queue worker.                                                                                                    |
+| 5.4     | Julio 2026 | Refactor: `MallaVisualizerService` extraído de `MallaController` con cache de 24h y métodos `forPrograma()`/`byVersion()`/`forgetAll()`. Nuevo `MallaPublicaController` extraído de closure de ruta. Cache invalidado automáticamente en mutaciones (reordenar, asignar/remover optativas). Tests E2E: `CargaE2ETest`, `CargaErroresHumanosE2ETest`, `MallaLifecycleE2ETest`, `OptativasE2ETest`. 145 tests totales (285 assertions). Contenedor Docker con nginx + php-fpm + supervisor + queue worker. |
+| 5.5     | Julio 2026 | Rendimiento: Redis 7 para sesión/cola/cache; extension PECL redis instalada; gzip compresión en nginx; PM tuning (max_children 30); opcache 20000 archivos; queue workers 5; memoria contenedor 2G. Fix N+1 en `renderProgramasActivos` (eager loading + join). Cache de 5 min con `Cache::remember`. `->toArray()` en cached data para evitar `__PHP_Incomplete_Class`. Throttle middleware en rutas OTP. k6 load tests. package.json scripts para load testing. |
 
 ---
 
@@ -71,6 +72,7 @@ Las entidades principales del dominio, de mayor a menor jerarquía, son:
 | **Capa**         | **Tecnología**              | **Versión** | **Rol**                                                     |
 | ---------------- | --------------------------- | ----------- | ----------------------------------------------------------- |
 | Base de datos    | MySQL                       | 8.0+        | Almacenamiento principal                                    |
+| Cache / Sesión   | Redis                       | 7.x         | Sesión, cola, cache de datos                                |
 | Backend          | Laravel                     | 12.x        | API REST, lógica de negocio, ORM                            |
 | Autenticación    | Laravel Sanctum             | 4.x         | Tokens de sesión para SPA. Autenticación OTP sin contraseña |
 | Lectura Excel    | Laravel Excel (Maatwebsite) | 3.x         | Parseo de archivos .xlsx                                    |
@@ -78,11 +80,11 @@ Las entidades principales del dominio, de mayor a menor jerarquía, son:
 | Build tool       | Vite                        | 6.x         | Bundler y servidor de desarrollo                            |
 | Routing frontend | React Router                | 7.x         | Navegación entre vistas                                     |
 | HTTP client      | Axios                       | 1.x         | Llamadas a la API REST                                      |
-| Servidor web     | nginx (contenedor)          | Alpine      | Contenedor Docker con supervisor                            |
-| PHP              | PHP-FPM                     | 8.3         | Contenedor Docker                                           |
+| Servidor web     | nginx                       | Alpine      | Contenedor Docker con supervisor y gzip                     |
+| PHP              | PHP-FPM                     | 8.4         | Alpine, con extensiones redis, pdo_mysql, etc.              |
 | OS               | Alpine Linux                | -           | contenedor base                                             |
-| Orquestación     | Docker Compose              | 3.8         | mysql + app                                                 |
-| Queue worker     | Supervisor                  | -           | Ejecuta `php artisan queue:work` automáticamente            |
+| Orquestación     | Docker Compose              | 3.8         | mysql + app + redis                                         |
+| Queue worker     | Supervisor                  | -           | Ejecuta `php artisan queue:work` (5 workers)                |
 
 > El frontend React se compila dentro del Dockerfile multi-etapa con Vite y se sirve como archivos estáticos desde nginx. En desarrollo local se usa `npm run dev` con Vite.
 
@@ -118,9 +120,10 @@ mallas/
     nginx.conf
     php-fpm.conf
     supervisord.conf
-  docker-compose.yml            # Orquestación Docker (mysql + app)
+  docker-compose.yml            # Orquestación Docker (mysql + redis + app)
   Dockerfile                    # Imagen Docker multi-etapa
   docker-entrypoint.sh          # Script de entrada con migraciones y cache
+  k6/                            # Load tests con k6 (smoke, full, stress)
 ```
 
 ---
@@ -988,35 +991,42 @@ El archivo se procesa **después** del archivo de malla (Paso 4), extrayendo **s
 - **Columna "Obligatoria"** usa SI/NO: mapear a obligatoria/optativa (RF-CE-10)
 - **Tipo requisito** con mayúsculas ("Prerrequisito"): normalizar a minúsculas
 
-### 12.4. Configuración del servidor de producción
+### 12.4. Configuración del servidor de producción (Docker)
 
-| **Parámetro**            | **Valor**          | **Donde configurar** |
-| ------------------------ | ------------------ | -------------------- |
-| Servidor web             | Apache 2.4.62      | FreeBSD              |
-| PHP                      | 8.3.8              | FreeBSD              |
-| MySQL                    | 8.0+               | Verificar versión    |
-| max_allowed_packet       | 64M mínimo         | my.cnf               |
-| character-set-server     | utf8mb4            | my.cnf               |
-| collation-server         | utf8mb4_unicode_ci | my.cnf               |
-| default-time-zone        | +00:00             | my.cnf               |
-| Apache mod_rewrite       | Habilitado         | .htaccess            |
-| Apache AllowOverride     | All                | .htaccess            |
-| PHP extension: pdo_mysql | Habilitada         | Laravel              |
-| PHP extension: fileinfo  | Habilitada         | Laravel Excel        |
-| PHP extension: zip       | Habilitada         | Laravel Excel        |
-| PHP extension: pcntl     | Habilitada         | queue worker         |
+| **Parámetro**                  | **Valor**          | **Donde configurar** |
+| ------------------------------ | ------------------ | -------------------- |
+| Servidor web                   | nginx              | `docker/nginx.conf`  |
+| PHP                            | 8.4-fpm-alpine     | Dockerfile           |
+| MySQL                          | 8.0+               | docker-compose.yml   |
+| Redis                          | 7-alpine           | docker-compose.yml   |
+| Cache store                    | redis              | docker-compose.yml   |
+| Session driver                 | redis              | docker-compose.yml   |
+| Queue connection               | redis              | docker-compose.yml   |
+| max_allowed_packet             | 64M mínimo         | docker-compose.yml   |
+| nginx gzip                     | Habilitado         | `docker/nginx.conf`  |
+| PM max_children                | 30                 | `docker/php-fpm.conf`|
+| Opcache max_accelerated_files  | 20000              | `docker/php.ini`     |
+| Memory limit (contenedor)      | 2G                 | docker-compose.yml   |
+| Queue workers                  | 5                  | `docker/supervisord.conf`|
+| PHP extension: pdo_mysql       | Habilitada         | Dockerfile           |
+| PHP extension: redis           | Habilitada         | Dockerfile (PECL)    |
+| PHP extension: fileinfo        | Habilitada         | PHP base image       |
+| PHP extension: zip             | Habilitada         | PHP base image       |
+| PHP extension: pcntl           | Habilitada         | PHP base image       |
 
 ### 12.5. Queue worker
 
-La aplicación usa `QUEUE_CONNECTION=database` para procesamiento asincrónico de cargas Excel.
+La aplicación usa `QUEUE_CONNECTION=redis` para procesamiento asincrónico de cargas Excel.
 **El worker debe estar corriendo para que las cargas se procesen.**
 
-En **producción (Docker):** supervisor ejecuta automáticamente:
+En **producción (Docker):** supervisor ejecuta automáticamente **5 workers**:
 
 ```ini
 [program:queue-worker]
-command=php /var/www/html/artisan queue:work --sleep=3 --tries=3 --max-time=3600
+command=php /var/www/html/artisan queue:work --sleep=1 --tries=3 --max-time=3600
 user=app
+numprocs=5
+process_name=%(program_name)s_%(process_num)02d
 autostart=true
 autorestart=true
 ```

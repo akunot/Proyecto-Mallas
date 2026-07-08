@@ -23,6 +23,18 @@ services:
       retries: 5
       start_period: 90s
 
+  redis:
+    image: redis:7-alpine
+    container_name: mallas_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
+      retries: 5
+
   app:
     build:
       context: .
@@ -42,9 +54,10 @@ services:
       DB_DATABASE: ${DB_DATABASE:-mallas_db}
       DB_USERNAME: root
       DB_PASSWORD: ${DB_PASSWORD:-root}
-      SESSION_DRIVER: database
-      QUEUE_CONNECTION: database
-      CACHE_STORE: database
+      REDIS_HOST: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
       LOG_CHANNEL: daily
       LOG_DAILY_DAYS: 30
       LOG_LEVEL: error
@@ -65,6 +78,8 @@ services:
     depends_on:
       mysql:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     volumes:
       - storage_data:/var/www/html/storage/app
       - storage_framework:/var/www/html/storage/framework
@@ -74,9 +89,9 @@ services:
     deploy:
       resources:
         limits:
-          memory: 1G
+          memory: 2G
         reservations:
-          memory: 512M
+          memory: 1G
 
   backup:
     image: alpine:3.19
@@ -105,6 +120,7 @@ services:
 
 volumes:
   mysql_data:
+  redis_data:
   storage_data:
   storage_framework:
   storage_logs:
