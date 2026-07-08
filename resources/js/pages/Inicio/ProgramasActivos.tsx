@@ -106,7 +106,7 @@ export default function ProgramasActivos({ facultades }: Props) {
                             <span className="w-2 h-2 rounded-full bg-[#77c53f] animate-pulse" />
                             <span className="text-white text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
                         </div>
-                        <h1 className="text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
+                        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
                             Tu futuro <br />
                             <span className="text-[#77c53f]">comienza aquí.</span>
                         </h1>
@@ -142,11 +142,12 @@ export default function ProgramasActivos({ facultades }: Props) {
             </div>
 
             {/* 2. BARRA DE NAVEGACIÓN RÁPIDA (Sticky) */}
-            <div className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-md py-3' : 'bg-transparent py-0 opacity-0 pointer-events-none'}`}>
-                <div className="max-w-7xl mx-auto px-6 flex items-center gap-4 overflow-x-auto scroll-hide">
-                    <span className="text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Ir a:</span>
+            <div className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-md py-2 sm:py-3' : 'bg-transparent py-0 opacity-0 pointer-events-none'}`}>
+                <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-2 sm:gap-4 overflow-x-auto scroll-hide">
+                    <span className="hidden sm:inline text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Ir a:</span>
+                    <span className="sm:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Ir:</span>
                     {facultades.map(f => (
-                        <a key={f.ID_Facultad} href={`#fac-${f.ID_Facultad}`} className="text-xs font-bold text-slate-600 hover:text-[#00236f] whitespace-nowrap px-3 py-1 rounded-full hover:bg-slate-100 transition-all">
+                        <a key={f.ID_Facultad} href={`#fac-${f.ID_Facultad}`} className="text-[10px] sm:text-xs font-bold text-slate-600 hover:text-[#00236f] whitespace-nowrap px-2 sm:px-3 py-1 rounded-full hover:bg-slate-100 transition-all">
                             {f.Nombre_Facultad.replace('FACULTAD DE ', '').replace('FACULTAD ', '')}
                         </a>
                     ))}
@@ -160,12 +161,12 @@ export default function ProgramasActivos({ facultades }: Props) {
                         
                         {/* Banner Facultad - Modernizado */}
                         <div className="flex items-end justify-between border-b-4 border-[#77c53f] pb-4">
-                            <div className="flex items-center gap-4">
-                                <div className="w-14 h-14 bg-[#77c53f] text-white rounded-2xl flex items-center justify-center facultad-glow">
+                            <div className="flex items-center gap-3 sm:gap-4">
+                                <div className="hidden sm:flex w-14 h-14 bg-[#77c53f] text-white rounded-2xl items-center justify-center facultad-glow">
                                     <span className="material-symbols-outlined !text-3xl">account_balance</span>
                                 </div>
                                 <div>
-                                    <h2 className="text-3xl font-black text-slate-900 tracking-tight uppercase">
+                                    <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase">
                                         {facultad.Nombre_Facultad}
                                     </h2>
                                     <p className="text-slate-500 text-sm font-medium tracking-wide">
@@ -194,8 +195,8 @@ export default function ProgramasActivos({ facultades }: Props) {
                                     <div className="absolute inset-0 program-card-overlay transition-opacity duration-500" />
 
                                     {/* Contenido de la Tarjeta */}
-                                    <div className="absolute inset-0 p-8 flex flex-col justify-end">
-                                        <div className="space-y-3 transform translate-y-4 group-hover:translate-y-0 transition-transform duration-500">
+                                    <div className="absolute inset-0 p-6 sm:p-8 flex flex-col justify-end">
+                                        <div className="space-y-3 transform sm:translate-y-4 sm:group-hover:translate-y-0 transition-transform duration-500">
                                             <div className="flex justify-between items-start">
                                                 <span className="px-3 py-1 bg-[#77c53f] text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg">
                                                     {programa.Nivel_Formacion || 'Pregrado'}
@@ -205,11 +206,11 @@ export default function ProgramasActivos({ facultades }: Props) {
                                                 )}
                                             </div>
                                             
-                                            <h3 className="text-xl font-black text-white leading-tight uppercase group-hover:text-[#77c53f] transition-colors">
+                                            <h3 className="text-xl font-black text-white leading-tight uppercase sm:group-hover:text-[#77c53f] transition-colors">
                                                 {programa.Nombre_Programa}
                                             </h3>
 
-                                            <div className="flex items-center gap-4 text-blue-100/80 text-xs font-bold border-t border-white/10 pt-3 opacity-0 group-hover:opacity-100 transition-opacity duration-500 delay-100">
+                                            <div className="flex items-center gap-4 text-blue-100/80 text-xs font-bold border-t border-white/10 pt-3 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-opacity duration-500 sm:delay-100">
                                                 <span className="flex items-center gap-1">
                                                     <span className="material-symbols-outlined !text-sm">history_edu</span>
                                                     {programa.Creditos_Totales} Créditos
@@ -223,7 +224,7 @@ export default function ProgramasActivos({ facultades }: Props) {
                                     </div>
 
                                     {/* Botón flotante de acción */}
-                                    <div className="absolute top-6 right-6 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-x-4 group-hover:translate-x-0">
+                                    <div className="absolute top-4 right-4 sm:top-6 sm:right-6 opacity-100 sm:opacity-0 sm:group-hover:opacity-100 transition-all duration-500 sm:translate-x-4 sm:group-hover:translate-x-0">
                                         <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center text-[#00236f] shadow-xl">
                                             <span className="material-symbols-outlined !text-xl">arrow_outward</span>
                                         </div>

@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import MallaDiffView, {
     type DiffResponse,
     type CambioItem,
@@ -726,6 +726,31 @@ export default function DetallePublico({
     }, [activeMalla]);
 
     const numSemestres = programa.Duracion_Semestres ?? 10;
+
+    // Mobile: carrusel de semestres
+    const semestreCarouselRef = useRef<HTMLDivElement>(null);
+    const [activeSemestre, setActiveSemestre] = useState(1);
+
+    const handleCarouselScroll = useCallback(() => {
+        if (semestreCarouselRef.current) {
+            const container = semestreCarouselRef.current;
+            const cardWidth = container.clientWidth;
+            const scrollLeft = container.scrollLeft;
+            const index = Math.round(scrollLeft / cardWidth);
+            setActiveSemestre(Math.min(Math.max(index + 1, 1), numSemestres));
+        }
+    }, [numSemestres]);
+
+    const scrollToSemestre = (num: number) => {
+        if (semestreCarouselRef.current) {
+            const container = semestreCarouselRef.current;
+            const child = container.children[num - 1] as HTMLElement | undefined;
+            if (child) {
+                child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
+            }
+        }
+        setActiveSemestre(num);
+    };
     const listaSemestres = useMemo(
         () => Array.from({ length: numSemestres }, (_, i) => i + 1),
         [numSemestres],
@@ -834,8 +859,26 @@ export default function DetallePublico({
                             </Link>
 
                             <div className="min-w-0 pt-0.5">
-                                {/* Eyebrow: facultad + normativa + plan */}
-                                <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase">
+                                {/* Eyebrow: mobile condensed */}
+                                <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase sm:hidden">
+                                    <span
+                                        className="material-symbols-outlined !text-[11px] opacity-70"
+                                        aria-hidden="true"
+                                    >
+                                        school
+                                    </span>
+                                    <span className="truncate">{programa.Facultad}</span>
+                                    {activeMalla?.Codigo_Plan && (
+                                        <>
+                                            <span className="mx-0.5 text-blue-400/60">·</span>
+                                            <span className="shrink-0 font-mono tracking-wider text-blue-300">
+                                                Plan {activeMalla.Codigo_Plan}
+                                            </span>
+                                        </>
+                                    )}
+                                </p>
+                                {/* Eyebrow: desktop full */}
+                                <p className="mb-0.5 hidden items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase sm:flex">
                                     <span
                                         className="material-symbols-outlined !text-[11px] opacity-70"
                                         aria-hidden="true"
@@ -878,13 +921,13 @@ export default function DetallePublico({
                                     )}
                                 </p>
                                 {/* Nombre del programa */}
-                                <h1 className="truncate text-base leading-tight font-black tracking-tight text-white sm:text-lg lg:text-xl">
+                                <h1 className="truncate text-sm leading-tight font-black tracking-tight text-white sm:text-lg lg:text-xl">
                                     {programa.Nombre_Programa}
                                 </h1>
                                 {/* Subtítulo: título otorgado + SNIES */}
                                 {(programa.Titulo_Otorgado ||
                                     programa.Codigo_SNIES) && (
-                                    <p className="mt-0.5 truncate text-[10px] text-blue-200/70">
+                                    <p className="mt-0.5 truncate text-[9px] text-blue-200/70 sm:text-[10px]">
                                         {programa.Titulo_Otorgado && (
                                             <span>
                                                 {programa.Titulo_Otorgado}
@@ -898,7 +941,8 @@ export default function DetallePublico({
                                             )}
                                         {programa.Codigo_SNIES && (
                                             <span className="font-mono">
-                                                SNIES {programa.Codigo_SNIES}
+                                                SNIES{' '}
+                                                {programa.Codigo_SNIES}
                                             </span>
                                         )}
                                     </p>
@@ -942,7 +986,7 @@ export default function DetallePublico({
 
                 {/* Quick Stats bar — separador visual entre identidad y canvas */}
                 <div className="mx-auto mt-3 max-w-[1800px] px-4 sm:px-8">
-                    <div className="flex w-fit items-stretch gap-0 overflow-hidden rounded-t-xl border border-b-0 border-white/10 bg-white/5">
+                    <div className="flex items-stretch gap-0 overflow-x-auto rounded-t-xl border border-b-0 border-white/10 bg-white/5 sm:w-fit sm:overflow-hidden [&::-webkit-scrollbar]:hidden">
                         {[
                             {
                                 icon: 'stars',
@@ -966,7 +1010,7 @@ export default function DetallePublico({
                         ].map((stat, i, arr) => (
                             <div
                                 key={stat.label}
-                                className={`flex items-center gap-2.5 px-4 py-2 ${i < arr.length - 1 ? 'border-r border-white/10' : ''}`}
+                                className={`flex shrink-0 items-center gap-2.5 px-4 py-2 ${i < arr.length - 1 ? 'border-r border-white/10' : ''}`}
                             >
                                 <span
                                     className="material-symbols-outlined shrink-0 !text-[16px] text-blue-300/70"
@@ -993,29 +1037,41 @@ export default function DetallePublico({
                 </div>
             </header>
 
-            {/* 2. SEMESTER CANVAS - Sin scroll, todo visible */}
+            {/* 2. SEMESTER CANVAS */}
             <main
-                className="flex-1 overflow-x-auto overflow-y-auto p-4"
-                style={
-                    {
-                        '--n-sem': numSemestres,
-                        '--n-rows': maxItemsPerSemestre,
-                    } as React.CSSProperties
-                }
+                className="flex-1 overflow-y-auto p-4"
             >
+                {/* Mobile: semester navigation dots */}
+                <div className="flex items-center justify-center gap-1.5 pb-2 sm:hidden" aria-hidden="true">
+                    {listaSemestres.map((num) => (
+                        <button
+                            key={num}
+                            onClick={() => scrollToSemestre(num)}
+                            className={`h-1.5 rounded-full transition-all duration-300 ${
+                                activeSemestre === num
+                                    ? 'w-6 bg-[#00236f]'
+                                    : 'w-1.5 bg-slate-300'
+                            }`}
+                            aria-label={`Ir al semestre ${ROMAN[num] || num}`}
+                        />
+                    ))}
+                </div>
+
                 <div
-                    className="grid h-full min-w-[720px] gap-3"
+                    ref={semestreCarouselRef}
+                    onScroll={handleCarouselScroll}
+                    className="flex h-full gap-4 overflow-x-auto sm:grid sm:min-w-[720px] sm:overflow-visible snap-x snap-mandatory sm:snap-none [&::-webkit-scrollbar]:hidden"
                     style={{
                         gridTemplateColumns: `repeat(${numSemestres}, minmax(0, 1fr))`,
-                    }}
+                    } as React.CSSProperties}
                 >
                     {listaSemestres.map((num) => {
                         return (
                             <div
                                 key={num}
-                                className="flex h-full min-w-0 flex-col"
+                                className="flex h-full min-w-0 flex-col w-[88vw] shrink-0 snap-start sm:w-auto sm:shrink sm:snap-none"
                             >
-                                <div className="mb-1.5 flex shrink-0 items-center justify-between px-1">
+                                <div className="mb-3 flex shrink-0 items-center justify-between px-1 sm:mb-1.5">
                                     <div className="flex items-center gap-1">
                                         <span className="truncate text-[9px] font-black tracking-[1px] text-slate-400 uppercase">
                                             Semestre
@@ -1027,7 +1083,7 @@ export default function DetallePublico({
                                 </div>
 
                                 <div
-                                    className="grid min-h-0 flex-1 gap-1.5"
+                                    className="grid min-h-0 flex-1 gap-2 sm:gap-1.5"
                                     style={{
                                         gridTemplateRows: `repeat(${maxItemsPerSemestre}, minmax(0, 1fr))`,
                                     }}
@@ -1095,7 +1151,7 @@ export default function DetallePublico({
                                                               ? `Ver optativas${slot.Nombre_Agrupacion ? ` de ${slot.Nombre_Agrupacion}` : ''}`
                                                               : undefined
                                                     }
-                                                    className={`flex h-full flex-col items-center justify-center rounded-xl border border-dashed p-2 text-center transition-all duration-300 ${isLibre || isOptativa ? 'cursor-pointer' : 'cursor-default'} ${slotTheme.wrapper} `}
+                                                    className={`flex h-full flex-col items-center justify-center rounded-xl border border-dashed p-3 text-center transition-all duration-300 sm:p-2 ${isLibre || isOptativa ? 'cursor-pointer' : 'cursor-default'} ${slotTheme.wrapper} `}
                                                     onClick={
                                                         isLibre
                                                             ? () => {
@@ -1237,7 +1293,7 @@ export default function DetallePublico({
                                             >
                                                 {/* Métricas Top */}
                                                 <div
-                                                    className={`${style.bg} flex shrink-0 justify-around border-b border-white/50 py-0.5 text-[9px] font-black text-slate-600`}
+                                                    className={`${style.bg} flex shrink-0 justify-around border-b border-white/50 py-1 text-[9px] font-black text-slate-600 sm:py-0.5`}
                                                 >
                                                     <span>
                                                         {
@@ -1256,14 +1312,14 @@ export default function DetallePublico({
                                                 </div>
 
                                                 {/* Nombre Central */}
-                                                <div className="flex min-h-0 flex-1 items-center justify-center px-2 py-1 text-center">
+                                                <div className="flex min-h-0 flex-1 items-center justify-center px-3 py-2 text-center sm:px-2 sm:py-1">
                                                     <h4 className="line-clamp-3 text-[11px] leading-tight font-bold text-slate-800">
                                                         {asig.Nombre_Asignatura}
                                                     </h4>
                                                 </div>
 
                                                 {/* Footer Info: código + un único indicador de requisitos (evita saturación de íconos) */}
-                                                <div className="flex shrink-0 items-center justify-between bg-slate-50/50 px-2 py-1">
+                                                <div className="flex shrink-0 items-center justify-between bg-slate-50/50 px-3 py-1.5 sm:px-2 sm:py-1">
                                                     <span className="truncate font-mono text-[9px] font-bold text-slate-500">
                                                         {asig.Codigo_Asignatura}
                                                     </span>
@@ -2099,7 +2155,7 @@ export default function DetallePublico({
                 <footer className="border-t border-slate-100 bg-white/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] backdrop-blur-md">
                     <div className="mx-auto flex min-h-[44px] max-w-[1800px] items-stretch justify-between gap-2 px-4 py-0 sm:px-6">
                         {/* Botones de componentes — con crédito integrado */}
-                        <div className="flex items-stretch gap-0">
+                        <div className="flex items-stretch gap-0 overflow-x-auto sm:overflow-visible [&::-webkit-scrollbar]:hidden">
                             {(
                                 [
                                     { id: 1, label: 'Fundamentación' },
@@ -2134,7 +2190,7 @@ export default function DetallePublico({
                                         }
                                         aria-pressed={isActive}
                                         aria-label={`Ver distribución de ${label}`}
-                                        className={`group relative flex items-center gap-2 border-r border-slate-100 px-3 py-2 transition-all duration-200 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-inset ${isActive ? 'bg-slate-50' : ''} `}
+                                        className={`group relative flex shrink-0 items-center gap-2 border-r border-slate-100 px-3 py-2 transition-all duration-200 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-inset ${isActive ? 'bg-slate-50' : ''} `}
                                     >
                                         {/* Indicador activo — borde superior */}
                                         <span
@@ -2146,7 +2202,7 @@ export default function DetallePublico({
                                             aria-hidden="true"
                                         />
                                         <span
-                                            className={`text-[11px] font-bold tracking-tight whitespace-nowrap uppercase transition-colors ${isActive ? 'text-slate-800' : 'text-slate-500 group-hover:text-slate-700'}`}
+                                            className={`text-[10px] font-bold tracking-tight whitespace-nowrap uppercase transition-colors sm:text-[11px] ${isActive ? 'text-slate-800' : 'text-slate-500 group-hover:text-slate-700'}`}
                                         >
                                             {label}
                                         </span>

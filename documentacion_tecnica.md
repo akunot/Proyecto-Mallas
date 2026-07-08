@@ -1037,4 +1037,81 @@ En **local:** ejecutar manualmente:
 php artisan queue:work --queue=default
 ```
 
-En **testing:** `QUEUE_CONNECTION=sync` en `phpunit.xml` para ejecución síncrona.|
+En **testing:** `QUEUE_CONNECTION=sync` en `phpunit.xml` para ejecución síncrona.
+
+---
+
+## 13. Operación en Producción
+
+### 13.1. Logs del sistema
+
+Todos los comandos asumen Docker en producción. Ejecutar desde el host.
+
+| **Fuente**             | **Comando**                                                         | **Archivo**                                      |
+| ---------------------- | ------------------------------------------------------------------- | ------------------------------------------------ |
+| Laravel (daily)        | `docker exec mallas_app cat /var/www/html/storage/logs/laravel-$(date +%Y-%m-%d).log` | `storage/logs/laravel-YYYY-MM-DD.log` |
+| Laravel (todo)         | `docker exec mallas_app ls -lt /var/www/html/storage/logs/*.log`    | `storage/logs/*.log`                             |
+| Supervisor (procesos)  | `docker exec mallas_app cat /var/www/html/storage/logs/supervisord.log` | `storage/logs/supervisord.log`              |
+| Nginx (error)          | `docker exec mallas_app cat /var/log/nginx/error.log`               | `/var/log/nginx/error.log`                       |
+| Nginx (acceso)         | `docker exec mallas_app cat /var/log/nginx/access.log`              | `/var/log/nginx/access.log`                      |
+
+Para seguir logs en vivo:
+
+```bash
+# Laravel
+docker exec mallas_app tail -f /var/www/html/storage/logs/laravel-$(date +%Y-%m-%d).log
+
+# Nginx errores
+docker exec mallas_app tail -f /var/log/nginx/error.log
+```
+
+### 13.2. Backup de base de datos
+
+El contenedor `mallas_backup` (definido en `docker-compose.yml`) ejecuta un `mysqldump` completo cada 24 horas automáticamente.
+
+**Cómo funciona:**
+
+- Corre sobre `alpine:3.19` e instala `mysql-client` al arrancar.
+- Cada ciclo: genera un dump con `--all-databases --single-transaction --routines --triggers`.
+- Guarda el archivo en `/backups/dump_YYYYMMDD_HHMMSS.sql` dentro del contenedor.
+- El volumen Docker `mallas_db_backups` (`db_backups` en `docker-compose.yml`) persiste estos archivos.
+- Limpieza automática: elimina dumps con más de 7 días (`-mtime +7`).
+
+**Variables de entorno relevantes:**
+
+| Variable       | Default | Descripción                     |
+| -------------- | ------- | ------------------------------- |
+| `DB_PASSWORD`  | `root`  | Contraseña de root de MySQL     |
+
+**Listar backups disponibles:**
+
+```bash
+docker run --rm -v mallas_db_backups:/backups alpine ls -lh /backups
+```
+
+### 13.3. Restauración de base de datos
+
+En caso de fallo, restaurar desde el backup más reciente:
+
+**Opción 1 — copiar al host y restaurar:**
+
+```bash
+# 1. Identificar el backup más reciente
+docker run --rm -v mallas_db_backups:/backups alpine ls -t /backups | head -1
+
+# 2. Copiarlo al host
+docker run --rm -v mallas_db_backups:/backups alpine cat /backups/dump_20260708_030001.sql > ~/restore.sql
+
+# 3. Restaurar en MySQL
+docker exec -i mallas_mysql mysql -u root -p"${DB_PASSWORD:-root}" mallas_db < ~/restore.sql
+```
+
+**Opción 2 — tubería directa (sin archivo intermedio):**
+
+```bash
+LATEST=$(docker run --rm -v mallas_db_backups:/backups alpine ls -t /backups | head -1)
+docker run --rm -v mallas_db_backups:/backups alpine cat /backups/$LATEST | \
+  docker exec -i mallas_mysql mysql -u root -p"${DB_PASSWORD:-root}" mallas_db
+```
+
+> **Advertencia:** La restauración sobreescribe los datos existentes en la base de datos. Asegurarse de que el contenedor `mysql` esté saludable antes de ejecutar (`docker compose ps`).
