@@ -527,6 +527,7 @@ export default function MallaDiffView({
                         {!loading && diffData && (
                             <>
                                 <div
+                                    className="diff-version-bar"
                                     style={{
                                         display: 'flex',
                                         alignItems: 'center',
@@ -538,7 +539,7 @@ export default function MallaDiffView({
                                         marginBottom: '1.5rem',
                                     }}
                                 >
-                                    <div style={{ textAlign: 'center' }}>
+                                    <div className="diff-version-col" style={{ textAlign: 'center' }}>
                                         <p
                                             style={{
                                                 margin: 0,
@@ -613,6 +614,7 @@ export default function MallaDiffView({
                                 </div>
 
                                 <div
+                                    className="diff-stats-grid"
                                     style={{
                                         display: 'grid',
                                         gridTemplateColumns: 'repeat(4, 1fr)',
@@ -1095,6 +1097,53 @@ export default function MallaDiffView({
             <style>{`
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                @media (max-width: 639px) {
+                    .modal-overlay {
+                        padding: 0 !important;
+                        align-items: flex-end !important;
+                    }
+                    .modal-container {
+                        max-height: 90vh !important;
+                        border-radius: 1rem 1rem 0 0 !important;
+                        width: 100% !important;
+                    }
+                    .modal-header {
+                        padding: 1rem !important;
+                    }
+                    .modal-body {
+                        padding: 1rem !important;
+                    }
+                    .modal-footer {
+                        padding: 0.75rem 1rem !important;
+                    }
+                    .diff-stats-grid {
+                        grid-template-columns: repeat(2, 1fr) !important;
+                    }
+                    .diff-stats-grid > div {
+                        padding: 0.5rem !important;
+                    }
+                    .diff-stats-grid p:first-child {
+                        font-size: 1.25rem !important;
+                    }
+                    .diff-version-bar {
+                        padding: 0.5rem 0.75rem !important;
+                        flex-wrap: wrap !important;
+                        gap: 0.5rem !important;
+                        justify-content: center !important;
+                    }
+                    .diff-version-col p:first-of-type {
+                        font-size: 0.7rem !important;
+                    }
+                    .diff-version-col p:nth-of-type(2) {
+                        font-size: 1rem !important;
+                    }
+                    .diff-version-bar > div:nth-child(2) {
+                        font-size: 1.25rem !important;
+                        order: -1;
+                        width: 100%;
+                        text-align: center;
+                    }
                 }
             `}</style>
         </>

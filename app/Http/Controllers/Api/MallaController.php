@@ -501,27 +501,19 @@ class MallaController extends Controller
     }
 
     /**
-     * Resuelve la agrupación destino: si existe en agrupaciones la retorna,
-     * si no, la crea desde plantillas_agrupacion usando el ID como ID_Plantilla_Agrupacion.
+     * Resuelve la agrupación destino a partir del ID de plantilla enviado por el frontend.
+     * Busca la plantilla, y si ya existe una agrupación con el mismo nombre+componente en la malla
+     * la retorna; si no, la crea desde la plantilla.
      */
     private function resolveAgrupacionDestino(MallaCurricular $malla, int $id): ?Agrupacion
     {
-        // 1. Buscar por ID directo en agrupaciones de la malla
-        $agrupacion = Agrupacion::where('ID_Agrupacion', $id)
-            ->where('ID_Malla', $malla->ID_Malla)
-            ->first();
-
-        if ($agrupacion) {
-            return $agrupacion;
-        }
-
-        // 2. Obtener la plantilla para conocer nombre y componente
+        // 1. Obtener la plantilla (el frontend envía ID_Plantilla_Agrupacion como ID_Agrupacion)
         $plantilla = PlantillaAgrupacion::find($id);
         if (! $plantilla || $plantilla->ID_Programa !== $malla->ID_Programa) {
             return null;
         }
 
-        // 3. Buscar si ya existe una agrupación con mismo nombre+componente en la malla
+        // 2. Buscar si ya existe una agrupación con mismo nombre+componente en la malla
         $agrupacionExistente = Agrupacion::where('ID_Malla', $malla->ID_Malla)
             ->where('ID_Componente', $plantilla->ID_Componente)
             ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
@@ -531,7 +523,7 @@ class MallaController extends Controller
             return $agrupacionExistente;
         }
 
-        // 4. No existe en absoluto → crearla desde la plantilla
+        // 3. No existe en absoluto → crearla desde la plantilla
         return $plantilla->generarAgrupacion($malla->ID_Malla);
     }
 

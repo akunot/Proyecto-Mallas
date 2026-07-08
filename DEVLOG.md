@@ -253,11 +253,57 @@
 
 ---
 
+### Julio 2026 — Fase de Optimización de Rendimiento ✅ COMPLETA
+
+Se realizaron optimizaciones de rendimiento para preparar el sistema para producción:
+
+#### Infraestructura
+- [x] Redis 7 añadido como servicio (sesión, cola, cache)
+- [x] Sesión migrada de `database` a `redis`
+- [x] Cola migrada de `database` a `redis`
+- [x] Cache migrada de `database` a `redis`
+- [x] Extensión PECL redis instalada en el contenedor
+- [x] Memoria del contenedor aumentada de 1G a 2G
+
+#### nginx
+- [x] Compresión gzip habilitada con nivel 5
+- [x] Tipos comprimidos: text, css, js, json, xml, svg, woff/woff2
+- [x] Cabecera `Vary: Accept-Encoding`
+
+#### PHP-FPM
+- [x] `pm.max_children` aumentado de 10 a 30
+- [x] `pm.start_servers` ajustado de 2 a 4
+- [x] `pm.min_spare_servers` ajustado de 1 a 2
+- [x] `pm.max_spare_servers` ajustado de 4 a 8
+- [x] `pm.max_requests` mantenido en 500
+
+#### Opcache
+- [x] `opcache.max_accelerated_files` aumentado de 10000 a 20000
+- [x] `memory_limit` reducido de 512M a 256M (opcache + FPM más eficientes)
+
+#### Queue Workers
+- [x] Workers aumentados de 2 a 5
+- [x] Sleep reducido de 3s a 1s
+
+#### Backend (routes/web.php)
+- [x] Cache de 5 min con `Cache::remember('programas_activos', ...)` en home
+- [x] Fix N+1: eager loading de `mallas` con subquery filtrada
+- [x] Fix N+1: `whereIn` en lugar de iterar facultades
+- [x] Fix serialización: `->toArray()` para evitar `__PHP_Incomplete_Class` en cached Collection
+- [x] Throttle middleware en rutas OTP (`otp-request`, `otp-verify`)
+
+#### Load Testing
+- [x] Scripts k6 para smoke, full y stress tests
+- [x] npm scripts: `test:load:smoke`, `test:load`, `test:load:stress`
+
+---
+
 ## Configuración del Entorno
 
 ### Requisitos
-- PHP 8.3.8+
+- PHP 8.4+
 - MySQL 8.0+
+- Redis 7
 - Node.js 18+ (desarrollo)
 - Composer 2.x
 
@@ -275,6 +321,13 @@ DB_PORT=3306
 DB_DATABASE=mallas_unal
 DB_USERNAME=root
 DB_PASSWORD=
+
+REDIS_HOST=127.0.0.1
+REDIS_PASSWORD=null
+REDIS_PORT=6379
+SESSION_DRIVER=redis
+QUEUE_CONNECTION=redis
+CACHE_STORE=redis
 
 SANCTUM_STATEFUL_DOMAINS=localhost:5173
 SESSION_DOMAIN=localhost
@@ -305,6 +358,7 @@ php artisan serve
 - API REST con Laravel 12
 - Frontend SPA con React 19 + Inertia
 - Autenticación con Laravel Sanctum + OTP
+- Redis 7 para sesión, cola y cache
 
 ### Patrones Implementados
 - Controller genérico para catálogos

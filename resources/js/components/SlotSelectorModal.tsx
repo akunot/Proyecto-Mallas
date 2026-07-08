@@ -217,13 +217,7 @@ export default function SlotSelectorModal({
                         )}
 
                         {/* Search & Sort */}
-                        <div
-                            style={{
-                                display: 'flex',
-                                gap: '1rem',
-                                marginBottom: '1.5rem',
-                            }}
-                        >
+                        <div className="slot-search-row">
                             {/* Search Input */}
                             <div style={{ flex: 1 }}>
                                 <input
@@ -244,6 +238,7 @@ export default function SlotSelectorModal({
                                         transition: 'all 200ms',
                                         boxShadow:
                                             '0 1px 2px rgba(0, 0, 0, 0.05)',
+                                        boxSizing: 'border-box',
                                     }}
                                     onFocus={(e) => {
                                         e.currentTarget.style.borderColor =
@@ -268,6 +263,7 @@ export default function SlotSelectorModal({
                                         setSortBy(e.target.value as SortBy)
                                     }
                                     style={{
+                                        width: '100%',
                                         padding: '0.75rem',
                                         border: '1px solid #e2e8f0',
                                         borderRadius: '0.5rem',
@@ -346,6 +342,7 @@ export default function SlotSelectorModal({
                                 }}
                             >
                                 <table
+                                    className="slot-table"
                                     style={{
                                         width: '100%',
                                         borderCollapse: 'collapse',
@@ -478,6 +475,7 @@ export default function SlotSelectorModal({
                                                         }
                                                     >
                                                         <td
+                                                            data-label="Código"
                                                             style={{
                                                                 padding:
                                                                     '0.75rem',
@@ -494,6 +492,7 @@ export default function SlotSelectorModal({
                                                             }
                                                         </td>
                                                         <td
+                                                            data-label="Asignatura"
                                                             style={{
                                                                 padding:
                                                                     '0.75rem',
@@ -505,6 +504,7 @@ export default function SlotSelectorModal({
                                                             }
                                                         </td>
                                                         <td
+                                                            data-label="Créditos"
                                                             style={{
                                                                 padding:
                                                                     '0.75rem',
@@ -519,6 +519,7 @@ export default function SlotSelectorModal({
                                                             }
                                                         </td>
                                                         <td
+                                                            data-label="Horas"
                                                             style={{
                                                                 padding:
                                                                     '0.75rem',
@@ -531,10 +532,11 @@ export default function SlotSelectorModal({
                                                         >
                                                             {item.Horas_Presencial &&
                                                             item.Horas_Estudiante
-                                                                ? `${item.Horas_Presencial}-${item.Horas_Estudiante}`
+                                                                ? `${item.Horas_Presencial}hP / ${item.Horas_Estudiante}hA`
                                                                 : '—'}
                                                         </td>
                                                         <td
+                                                            data-label="Req"
                                                             style={{
                                                                 padding:
                                                                     '0.75rem',
@@ -774,10 +776,79 @@ export default function SlotSelectorModal({
                 </div>
             </div>
 
-            {/* Spinner animation */}
+            {/* Spinner animation + mobile responsive */}
             <style>{`
                 @keyframes spin {
                     to { transform: rotate(360deg); }
+                }
+                .slot-search-row {
+                    display: flex;
+                    flex-direction: column;
+                    gap: 0.75rem;
+                    margin-bottom: 1.5rem;
+                }
+                @media (min-width: 640px) {
+                    .slot-search-row {
+                        flex-direction: row;
+                    }
+                }
+                @media (max-width: 639px) {
+                    .modal-overlay {
+                        padding: 0 !important;
+                        align-items: flex-end !important;
+                    }
+                    .modal-container {
+                        max-height: 90vh !important;
+                        border-radius: 1rem 1rem 0 0 !important;
+                        width: 100% !important;
+                    }
+                    .modal-body {
+                        padding: 1rem !important;
+                    }
+                    .modal-header {
+                        padding: 1rem !important;
+                    }
+                    .modal-footer {
+                        padding: 0.75rem 1rem !important;
+                    }
+                    .slot-table thead {
+                        display: none;
+                    }
+                    .slot-table,
+                    .slot-table tbody,
+                    .slot-table tr,
+                    .slot-table td {
+                        display: block;
+                    }
+                    .slot-table tr {
+                        margin-bottom: 0.75rem;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 0.75rem;
+                        padding: 0.75rem;
+                        background: white;
+                        box-shadow: 0 1px 3px rgba(0,0,0,0.06);
+                    }
+                    .slot-table td {
+                        padding: 0.35rem 0 !important;
+                        text-align: left !important;
+                        border: none !important;
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        gap: 0.5rem;
+                    }
+                    .slot-table td::before {
+                        content: attr(data-label);
+                        font-weight: 700;
+                        color: #64748b;
+                        text-transform: uppercase;
+                        font-size: 0.7rem;
+                        letter-spacing: 0.05em;
+                        white-space: nowrap;
+                    }
+                    .slot-table td:last-child {
+                        justify-content: flex-end;
+                    }
                 }
             `}</style>
         </>

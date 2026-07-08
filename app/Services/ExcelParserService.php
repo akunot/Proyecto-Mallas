@@ -41,6 +41,10 @@ class ExcelParserService
 
     private array $agrupacionesCache = [];     // "ID_Malla|ID_Componente|Nombre" => ID_Agrupacion
 
+    private array $processedRels = [];
+
+    private array $processedReqs = [];
+
     // Batch size para inserts
     private const BATCH_SIZE = 500;
 
@@ -1052,6 +1056,23 @@ class ExcelParserService
 
         // 7. Insertar requisitos (usando upsert para evitar duplicados por re-upload)
         if (! empty($batchRequisitos)) {
+            // Pre-cleanup: upsert no frena duplicados cuando ID_Asignatura_Requerida IS NULL
+            // (MySQL UNIQUE permite múltiples NULLs). Los eliminamos antes de insertar.
+            $nullReqSubjects = [];
+            foreach ($batchRequisitos as $req) {
+                if ($req['ID_Asignatura_Requerida'] === null) {
+                    $nullReqSubjects[] = $req['ID_Asignatura'];
+                }
+            }
+            $nullReqSubjects = array_unique($nullReqSubjects);
+            if (! empty($nullReqSubjects)) {
+                DB::table('requisitos')
+                    ->whereNull('ID_Asignatura_Requerida')
+                    ->whereIn('ID_Asignatura', $nullReqSubjects)
+                    ->where('ID_Programa', $this->malla->ID_Programa)
+                    ->delete();
+            }
+
             $chunks = array_chunk($batchRequisitos, self::BATCH_SIZE);
             foreach ($chunks as $chunk) {
                 try {
@@ -1195,7 +1216,8 @@ class ExcelParserService
                 $this->recordError($rowNumber, 'Obligatoria', "Valor '{$obligatoriaVal}' no reconocido. Se esperaba 'SI' o 'NO'. Se usará 'NO' por defecto.", $obligatoriaVal, 'advertencia');
             }
         }
-        $tipoAsignatura = $this->mapObligatoria($obligatoriaVal);
+        $obligatoriaEmpty = $obligatoriaVal === null;
+        $tipoAsignatura = $this->mapObligatoria($obligatoriaVal ?? 'NO');
 
         // Procesar requisitos ANTES del dedup: así si una materia tiene
         // múltiples prerequisitos en filas separadas, todos se registran.
@@ -1221,15 +1243,18 @@ class ExcelParserService
         // NOTA: una misma asignatura puede aparecer en múltiples filas
         // dentro de la misma agrupación (requisitos múltiples). El dedup
         // evita duplicar agrupacion_asignatura sin perder los requisitos.
+        // Si Obligatoria está vacía en la fila duplicada, se hereda el valor anterior.
         $relKey = $agrupKey.'|'.$asignaturaReqId;
-        static $processedRels = [];
-        if (isset($processedRels[$relKey])) {
-            if ($processedRels[$relKey] !== $tipoAsignatura) {
+        if (isset($this->processedRels[$relKey])) {
+            if ($obligatoriaEmpty) {
+                return;
+            }
+            if ($this->processedRels[$relKey] !== $tipoAsignatura) {
                 $this->recordError(
                     $rowNumber,
                     'Obligatoria',
                     "La asignatura {$codigoAsignatura} aparece con valor Obligatoria '{$obligatoriaVal}' ".
-                    "contradictorio al valor anterior '".($processedRels[$relKey] === 'obligatoria' ? 'SI' : 'NO').
+                    "contradictorio al valor anterior '".($this->processedRels[$relKey] === 'obligatoria' ? 'SI' : 'NO').
                     "' en la misma agrupación.",
                     $obligatoriaVal,
                     'error'
@@ -1238,7 +1263,7 @@ class ExcelParserService
 
             return;
         }
-        $processedRels[$relKey] = $tipoAsignatura;
+        $this->processedRels[$relKey] = $tipoAsignatura;
 
         $batchRelaciones[] = [
             'ID_Malla' => $this->malla->ID_Malla,
@@ -1847,11 +1872,13 @@ class ExcelParserService
         }
 
         $dedupKey = $asignaturaBaseId.'|'.($asignaturaReqId ?? 'null').'|'.$idPrograma;
-        static $processedReqs = [];
-        if (isset($processedReqs[$dedupKey])) {
+        if ($asignaturaReqId === null) {
+            $dedupKey .= '|'.($descripcion ?? '');
+        }
+        if (isset($this->processedReqs[$dedupKey])) {
             return;
         }
-        $processedReqs[$dedupKey] = true;
+        $this->processedReqs[$dedupKey] = true;
 
         $batchRequisitos[] = [
             'ID_Asignatura' => $asignaturaBaseId,

@@ -1,6 +1,12 @@
-version: '3.8'
-
 services:
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: mallas_mailpit
+    restart: unless-stopped
+    ports:
+      - '8025:8025'
+      - '1025:1025'
+
   mysql:
     image: mysql:8.0
     container_name: mallas_mysql
@@ -8,14 +14,25 @@ services:
     environment:
       MYSQL_ROOT_PASSWORD: ${DB_PASSWORD:-root}
       MYSQL_DATABASE: ${DB_DATABASE:-mallas_db}
-    ports:
-      - '3307:3306'
     volumes:
       - mysql_data:/var/lib/mysql
     healthcheck:
       test: ['CMD', 'mysqladmin', 'ping', '-h', 'localhost']
       interval: 10s
       timeout: 5s
+      retries: 5
+      start_period: 90s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mallas_redis
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ['CMD', 'redis-cli', 'ping']
+      interval: 5s
+      timeout: 3s
       retries: 5
 
   app:
@@ -25,10 +42,11 @@ services:
     container_name: mallas_app
     restart: unless-stopped
     ports:
-      - '80:80'
+      - '8080:80'
     environment:
       APP_ENV: production
       APP_DEBUG: false
+      APP_KEY: ${APP_KEY}
       APP_URL: http://localhost
       DB_CONNECTION: mysql
       DB_HOST: mysql
@@ -36,20 +54,74 @@ services:
       DB_DATABASE: ${DB_DATABASE:-mallas_db}
       DB_USERNAME: root
       DB_PASSWORD: ${DB_PASSWORD:-root}
-      SESSION_DRIVER: file
-      QUEUE_CONNECTION: database
-      CACHE_STORE: file
-      MAIL_MAILER: log
+      REDIS_HOST: redis
+      SESSION_DRIVER: redis
+      QUEUE_CONNECTION: redis
+      CACHE_STORE: redis
+      LOG_CHANNEL: daily
+      LOG_DAILY_DAYS: 30
+      LOG_LEVEL: error
+      MAIL_MAILER: smtp
+      MAIL_HOST: mailpit
+      MAIL_PORT: 1025
+      MAIL_USERNAME: null
+      MAIL_PASSWORD: null
+      MAIL_ENCRYPTION: null
+      MAIL_FROM_ADDRESS: "noreply@mallas.edu.co"
+      MAIL_FROM_NAME: "Sistema de Mallas Académicas"
+    healthcheck:
+      test: ['CMD', 'curl', '-f', 'http://localhost:80/api/v1/health']
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
     depends_on:
       mysql:
+        condition: service_healthy
+      redis:
         condition: service_healthy
     volumes:
       - storage_data:/var/www/html/storage/app
       - storage_framework:/var/www/html/storage/framework
       - storage_logs:/var/www/html/storage/logs
+    tmpfs:
+      - /var/www/html/storage/tmp:uid=1001,gid=1001,size=256M
+    deploy:
+      resources:
+        limits:
+          memory: 2G
+        reservations:
+          memory: 1G
+
+  backup:
+    image: alpine:3.19
+    container_name: mallas_backup
+    restart: unless-stopped
+    command:
+      - /bin/sh
+      - -c
+      - |
+        apk add --no-cache mysql-client > /dev/null 2>&1
+        while true; do
+          TS=$(date +%Y%m%d_%H%M%S)
+          echo "[$$TS] Running MySQL backup..."
+          mysqldump -h mysql -u root -p"${DB_PASSWORD:-root}" --all-databases --single-transaction --routines --triggers > /backups/dump_$${TS}.sql 2>/dev/null
+          find /backups -name 'dump_*.sql' -mtime +7 -delete
+          echo "[$$(date +%Y%m%d_%H%M%S)] Backup complete. Sleeping 24h..."
+          sleep 86400
+        done
+    environment:
+      DB_PASSWORD: ${DB_PASSWORD:-root}
+    volumes:
+      - db_backups:/backups
+    depends_on:
+      mysql:
+        condition: service_healthy
 
 volumes:
   mysql_data:
+  redis_data:
   storage_data:
   storage_framework:
   storage_logs:
+  db_backups:

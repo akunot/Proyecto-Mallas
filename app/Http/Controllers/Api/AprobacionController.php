@@ -17,7 +17,7 @@ class AprobacionController extends Controller
     public function misCargas(Request $request): JsonResponse
     {
         $perPage = $request->per_page ?? 20;
-        $cargas = CargaMalla::with(['usuario', 'programa', 'malla'])
+        $cargas = CargaMalla::with(['usuario', 'programa', 'malla', 'usuarioRevisor'])
             ->where('ID_Usuario', $request->user()->ID_Usuario)
             ->where('tipo_carga', 'malla')
             ->orderBy('Creacion_Carga', 'desc')
@@ -40,7 +40,7 @@ class AprobacionController extends Controller
     public function pendientes(Request $request): JsonResponse
     {
         $perPage = $request->per_page ?? 20;
-        $cargas = CargaMalla::with(['usuario', 'programa', 'malla'])
+        $cargas = CargaMalla::with(['usuario', 'programa', 'malla', 'usuarioRevisor'])
             ->where('Estado_Carga', 'pendiente_aprobacion')
             ->where('tipo_carga', 'malla')
             ->orderBy('Creacion_Carga', 'desc')

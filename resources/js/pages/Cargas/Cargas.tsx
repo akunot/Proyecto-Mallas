@@ -72,6 +72,51 @@ const formatDate = (d: string) =>
         minute: '2-digit',
     });
 
+const COLUMN_LABELS: Record<string, string> = {
+    agrupaciones: 'Agrupaciones',
+    agrupacion_asignatura: 'Asignaturas de la agrupación',
+    componentes: 'Componentes',
+    requisitos: 'Requisitos',
+    obligatoria: 'Tipo Obligatoria',
+    asignatura: 'Código de Asignatura',
+};
+
+const friendlyColumnName = (col: string | null): string => {
+    if (!col) return '';
+    const key = col.replace(/^\d+/, '').toLowerCase();
+    return COLUMN_LABELS[key] || col;
+};
+
+const simplifyErrorMessage = (msg: string): string => {
+    // SQL constraint violations
+    if (msg.includes('SQLSTATE[23000]') && msg.includes('1452')) {
+        const match = msg.match(/REFERENCES\s+`?(\w+)`?/i);
+        if (match) {
+            const refTable = match[1]
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return `El valor no existe en la tabla de referencia (${refTable}). Verifique que los datos relacionados estén cargados primero.`;
+        }
+        return 'Error de integridad referencial: un valor no existe en la tabla relacionada.';
+    }
+    if (msg.includes('SQLSTATE[23000]') && msg.includes('1062')) {
+        return 'Valor duplicado: este registro ya existe en el sistema.';
+    }
+    if (msg.includes('Data truncated')) {
+        return 'El formato del valor no es válido para la columna. Revise que el tipo de dato sea correcto.';
+    }
+    if (msg.includes('bulk insert')) {
+        const tableMatch = msg.match(/bulk insert de (\w+)/);
+        if (tableMatch) {
+            const table = tableMatch[1]
+                .replace(/_/g, ' ')
+                .replace(/\b\w/g, (c) => c.toUpperCase());
+            return `Error al insertar datos en ${table}. Revise que los valores sean correctos.`;
+        }
+    }
+    return msg;
+};
+
 // --- Subcomponente: Badge de Estado Unificado ---
 const StatusBadge = ({ estado, tipo }: { estado: string; tipo: string }) => {
     const config: Record<
@@ -151,9 +196,13 @@ export default function Cargas() {
 
     // Confirmación de eliminación
     const [deleteConfirm, setDeleteConfirm] = useState<number | null>(null);
+    const [deleting, setDeleting] = useState(false);
 
     // Polling
     const [pollingIds, setPollingIds] = useState<Set<number>>(new Set());
+
+    // Procesamiento en curso (evita doble clic)
+    const [processingIds, setProcessingIds] = useState<Set<number>>(new Set());
 
     // Filtros
     const [filtroTipo, setFiltroTipo] = useState<string>('');
@@ -378,6 +427,7 @@ export default function Cargas() {
     };
 
     const handleProcesar = async (cargaId: number) => {
+        setProcessingIds((prev) => new Set(prev).add(cargaId));
         try {
             const res = await fetch(
                 `${apiUrl}/api/v1/cargas/${cargaId}/procesar`,
@@ -414,6 +464,12 @@ export default function Cargas() {
                 message: 'Error de conexión al procesar.',
                 type: 'error',
             });
+        } finally {
+            setProcessingIds((prev) => {
+                const next = new Set(prev);
+                next.delete(cargaId);
+                return next;
+            });
         }
     };
 
@@ -423,6 +479,7 @@ export default function Cargas() {
     };
 
     const handleDelete = async (cargaId: number) => {
+        setDeleting(true);
         try {
             const res = await fetch(`${apiUrl}/api/v1/cargas/${cargaId}`, {
                 method: 'DELETE',
@@ -442,10 +499,12 @@ export default function Cargas() {
                     message: data.message ?? 'Error al eliminar la carga.',
                     type: 'error',
                 });
+                setDeleting(false);
                 return;
             }
 
             setDeleteConfirm(null);
+            setDeleting(false);
             setToast({
                 message: 'Carga eliminada correctamente.',
                 type: 'success',
@@ -457,6 +516,7 @@ export default function Cargas() {
                 message: 'Error de conexión al eliminar.',
                 type: 'error',
             });
+            setDeleting(false);
         }
     };
 
@@ -716,24 +776,16 @@ export default function Cargas() {
                                                         }
                                                         disabled={pollingIds.has(
                                                             carga.ID_Carga,
+                                                        ) || processingIds.has(
+                                                            carga.ID_Carga,
                                                         )}
                                                         className="rounded-lg bg-blue-600 px-3 py-1 text-[11px] font-bold text-white hover:bg-blue-700 disabled:opacity-50"
                                                     >
-                                                        PROCESAR
-                                                    </button>
-                                                )}
-                                                {carga.Estado_Carga ===
-                                                    'con_errores' && (
-                                                    <button
-                                                        onClick={() =>
-                                                            handleProcesar(
-                                                                carga.ID_Carga,
-                                                            )
-                                                        }
-                                                        className="rounded-lg bg-amber-500 px-3 py-1 text-[11px] font-bold text-white hover:bg-amber-600"
-                                                        title="Reintentar"
-                                                    >
-                                                        REINTENTAR
+                                                        {processingIds.has(
+                                                            carga.ID_Carga,
+                                                        )
+                                                            ? 'PROCESANDO…'
+                                                            : 'PROCESAR'}
                                                     </button>
                                                 )}
                                                 {[
@@ -1078,12 +1130,16 @@ export default function Cargas() {
                                                                     err.Columna_Error &&
                                                                     ' · '}
                                                                 {err.Columna_Error &&
-                                                                    err.Columna_Error}
+                                                                    friendlyColumnName(
+                                                                        err.Columna_Error,
+                                                                    )}
                                                             </span>
                                                         )}
                                                     </div>
                                                     <p className="mt-1.5 text-sm leading-relaxed text-slate-800">
-                                                        {err.Mensaje_Error}
+                                                        {simplifyErrorMessage(
+                                                            err.Mensaje_Error,
+                                                        )}
                                                     </p>
                                                     {err.Valor_Recibido && (
                                                         <div className="mt-1.5 flex items-center gap-1.5">
@@ -1096,6 +1152,20 @@ export default function Cargas() {
                                                                 }
                                                             </code>
                                                         </div>
+                                                    )}
+                                                    {err.Mensaje_Error.includes(
+                                                        'SQLSTATE',
+                                                    ) && (
+                                                        <details className="mt-2">
+                                                            <summary className="cursor-pointer text-[11px] font-medium text-slate-400 hover:text-slate-600">
+                                                                Detalle técnico
+                                                            </summary>
+                                                            <pre className="mt-1 whitespace-pre-wrap rounded bg-slate-50 p-2 font-mono text-[11px] text-slate-500">
+                                                                {
+                                                                    err.Mensaje_Error
+                                                                }
+                                                            </pre>
+                                                        </details>
                                                     )}
                                                 </div>
                                             </div>
@@ -1179,9 +1249,17 @@ export default function Cargas() {
                             </button>
                             <button
                                 onClick={() => handleDelete(deleteConfirm)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700"
+                                disabled={deleting}
+                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white transition-colors hover:bg-red-700 disabled:cursor-not-allowed disabled:opacity-50"
                             >
-                                Eliminar
+                                {deleting ? (
+                                    <span className="flex items-center gap-2">
+                                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-white border-t-transparent" />
+                                        ELIMINANDO…
+                                    </span>
+                                ) : (
+                                    'Eliminar'
+                                )}
                             </button>
                         </div>
                     </div>

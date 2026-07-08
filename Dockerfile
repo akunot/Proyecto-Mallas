@@ -1,4 +1,4 @@
-FROM php:8.3-fpm-alpine AS base
+FROM php:8.4-fpm-alpine AS base
 
 RUN apk add --no-cache \
     curl \
@@ -8,9 +8,19 @@ RUN apk add --no-cache \
     supervisor \
     nodejs \
     npm \
-    bash
+    bash \
+    oniguruma-dev \
+    libpng-dev \
+    libjpeg-turbo-dev \
+    freetype-dev \
+    libzip-dev
 
-RUN docker-php-ext-install pdo_mysql mbstring bcmath
+RUN docker-php-ext-configure gd --with-freetype --with-jpeg \
+    && docker-php-ext-install pdo_mysql mbstring bcmath gd zip
+
+RUN apk add --no-cache build-base autoconf automake libtool \
+    && pecl install redis && docker-php-ext-enable redis \
+    && apk del build-base autoconf automake libtool
 
 COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
 
@@ -35,6 +45,7 @@ RUN addgroup -g 1001 -S app && adduser -S app -u 1001 -G app
 RUN mkdir -p /var/log/supervisor /var/log/nginx /run/nginx \
     && chown -R app:app /var/www/html/storage /var/www/html/bootstrap/cache /var/log/nginx /var/log/supervisor /run/nginx
 
+COPY docker/php.ini /usr/local/etc/php/conf.d/zz-app.ini
 COPY docker/nginx.conf /etc/nginx/nginx.conf
 COPY docker/php-fpm.conf /usr/local/etc/php-fpm.d/zz-docker.conf
 COPY docker/supervisord.conf /etc/supervisor/conf.d/supervisord.conf
