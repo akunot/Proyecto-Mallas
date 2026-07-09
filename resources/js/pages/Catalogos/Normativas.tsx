@@ -37,6 +37,14 @@ export default function Normativas({ normativas }: Props) {
     const sortOrder = normativas.meta.sort_order || 'asc';
 
     const columns = [
+        {
+            key: 'ID_Normativa',
+            label: 'ID',
+            sortable: true,
+            render: (value: number) => (
+                <span className="font-mono text-xs text-slate-500">#{value}</span>
+            )
+        },
         { 
             key: 'Documento', 
             label: 'Documento Legal',

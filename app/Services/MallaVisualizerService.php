@@ -117,6 +117,7 @@ final class MallaVisualizerService
                 'Numero_Normativa' => $malla->normativa->Numero_Normativa,
                 'Instancia' => $malla->normativa->Instancia,
                 'Anio_Normativa' => $malla->normativa->Anio_Normativa,
+                'Url_Normativa' => $malla->normativa->Url_Normativa,
             ] : null,
             'agrupaciones' => $malla->agrupaciones->map(function ($agrupacion): array {
                 return [

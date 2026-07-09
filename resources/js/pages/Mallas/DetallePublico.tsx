@@ -101,6 +101,7 @@ interface NormativaInfo {
     Numero_Normativa: string;
     Instancia: string;
     Anio_Normativa: number | null;
+    Url_Normativa: string | null;
 }
 
 interface ProgramaInfo {
@@ -891,22 +892,46 @@ export default function DetallePublico({
                                             <span className="mx-0.5 text-blue-400/60">
                                                 ·
                                             </span>
-                                            <span className="text-blue-100">
-                                                {
-                                                    activeMalla.normativa
-                                                        .Tipo_Normativa
-                                                }{' '}
-                                                {
-                                                    activeMalla.normativa
-                                                        .Numero_Normativa
-                                                }
-                                                {activeMalla.normativa
-                                                    .Anio_Normativa &&
-                                                    ` de ${activeMalla.normativa.Anio_Normativa}`}
-                                                {activeMalla.normativa
-                                                    .Instancia &&
-                                                    ` (${activeMalla.normativa.Instancia})`}
-                                            </span>
+                                            {activeMalla.normativa.Url_Normativa ? (
+                                                <a
+                                                    href={activeMalla.normativa.Url_Normativa}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-blue-100 underline decoration-blue-300/40 hover:decoration-blue-100 transition-all"
+                                                >
+                                                    {
+                                                        activeMalla.normativa
+                                                            .Tipo_Normativa
+                                                    }{' '}
+                                                    {
+                                                        activeMalla.normativa
+                                                            .Numero_Normativa
+                                                    }
+                                                    {activeMalla.normativa
+                                                        .Anio_Normativa &&
+                                                        ` de ${activeMalla.normativa.Anio_Normativa}`}
+                                                    {activeMalla.normativa
+                                                        .Instancia &&
+                                                        ` (${activeMalla.normativa.Instancia})`}
+                                                </a>
+                                            ) : (
+                                                <span className="text-blue-100">
+                                                    {
+                                                        activeMalla.normativa
+                                                            .Tipo_Normativa
+                                                    }{' '}
+                                                    {
+                                                        activeMalla.normativa
+                                                            .Numero_Normativa
+                                                    }
+                                                    {activeMalla.normativa
+                                                        .Anio_Normativa &&
+                                                        ` de ${activeMalla.normativa.Anio_Normativa}`}
+                                                    {activeMalla.normativa
+                                                        .Instancia &&
+                                                        ` (${activeMalla.normativa.Instancia})`}
+                                                </span>
+                                            )}
                                         </>
                                     )}
                                     {activeMalla?.Codigo_Plan && (

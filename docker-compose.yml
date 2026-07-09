@@ -61,14 +61,14 @@ services:
       LOG_CHANNEL: daily
       LOG_DAILY_DAYS: 30
       LOG_LEVEL: error
-      MAIL_MAILER: smtp
-      MAIL_HOST: mailpit
-      MAIL_PORT: 1025
-      MAIL_USERNAME: null
-      MAIL_PASSWORD: null
-      MAIL_ENCRYPTION: null
-      MAIL_FROM_ADDRESS: "noreply@mallas.edu.co"
-      MAIL_FROM_NAME: "Sistema de Mallas Académicas"
+      MAIL_MAILER: ${MAIL_MAILER:-smtp}
+      MAIL_HOST: ${MAIL_HOST:-smtp.gmail.com}
+      MAIL_PORT: ${MAIL_PORT:-587}
+      MAIL_USERNAME: "${MAIL_USERNAME}"
+      MAIL_PASSWORD: "${MAIL_PASSWORD}"
+      MAIL_ENCRYPTION: ${MAIL_ENCRYPTION:-tls}
+      MAIL_FROM_ADDRESS: "${MAIL_FROM_ADDRESS}"
+      MAIL_FROM_NAME: "${MAIL_FROM_NAME}"
     healthcheck:
       test: ['CMD', 'curl', '-f', 'http://localhost:80/api/v1/health']
       interval: 15s

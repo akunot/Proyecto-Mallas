@@ -12,17 +12,21 @@ class UsuarioSeeder extends Seeder
      */
     public function run(): void
     {
-        // Usuario administrador principal
         Usuario::create([
-            'Nombre_Usuario' => 'Administrador Sistema',
-            'Email_Usuario' => 'admin@unal.edu.co',
+            'Nombre_Usuario' => 'Sistema de Información Académico',
+            'Email_Usuario' => 'sia_man@unal.edu.co',
             'Activo_Usuario' => 1,
         ]);
 
-        // Usuario revisor de ejemplo
         Usuario::create([
-            'Nombre_Usuario' => 'Revisor Académico',
-            'Email_Usuario' => 'revisor@unal.edu.co',
+            'Nombre_Usuario' => 'Espacio Virtual de Atencion',
+            'Email_Usuario' => 'eva_man@unal.edu.co',
+            'Activo_Usuario' => 1,
+        ]);
+
+        Usuario::create([
+            'Nombre_Usuario' => 'Sergio Alejandro',
+            'Email_Usuario' => 'secastrob@unal.edu.co',
             'Activo_Usuario' => 1,
         ]);
     }
