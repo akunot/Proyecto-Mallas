@@ -222,7 +222,7 @@ export default function InstitutionalHeader() {
         <div className="hidden items-center gap-2 text-[22px] leading-[18px] sm:text-[27px] md:flex">
           <span className="h-[17px] w-[14px] shrink-0 bg-[url('/unal/images/locDot.png')] bg-no-repeat" aria-hidden="true" />
           <a href="/" className="truncate text-white no-underline hover:text-white">
-            manizales.unal.edu.co
+            mallas.manizales.unal.edu.co
           </a>
         </div>
 
