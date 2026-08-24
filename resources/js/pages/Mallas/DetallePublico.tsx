@@ -738,7 +738,7 @@ export default function DetallePublico({
         if (semestreCarouselRef.current) {
             const container = semestreCarouselRef.current;
             const cardWidth = container.clientWidth;
-            const scrollLeft = container.scrollLeft;
+            const { scrollLeft } = container;
             const index = Math.round(scrollLeft / cardWidth);
             setActiveSemestre(Math.min(Math.max(index + 1, 1), numSemestres));
         }
@@ -842,7 +842,8 @@ export default function DetallePublico({
             <InstitutionalHeader />
 
             {/* 1. HEADER DASHBOARD — Identidad institucional + Quick Stats */}
-            <header className="z-50 shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
+            <div className="bg-[#00236f] pt-10">
+                <header className="z-10 shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
                 {/* Barra superior: navegación + identidad */}
                 <div className="px-4 pt-3 pb-0 sm:px-8">
                     <div className="mx-auto flex max-w-[1800px] items-start justify-between gap-4">
@@ -1063,7 +1064,8 @@ export default function DetallePublico({
                         ))}
                     </div>
                 </div>
-            </header>
+                </header>
+            </div>
 
             {/* 2. SEMESTER CANVAS */}
             <main
