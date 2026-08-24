@@ -1,5 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
+import InstitutionalFooter from '../../components/InstitutionalFooter';
+import InstitutionalHeader from '../../components/InstitutionalHeader';
 
 // --- Interfaces ---
 interface Programa {
@@ -91,6 +93,7 @@ export default function ProgramasActivos({ facultades }: Props) {
     return (
         <div className="min-h-screen bg-[#f1f5f9] selection:bg-green-200">
             <Head title="Mallas Curriculares - UNAL Manizales" />
+            <InstitutionalHeader />
 
             {/* 1. HERO SECTION - Altamente Atractiva */}
             <div className="relative bg-[#00236f] py-20 lg:py-32 overflow-hidden">
@@ -244,6 +247,8 @@ export default function ProgramasActivos({ facultades }: Props) {
                     <p className="text-slate-500">Prueba con otro término de búsqueda.</p>
                 </div>
             )}
+
+            <InstitutionalFooter />
         </div>
     );
 }

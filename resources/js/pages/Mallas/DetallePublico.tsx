@@ -5,6 +5,8 @@ import MallaDiffView, {
     type CambioItem,
     type CambioModificado,
 } from '../../components/MallaDiffView';
+import InstitutionalFooter from '../../components/InstitutionalFooter';
+import InstitutionalHeader from '../../components/InstitutionalHeader';
 import MallaHistoryModal from '../../components/MallaHistoryModal';
 import SlotSelectorModal from '../../components/SlotSelectorModal';
 import VersionBadge from '../../components/VersionBadge';
@@ -835,8 +837,9 @@ export default function DetallePublico({
     };
 
     return (
-        <div className="flex h-screen flex-col overflow-y-auto bg-[#f1f5f9] font-sans selection:bg-blue-100">
+        <div className="flex min-h-screen flex-col bg-[#f1f5f9] font-sans selection:bg-blue-100">
             <Head title={`${programa.Nombre_Programa} - Malla Curricular`} />
+            <InstitutionalHeader />
 
             {/* 1. HEADER DASHBOARD — Identidad institucional + Quick Stats */}
             <header className="z-50 shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
@@ -2258,6 +2261,8 @@ export default function DetallePublico({
                     </div>
                 </footer>
             </div>
+
+            <InstitutionalFooter />
 
             {/* MODAL: ¿Cómo leer la malla? — Guía visual rediseñada con explicación de agrupaciones */}
             {showGuideModal && (
