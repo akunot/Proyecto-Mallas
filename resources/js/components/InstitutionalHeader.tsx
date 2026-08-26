@@ -144,7 +144,7 @@ export default function InstitutionalHeader() {
   }, []);
 
   return (
-    <header className="relative z-[20010] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
+    <header className="relative z-[50000] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
       {/* Barra Superior - Desktop */}
       <div className="relative hidden h-[30px] bg-[#666] md:block">
         <div className="flex h-full items-stretch justify-end pr-[70px] lg:pr-[85px]">
@@ -204,13 +204,13 @@ export default function InstitutionalHeader() {
         </a>
 
         {/* Escudo Institucional - insignia completa desde tablet/desktop */}
-        <a
-          href="https://unal.edu.co"
-          target="_blank"
-          rel="noreferrer noopener"
-          className="absolute z-30 -top-[30px] left-0 hidden h-[114px] w-[195px] items-center justify-center bg-[url('/unal/images/sealBck.png')] bg-contain bg-bottom bg-no-repeat px-5 md:flex lg:left-[10px] lg:h-[135px] lg:w-[234px] lg:px-7"
-          aria-label="Universidad Nacional de Colombia"
-        >
+         <a
+           href="https://unal.edu.co"
+           target="_blank"
+           rel="noreferrer noopener"
+           className="absolute z-[200] -top-[30px] left-0 hidden h-[114px] w-[195px] items-center justify-center bg-[url('/unal/images/sealBck.png')] bg-contain bg-bottom bg-no-repeat px-5 md:flex lg:left-[10px] lg:h-[135px] lg:w-[234px] lg:px-7"
+           aria-label="Universidad Nacional de Colombia"
+         >
           <img
             src="/unal/images/escudoUnal.svg"
             alt="Escudo de la Universidad Nacional de Colombia"
@@ -229,7 +229,7 @@ export default function InstitutionalHeader() {
         <img
           src="/unal/images/sealColombia.png"
           alt="Escudo de la República de Colombia"
-          className="absolute z-30 right-[10px] top-[4px] hidden h-[66px] w-[66px] md:block"
+          className="absolute z-[200] right-[10px] top-[4px] hidden h-[66px] w-[66px] md:block"
         />
 
         {/* Botón Menú Móvil */}
@@ -245,7 +245,7 @@ export default function InstitutionalHeader() {
       </div>
 
       {/* Navegación Secundaria - Desktop */}
-      <nav aria-label="Navegación principal" className="relative z-[20] hidden h-[23px] items-center bg-[url('/unal/images/navigationBack.png')] bg-repeat pl-[200px] text-white md:flex lg:pl-[250px] lg:pr-[70px]">
+      <nav aria-label="Navegación principal" className="relative z-[150] hidden h-[23px] items-center bg-[url('/unal/images/navigationBack.png')] bg-repeat pl-[200px] text-white md:flex lg:pl-[250px] lg:pr-[70px]">
         <div className="flex min-w-0 flex-1 items-center gap-1">
           {NAVIGATION_ITEMS.map(({ label, submenu }) => (
             <div key={label} className="relative h-full">
@@ -258,8 +258,8 @@ export default function InstitutionalHeader() {
               >
                 {label} <span className="ml-1 text-[#94b43b]">▼</span>
               </button>
-                {navigationOpen === label && (
-                  <ul className="absolute left-0 top-full z-50 min-w-56 border border-[#222] bg-[#333] py-1 shadow-lg">
+                 {navigationOpen === label && (
+                   <ul className="absolute left-0 top-full z-[9999] min-w-56 border border-[#222] bg-[#333] py-1 shadow-lg">
                     {submenu.map(({ label, href }) => (
                       <li key={label}>
                         <a href={href} className="block whitespace-nowrap px-3 py-1 text-[14px] text-white hover:bg-[#4b4b4b]">
@@ -285,7 +285,7 @@ export default function InstitutionalHeader() {
             Sedes <span className="ml-1 text-[#94b43b]">▼</span>
           </button>
           {campusesOpen && (
-            <ul className="absolute right-0 top-full z-50 min-w-44 border border-[#222] bg-[#333] py-1 shadow-lg">
+            <ul className="absolute right-0 top-full z-[9999] min-w-44 border border-[#222] bg-[#333] py-1 shadow-lg">
               {CAMPUSES.map(({ label, href }) => (
                 <li key={label}>
                   <a
@@ -463,7 +463,7 @@ export default function InstitutionalHeader() {
         onClick={() => setServicesOpen((prev) => !prev)}
         aria-expanded={servicesOpen}
         aria-controls="institutional-services"
-        className="fixed top-[150px] right-0 z-[110] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
+        className="fixed top-[150px] right-0 z-[30000] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
         style={{ transform: servicesOpen ? 'translateX(-240px)' : 'translateX(0)' }}
       >
         Servicios
@@ -472,7 +472,7 @@ export default function InstitutionalHeader() {
       {servicesOpen && (
         <aside
           id="institutional-services"
-          className="fixed top-0 right-0 z-[100] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
+          className="fixed top-0 right-0 z-[30000] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
           aria-label="Servicios institucionales"
         >
           <ul className="m-0 h-full w-[240px] overflow-y-auto overflow-x-hidden px-[10px] py-[150px] text-[13px] leading-8">

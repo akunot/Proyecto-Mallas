@@ -212,8 +212,26 @@ const ROMAN: Record<number, string> = {
     19: 'XIX',
     20: 'XX',
 };
-
 const PLACEHOLDER_RE = /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i;
+
+const getUniqueRequisitos = (requisitos: Requisito[] = []): Requisito[] => {
+    const seen = new Set<string>();
+    const unicos: Requisito[] = [];
+
+    requisitos.forEach((r) => {
+        const key = r.ID_Asignatura_Requerida
+            ? `${r.ID_Asignatura_Requerida}|${r.Tipo_Requisito}`
+            : `${r.Tipo_Requisito}|${r.Valor_Creditos ?? 0}|${r.Descripcion_Requisito ?? ''}`;
+
+        if (!seen.has(key)) {
+            seen.add(key);
+            unicos.push(r);
+        }
+    });
+
+    return unicos;
+};
+
 export default function DetallePublico({
     disponible,
     programa,
@@ -576,6 +594,10 @@ export default function DetallePublico({
         return null;
     }, [selectedAsig, activeMalla]);
 
+    const requisitosUnicos = useMemo(() => {
+        return getUniqueRequisitos(selectedAsigData?.requisitos);
+    }, [selectedAsigData]);
+
     // --- Lógica de Highlighter para prerrequisitos ---
     const activeRelations = useMemo(() => {
         const pre = new Set<number>();
@@ -687,6 +709,11 @@ export default function DetallePublico({
                     totalCreditosOptativos: 0,
                 };
             }
+
+            const existeAgrupacion = map[compId].agrupaciones.some(
+                (r) => r.Nombre_Agrupacion === agrup.Nombre_Agrupacion,
+            );
+            if (existeAgrupacion) return;
 
             map[compId].agrupaciones.push({
                 Nombre_Agrupacion: agrup.Nombre_Agrupacion,
@@ -843,7 +870,7 @@ export default function DetallePublico({
 
             {/* 1. HEADER DASHBOARD — Identidad institucional + Quick Stats */}
             <div className="bg-[#00236f] pt-10">
-                <header className="z-10 shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
+                <header className="shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
                 {/* Barra superior: navegación + identidad */}
                 <div className="px-4 pt-3 pb-0 sm:px-8">
                     <div className="mx-auto flex max-w-[1800px] items-start justify-between gap-4">
@@ -1389,9 +1416,9 @@ export default function DetallePublico({
                                                                             ),
                                                                 );
                                                             const reqCount =
-                                                                asig.requisitos
-                                                                    ?.length ??
-                                                                0;
+                                                                getUniqueRequisitos(
+                                                                    asig.requisitos,
+                                                                ).length;
 
                                                             if (
                                                                 reqCount === 0
@@ -1451,14 +1478,14 @@ export default function DetallePublico({
             {selectedAsig && selectedAsigData && (
                 <>
                     <div
-                        className="fixed inset-0 z-[99] bg-black/20 sm:pointer-events-none sm:bg-transparent"
+                        className="fixed inset-0 z-[20020] bg-black/20 sm:pointer-events-none sm:bg-transparent"
                         onClick={() => setSelectedAsig(null)}
                         aria-hidden="true"
                     />
                     <div
                         role="dialog"
                         aria-label={`Detalle de ${selectedAsigData.Nombre_Asignatura}`}
-                        className="fixed inset-x-0 bottom-0 z-[100] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
+                        className="fixed inset-x-0 bottom-0 z-[20040] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="bg-[#00236f] p-6 text-white">
@@ -1518,10 +1545,9 @@ export default function DetallePublico({
                                     <span className="h-[1px] w-4 bg-slate-200" />{' '}
                                     Prerrequisitos de área
                                 </h5>
-                                {selectedAsigData.requisitos &&
-                                selectedAsigData.requisitos.length > 0 ? (
+                                {requisitosUnicos.length > 0 ? (
                                     <ul className="space-y-2">
-                                        {selectedAsigData.requisitos.map(
+                                        {requisitosUnicos.map(
                                             (r, i) => {
                                                 const t = (
                                                     r.Tipo_Requisito ?? ''
@@ -1565,7 +1591,7 @@ export default function DetallePublico({
             )}
 
             {/* 4. FOOTER — Panel de distribución de créditos + leyenda */}
-            <div className="relative z-10 shrink-0">
+            <div className="relative z-[20020] shrink-0">
                 {/* PANEL EXPANDIDO DE COMPONENTE */}
                 {activeComponentPanel &&
                     (() => {
@@ -1595,7 +1621,7 @@ export default function DetallePublico({
                         );
 
                         return (
-                            <div className="absolute right-0 bottom-full left-0 z-50 max-h-[58vh] overflow-y-auto border-t border-slate-100 bg-white/95 shadow-[0_-12px_40px_rgba(0,0,0,0.13)] backdrop-blur-md duration-300 animate-in slide-in-from-bottom">
+                            <div className="absolute right-0 bottom-full left-0 z-[20020] max-h-[58vh] overflow-y-auto border-t border-slate-100 bg-white/95 shadow-[0_-12px_40px_rgba(0,0,0,0.13)] backdrop-blur-md duration-300 animate-in slide-in-from-bottom">
                                 <div className="mx-auto max-w-[1800px] px-5 py-5 sm:px-8">
                                     {/* Header del panel */}
                                     <div className="mb-5 flex items-start justify-between gap-4">
@@ -2269,7 +2295,7 @@ export default function DetallePublico({
             {/* MODAL: ¿Cómo leer la malla? — Guía visual rediseñada con explicación de agrupaciones */}
             {showGuideModal && (
                 <div
-                    className="fixed inset-0 z-[200] flex items-center justify-center bg-black/50 px-4"
+                    className="fixed inset-0 z-[60000] flex items-center justify-center bg-black/50 px-4"
                     onClick={() => setShowGuideModal(false)}
                 >
                     <div
