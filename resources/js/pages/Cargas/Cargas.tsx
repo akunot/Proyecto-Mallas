@@ -384,6 +384,7 @@ export default function Cargas() {
                 {
                     method: 'POST',
                     headers: {
+                        Accept: 'application/json',
                         'X-Requested-With': 'XMLHttpRequest',
                         'X-CSRF-TOKEN': getCsrf(),
                     },
@@ -392,7 +393,24 @@ export default function Cargas() {
                 },
             );
 
-            const uploadData = await uploadRes.json();
+            // El backend responde JSON, pero si PHP emite un warning que se
+            // imprime antes (p.ej. al superar `post_max_size`), la respuesta
+            // deja de ser JSON válido. Parseamos de forma robusta para
+            // mostrar el mensaje real en lugar de un error de sintaxis.
+            let uploadData: Record<string, any> = {};
+
+            try {
+                uploadData = await uploadRes.json();
+            } catch {
+                const text = await uploadRes.text().catch(() => '');
+                setToast({
+                    message: text
+                        ? `El servidor respondió con un error inesperado: ${text.slice(0, 200)}`
+                        : 'Error inesperado al subir el archivo.',
+                    type: 'error',
+                });
+                return;
+            }
 
             if (!uploadRes.ok) {
                 const msgs = uploadData.errors

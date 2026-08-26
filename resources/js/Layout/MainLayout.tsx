@@ -2,8 +2,6 @@ import { Link, usePage } from '@inertiajs/react';
 import type { ReactNode } from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import InstitutionalFooter from '../components/InstitutionalFooter';
-import InstitutionalHeader from '../components/InstitutionalHeader';
 
 // --- Subcomponentes Refactorizados ---
 
@@ -107,7 +105,6 @@ export default function Layout({ children }: { children: ReactNode }) {
 
     return (
         <div className="flex min-h-screen flex-col bg-[#f8fafc] font-sans text-slate-900 antialiased">
-            <InstitutionalHeader />
             <div className="flex min-h-0 flex-1">
             {/* Sidebar Overlay para Móvil */}
             {isMobile && sidebarOpen && (
@@ -305,7 +302,6 @@ export default function Layout({ children }: { children: ReactNode }) {
                 </main>
             </div>
             </div>
-            <InstitutionalFooter />
         </div>
     );
 }
