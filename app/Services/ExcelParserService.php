@@ -2356,7 +2356,7 @@ class ExcelParserService
 
         // 1. Agrupar asignaturas tocadas en el batch
         $asignaturasEnBatch = [];
-        $keysDelBatch = []; // Conjunto de claves válidas del batch
+        $keysDel Batch = []; // Conjunto de claves válidas del batch
 
         foreach ($batchRequisitos as $req) {
             $asigId = $req['ID_Asignatura'];
@@ -2366,7 +2366,7 @@ class ExcelParserService
             $reqKey = "{$asigId}|{$programaId}|".
                 ($req['ID_Asignatura_Requerida'] ?? 'null').'|'.
                 ($req['Descripcion_Requisito'] ?? '');
-            $keysDelBatch[$reqKey] = true;
+            $keysDel Batch[$reqKey] = true;
         }
 
         $asignaturaIds = array_keys($asignaturasEnBatch);
@@ -2385,7 +2385,7 @@ class ExcelParserService
                 ($reqExistente->ID_Asignatura_Requerida ?? 'null').'|'.
                 ($reqExistente->Descripcion_Requisito ?? '');
 
-            if (! isset($keysDelBatch[$existentKey])) {
+            if (! isset($keysDel Batch[$existentKey])) {
                 $requisitosAEliminar[] = $reqExistente->ID_Requisito;
             }
         }

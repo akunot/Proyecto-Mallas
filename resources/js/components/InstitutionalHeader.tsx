@@ -144,7 +144,7 @@ export default function InstitutionalHeader() {
   }, []);
 
   return (
-    <header className="relative z-[50000] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
+    <header className="relative z-[300] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
       {/* Barra Superior - Desktop */}
       <div className="relative hidden h-[30px] bg-[#666] md:block">
         <div className="flex h-full items-stretch justify-end pr-[70px] lg:pr-[85px]">
@@ -259,7 +259,7 @@ export default function InstitutionalHeader() {
                 {label} <span className="ml-1 text-[#94b43b]">▼</span>
               </button>
                  {navigationOpen === label && (
-                   <ul className="absolute left-0 top-full z-[9999] min-w-56 border border-[#222] bg-[#333] py-1 shadow-lg">
+                   <ul className="absolute left-0 top-full z-[350] min-w-56 border border-[#222] bg-[#333] py-1 shadow-lg">
                     {submenu.map(({ label, href }) => (
                       <li key={label}>
                         <a href={href} className="block whitespace-nowrap px-3 py-1 text-[14px] text-white hover:bg-[#4b4b4b]">
@@ -285,7 +285,7 @@ export default function InstitutionalHeader() {
             Sedes <span className="ml-1 text-[#94b43b]">▼</span>
           </button>
           {campusesOpen && (
-            <ul className="absolute right-0 top-full z-[9999] min-w-44 border border-[#222] bg-[#333] py-1 shadow-lg">
+         <ul className="absolute right-0 top-full z-[350] min-w-44 border border-[#222] bg-[#333] py-1 shadow-lg">
               {CAMPUSES.map(({ label, href }) => (
                 <li key={label}>
                   <a
@@ -463,7 +463,7 @@ export default function InstitutionalHeader() {
         onClick={() => setServicesOpen((prev) => !prev)}
         aria-expanded={servicesOpen}
         aria-controls="institutional-services"
-        className="fixed top-[150px] right-0 z-[30000] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
+        className="fixed top-[150px] right-0 z-[350] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
         style={{ transform: servicesOpen ? 'translateX(-240px)' : 'translateX(0)' }}
       >
         Servicios
@@ -472,7 +472,7 @@ export default function InstitutionalHeader() {
       {servicesOpen && (
         <aside
           id="institutional-services"
-          className="fixed top-0 right-0 z-[30000] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
+          className="fixed top-0 right-0 z-[350] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
           aria-label="Servicios institucionales"
         >
           <ul className="m-0 h-full w-[240px] overflow-y-auto overflow-x-hidden px-[10px] py-[150px] text-[13px] leading-8">

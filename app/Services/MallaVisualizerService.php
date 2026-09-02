@@ -18,7 +18,7 @@ final class MallaVisualizerService
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($idPrograma): ?array {
             $malla = MallaCurricular::with($this->eagerLoads($idPrograma))
                 ->where('ID_Programa', $idPrograma)
-                ->whereIn('Estado', ['activa', 'ACTIVO'])
+                ->whereIn('Estado', ['activa', 'ACTIVA'])
                 ->orderBy('Fecha_Vigencia', 'desc')
                 ->first();
 

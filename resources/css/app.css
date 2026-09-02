@@ -2873,7 +2873,12 @@ body {
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 200;
+    /* Debe quedar por encima de todo el chrome institucional:
+       - Header UNAL (InstitutionalHeader) usa z-[300]
+       - Footer de componentes de DetallePublico usa z-[20020]
+       Con z-index 30000 el catálogo de optativas/electivas, el historial
+       y el diff aparecen SIEMPRE encima del header y del footer. */
+    z-index: 30000;
     padding: 1rem;
 }
 
