@@ -28,38 +28,63 @@ interface Props {
     facultades: Facultad[];
 }
 
-// Imágenes placeholder representativas por área de conocimiento
+// Mapeo de programas a archivos de imagen local
+// Nombres basados en los archivos disponibles en public/programas/
 const imagesPorPrograma: Record<string, string> = {
-    'INGENIERÍA CIVIL': 'https://images.unsplash.com/photo-1503387762-592deb58ef4e?w=600&q=80',
-    'INGENIERÍA ELÉCTRICA': 'https://images.unsplash.com/photo-1473341304170-971dccb5ac1e?w=600&q=80',
+    'INGENIERÍA CIVIL': '/programas/Ingenieria civil',
+    'INGENIERÍA ELÉCTRICA': '/programas/Ing. Electrica',
+    'INGENIERÍA MECÁNICA': 'unsplash', // Fallback Unsplash
+    'INGENIERÍA INDUSTRIAL': '/programas/Ing. Industrial',
+    'INGENIERÍA QUÍMICA': '/programas/Ing. Quimica',
+    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': '/programas/Administración de Sistemas Informáticos',
+    'INGENIERÍA AGRÍCOLA': 'unsplash', // Fallback Unsplash
+    'ADMINISTRACIÓN DE EMPRESAS': '/programas/Administración de Empresas',
+    'CONTADURÍA PÚBLICA': 'unsplash', // Fallback Unsplash
+    'DERECHO': 'unsplash', // Fallback Unsplash
+    'ARQUITECTURA': '/programas/ARQUITECTURA',
+    'MEDICINA': 'unsplash', // Fallback Unsplash
+    'ENFERMERÍA': 'unsplash', // Fallback Unsplash
+    'BIOLOGÍA': '/programas/Ingeniería Biológica',
+    'MATEMÁTICAS': '/programas/Matemáticas',
+    'FÍSICA': '/programas/Ing. Fisica',
+    'QUÍMICA': '/programas/Ing. Quimica',
+    'CIENCIAS HUMANAS': 'unsplash', // Fallback Unsplash
+    'CIENCIAS DE LA COMPUTACIÓN': '/programas/Ciencias de la Computación',
+    'ESTADÍSTICA': '/programas/Estadistica',
+    'GESTIÓN CULTURAL': '/programas/Gestión Cultural',
+    'INGENIERÍA ELECTRÓNICA': '/programas/Ing. Electrónica',
+    'INGENIERÍA FÍSICA': '/programas/Ing. Fisica',
+    'INGENIERÍA BIOLÓGICA': '/programas/Ingeniería Biológica',
+};
+
+// URLs de fallback Unsplash para programas sin imagen local
+const unsplashFallbacks: Record<string, string> = {
     'INGENIERÍA MECÁNICA': 'https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=600&q=80',
-    'INGENIERÍA INDUSTRIAL': 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=600&q=80',
-    'INGENIERÍA QUÍMICA': 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=600&q=80',
-    'INGENIERÍA DE SISTEMAS': 'https://images.unsplash.com/photo-1518432031352-d6fc5c10da5a?w=600&q=80',
     'INGENIERÍA AGRÍCOLA': 'https://images.unsplash.com/photo-1586771107445-b3b7cb66f5c6?w=600&q=80',
-    'ADMINISTRACIÓN DE EMPRESAS': 'https://images.unsplash.com/photo-1507679799987-c73779587ccf?w=600&q=80',
     'CONTADURÍA PÚBLICA': 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80',
     'DERECHO': 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80',
-    'ARQUITECTURA': 'https://images.unsplash.com/photo-1511818966892-d7d671e672a2?w=600&q=80',
     'MEDICINA': 'https://images.unsplash.com/photo-1617317366354-2d9a4080185c?w=600&q=80',
     'ENFERMERÍA': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80',
-    'BIOLOGÍA': 'https://images.unsplash.com/photo-1530026186672-2cd00ffc50fe?w=600&q=80',
-    'MATEMÁTICAS': 'https://images.unsplash.com/photo-1509228627152-72ae9ae6848d?w=600&q=80',
-    'FÍSICA': 'https://images.unsplash.com/photo-1604871000636-074fa5117945?w=600&q=80',
-    'QUÍMICA': 'https://images.unsplash.com/photo-1603126857599-f6e157fa2fe6?w=600&q=80',
     'CIENCIAS HUMANAS': 'https://images.unsplash.com/photo-1531746790095-e5cb157ad1d5?w=600&q=80',
 };
 
 const getImageForPrograma = (nombre: string): string => {
     const upper = nombre.toUpperCase().trim();
 
-    for (const [key, url] of Object.entries(imagesPorPrograma)) {
-        if (upper.includes(key)) {
-return url;
-}
+    // Buscar coincidencia exacta o parcial en el mapeo
+    for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
+        if (upper.includes(key) || key.includes(upper.split(' ')[0])) {
+            if (imagePath === 'unsplash') {
+                // Retornar URL de Unsplash específica para este programa
+                return unsplashFallbacks[key] || 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80';
+            }
+            // Retornar ruta local con extensión correcta
+            // Intentar .png primero (si existe), sino .jpg
+            return `${imagePath}.jpg`;
+        }
     }
 
-    // Imagen genérica para carreras no listadas
+    // Imagen genérica de fallback para carreras no listadas
     return 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80';
 };
 
