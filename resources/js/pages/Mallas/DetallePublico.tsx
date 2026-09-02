@@ -254,6 +254,23 @@ export default function DetallePublico({
     const [showDiffModal, setShowDiffModal] = useState(false);
     const [diffData, setDiffData] = useState<DiffResponse | null>(null);
     const [loadingDiff, setLoadingDiff] = useState(false);
+    const [historialRequisitos, setHistorialRequisitos] = useState<
+        Array<{
+            fecha: string;
+            asignatura_afectada: {
+                ID_Asignatura: number;
+                Codigo_Asignatura: string;
+                Nombre_Asignatura: string;
+            } | null;
+            tipo_cambio: string;
+            resumen: string;
+            normativa: {
+                Tipo_Normativa: string;
+                Numero_Normativa: string;
+                Anio_Normativa: string;
+            } | null;
+        }>
+    >([]);
     const [loadingVersion, setLoadingVersion] = useState(false);
 
     // Modal de Libre Elección
@@ -306,6 +323,25 @@ export default function DetallePublico({
             if (res.ok) {
                 const data = await res.json();
                 setVersiones(data.data ?? []);
+            }
+        } catch {
+            // ignore
+        }
+    };
+
+    const fetchHistorialRequisitos = async () => {
+        try {
+            const res = await fetch(
+                `/api/v1/public/programas/${programa.ID_Programa}/historial-requisitos`,
+                {
+                    headers: { Accept: 'application/json' },
+                    credentials: 'same-origin',
+                },
+            );
+
+            if (res.ok) {
+                const data = await res.json();
+                setHistorialRequisitos(data.data ?? []);
             }
         } catch {
             // ignore
@@ -376,19 +412,23 @@ export default function DetallePublico({
         setLoadingDiff(true);
         setShowDiffModal(true);
         setDiffData(null);
+        setHistorialRequisitos([]);
 
         try {
             const [id1, id2] = Array.from(selectedForDiff);
-            const res = await fetch(
-                `/api/v1/public/mallas/${id1}/diff/${id2}`,
-                {
-                    headers: { Accept: 'application/json' },
-                    credentials: 'same-origin',
-                },
-            );
+            const [diffRes, historialRes] = await Promise.all([
+                fetch(
+                    `/api/v1/public/mallas/${id1}/diff/${id2}`,
+                    {
+                        headers: { Accept: 'application/json' },
+                        credentials: 'same-origin',
+                    },
+                ),
+                fetchHistorialRequisitos(),
+            ]);
 
-            if (res.ok) {
-                const data = await res.json();
+            if (diffRes.ok) {
+                const data = await diffRes.json();
                 setDiffData(data.data ?? null);
             }
         } catch {
@@ -2766,9 +2806,11 @@ export default function DetallePublico({
                 onClose={() => {
                     setShowDiffModal(false);
                     setDiffData(null);
+                    setHistorialRequisitos([]);
                 }}
                 diffData={diffData}
                 loading={loadingDiff}
+                historialRequisitos={historialRequisitos}
             />
 
             <style>{`

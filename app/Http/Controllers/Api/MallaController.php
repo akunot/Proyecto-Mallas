@@ -5,6 +5,8 @@ namespace App\Http\Controllers\Api;
 use App\Models\Agrupacion;
 use App\Models\AgrupacionAsignatura;
 use App\Models\Asignatura;
+use App\Models\CargaMalla;
+use App\Models\LogActividad;
 use App\Models\MallaCurricular;
 use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
@@ -15,6 +17,8 @@ use App\Services\MallaVisualizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 
 class MallaController extends Controller
@@ -105,6 +109,169 @@ class MallaController extends Controller
             ]);
 
         return response()->json(['data' => $versiones]);
+    }
+
+    /**
+     * Endpoint público: historial legible de cambios de requisitos de un programa.
+     *
+     * Se apoya en la auditoría (logs_actividad) registrada por ExcelParserService
+     * durante el reprocesamiento de mallas. Es la pieza complementaria que
+     * publicDiff() no puede cubrir: requisitos corregidos en asignaturas que
+     * persisten entre dos versiones de malla del mismo programa.
+     */
+    public function publicHistorialRequisitos(int $programaId): JsonResponse
+    {
+        $programa = Programa::find($programaId);
+
+        if (! $programa) {
+            return response()->json(['message' => 'Programa no encontrado.'], 404);
+        }
+
+        $logs = LogActividad::where('Entidad_Log', 'requisitos')
+            ->whereIn('Accion_Log', ['INSERT_REQUISITO', 'UPDATE_REQUISITO', 'DELETE_REQUISITO_OBSOLETO'])
+            ->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(Detalle_Log, '$.ID_Programa')) = ?", [(string) $programaId])
+            ->orderByDesc('Creacion_Log')
+            ->orderByDesc('ID_Log') // Desempate determinista dentro del mismo segundo
+            ->get();
+
+        if ($logs->isEmpty()) {
+            return response()->json(['data' => []]);
+        }
+
+        // Resolver en consultas únicas las asignaturas (afectada y requeridas)
+        // y las cargas con su normativa.
+        $asignaturaIds = $logs
+            ->map(fn (LogActividad $log) => (int) ($log->Detalle_Log['ID_Asignatura'] ?? 0))
+            ->filter()
+            ->unique();
+
+        $requeridaIds = $logs->flatMap(function (LogActividad $log) {
+            $ids = [];
+            foreach (['valor_anterior', 'valor_nuevo'] as $campo) {
+                $requisito = $log->Detalle_Log[$campo] ?? null;
+                $id = $requisito['ID_Asignatura_Requerida'] ?? null;
+                if ($id) {
+                    $ids[] = (int) $id;
+                }
+            }
+
+            return $ids;
+        })->unique();
+
+        $asignaturas = Asignatura::whereIn(
+            'ID_Asignatura',
+            $asignaturaIds->concat($requeridaIds)->unique()->values()->all()
+        )->get()->keyBy('ID_Asignatura');
+
+        $cargaIds = $logs
+            ->map(fn (LogActividad $log) => (int) ($log->Detalle_Log['ID_Carga'] ?? 0))
+            ->filter()
+            ->unique();
+
+        $cargas = CargaMalla::with('normativa')
+            ->whereIn('ID_Carga', $cargaIds->values()->all())
+            ->get()
+            ->keyBy('ID_Carga');
+
+        $data = $logs->map(function (LogActividad $log) use ($asignaturas, $cargas) {
+            $detalle = $log->Detalle_Log;
+
+            $normativa = null;
+            $carga = $cargas->get((int) ($detalle['ID_Carga'] ?? 0));
+            if ($carga) {
+                $normativa = $carga->normativa;
+            }
+
+            return [
+                'fecha' => Carbon::parse($log->Creacion_Log)->toIso8601String(),
+                'asignatura_afectada' => $this->asignaturaPublica(
+                    $asignaturas,
+                    (int) ($detalle['ID_Asignatura'] ?? 0)
+                ),
+                'tipo_cambio' => $log->Accion_Log,
+                'resumen' => $this->describirCambioRequisito(
+                    $log->Accion_Log,
+                    $detalle['valor_anterior'] ?? null,
+                    $detalle['valor_nuevo'] ?? null,
+                    $asignaturas
+                ),
+                'normativa' => $normativa ? [
+                    'Tipo_Normativa' => $normativa->Tipo_Normativa,
+                    'Numero_Normativa' => $normativa->Numero_Normativa,
+                    'Anio_Normativa' => $normativa->Anio_Normativa,
+                ] : null,
+            ];
+        })->values();
+
+        return response()->json(['data' => $data]);
+    }
+
+    private function asignaturaPublica(Collection $asignaturas, int $id): ?array
+    {
+        $asignatura = $asignaturas->get($id);
+        if (! $asignatura) {
+            return null;
+        }
+
+        return [
+            'ID_Asignatura' => $asignatura->ID_Asignatura,
+            'Codigo_Asignatura' => $asignatura->Codigo_Asignatura,
+            'Nombre_Asignatura' => $asignatura->Nombre_Asignatura,
+        ];
+    }
+
+    private function describirCambioRequisito(
+        string $accion,
+        ?array $anterior,
+        ?array $nuevo,
+        Collection $asignaturas
+    ): string {
+        $tipo = $this->tipoRequisitoLegible($nuevo['Tipo_Requisito'] ?? ($anterior['Tipo_Requisito'] ?? null));
+
+        $nombrar = function (?array $requisito) use ($asignaturas): string {
+            if (! $requisito) {
+                return '—';
+            }
+
+            return $this->nombrarRequisito($requisito, $asignaturas);
+        };
+
+        return match ($accion) {
+            'INSERT_REQUISITO' => "Se agregó el {$tipo} '{$nombrar($nuevo)}'",
+            'UPDATE_REQUISITO' => "El {$tipo} cambió de '{$nombrar($anterior)}' a '{$nombrar($nuevo)}'",
+            'DELETE_REQUISITO_OBSOLETO' => "Se eliminó el {$tipo} '{$nombrar($anterior)}'",
+            default => $accion,
+        };
+    }
+
+    private function nombrarRequisito(array $requisito, Collection $asignaturas): string
+    {
+        if (! empty($requisito['ID_Asignatura_Requerida'])) {
+            $asignatura = $asignaturas->get((int) $requisito['ID_Asignatura_Requerida']);
+
+            return $asignatura?->Nombre_Asignatura ?? "Asignatura #{$requisito['ID_Asignatura_Requerida']}";
+        }
+
+        if (! empty($requisito['Descripcion_Requisito'])) {
+            return $requisito['Descripcion_Requisito'];
+        }
+
+        if (! empty($requisito['Valor_Creditos'])) {
+            return "{$requisito['Valor_Creditos']} créditos";
+        }
+
+        return $requisito['Tipo_Requisito'] ?? 'requisito';
+    }
+
+    private function tipoRequisitoLegible(?string $tipo): string
+    {
+        return match (strtolower($tipo ?? '')) {
+            'prerrequisito' => 'prerrequisito',
+            'correquisito' => 'correquisito',
+            'creditos' => 'requisito de créditos',
+            'preferente' => 'requisito preferente',
+            default => 'requisito',
+        };
     }
 
     /**

@@ -8,6 +8,7 @@ use App\Models\Asignatura;
 use App\Models\CargaMalla;
 use App\Models\Componente;
 use App\Models\ErrorCarga;
+use App\Models\LogActividad;
 use App\Models\MallaCurricular;
 use App\Models\Normativa;
 use App\Models\PlantillaAgrupacion;
@@ -1058,6 +1059,11 @@ class ExcelParserService
 
         // 7. Insertar requisitos (usando upsert para evitar duplicados por re-upload)
         if (! empty($batchRequisitos)) {
+            // Auditar en logs_actividad los requisitos nuevos/modificados (INSERT/UPDATE).
+            // Cubre el caso que publicDiff() no detecta: asignaturas que persisten
+            // entre versiones cuyo requisito fue corregido.
+            $this->detectarCambiosRequisitos($batchRequisitos, $this->malla->ID_Programa);
+
             // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
             $this->cleanupObsoleteRequisitos($batchRequisitos, $this->malla->ID_Programa);
 
@@ -1948,7 +1954,7 @@ class ExcelParserService
             }
         }
 
-        Requisito::create([
+        $requisito = Requisito::create([
             'ID_Asignatura' => $relacion->ID_Asignatura,
             'ID_Programa' => $this->malla ? $this->malla->ID_Programa : null,
             'ID_Asignatura_Requerida' => $asignaturaReqId,
@@ -1956,6 +1962,26 @@ class ExcelParserService
             'Valor_Creditos' => $valorCreditos,
             'Descripcion_Requisito' => $descripcion,
         ]);
+
+        // Auditar la creación de requisito generado desde un placeholder
+        // (LIBRE*, OPTATIVA*, NIVELATORIO*).
+        if (isset($this->carga) && $this->malla) {
+            $this->registrarLogRequisito(
+                'INSERT_REQUISITO',
+                $this->malla->ID_Programa,
+                $relacion->ID_Asignatura,
+                $requisito->ID_Requisito,
+                null,
+                $this->sanearRequisito([
+                    'ID_Asignatura' => $relacion->ID_Asignatura,
+                    'ID_Programa' => $this->malla->ID_Programa,
+                    'ID_Asignatura_Requerida' => $asignaturaReqId,
+                    'Tipo_Requisito' => $tipoMapeado,
+                    'Valor_Creditos' => $valorCreditos,
+                    'Descripcion_Requisito' => $descripcion,
+                ], $this->malla->ID_Programa)
+            );
+        }
     }
 
     /**
@@ -2338,6 +2364,161 @@ class ExcelParserService
     }
 
     /**
+     * Compara el batch nuevo de requisitos contra el estado actual en BD y registra
+     * en logs_actividad las inserciones (INSERT_REQUISITO) y actualizaciones
+     * (UPDATE_REQUISITO) detectadas durante el reprocesamiento de una malla.
+     *
+     * Las eliminaciones se auditan por separado en cleanupObsoleteRequisitos()
+     * con la acción DELETE_REQUISITO_OBSOLETO.
+     *
+     * @param  array  $batchRequisitos  Array de requisitos a insertar/actualizar
+     * @param  int  $programaId  ID del programa de esta malla
+     */
+    private function detectarCambiosRequisitos(array $batchRequisitos, int $programaId): void
+    {
+        if (empty($batchRequisitos)) {
+            return;
+        }
+
+        $asignaturaIds = array_values(array_unique(array_column($batchRequisitos, 'ID_Asignatura')));
+
+        $existentes = DB::table('requisitos')
+            ->whereIn('ID_Asignatura', $asignaturaIds)
+            ->where('ID_Programa', $programaId)
+            ->get()
+            ->keyBy(fn ($requisito) => $this->claveRequisito(
+                $requisito->ID_Asignatura,
+                $requisito->ID_Programa,
+                $requisito->ID_Asignatura_Requerida
+            ));
+
+        foreach ($batchRequisitos as $requisito) {
+            $clave = $this->claveRequisito(
+                (int) $requisito['ID_Asignatura'],
+                $programaId,
+                isset($requisito['ID_Asignatura_Requerida'])
+                    ? (int) $requisito['ID_Asignatura_Requerida']
+                    : null
+            );
+
+            $valorNuevo = $this->sanearRequisito($requisito, $programaId);
+            $existente = $existentes->get($clave);
+
+            if (! $existente) {
+                // Requisito que no existía antes de esta carga: INSERT.
+                $this->registrarLogRequisito(
+                    'INSERT_REQUISITO',
+                    $programaId,
+                    (int) $requisito['ID_Asignatura'],
+                    null,
+                    null,
+                    $valorNuevo
+                );
+
+                continue;
+            }
+
+            $valorAnterior = $this->sanearRequisito((array) $existente, $existente->ID_Programa);
+
+            if ($this->requisitoCambio($valorAnterior, $valorNuevo)) {
+                // Misma clave natural (asignatura + programa + asignatura requerida)
+                // pero contenido distinto: el requisito fue corregido en esta carga.
+                $this->registrarLogRequisito(
+                    'UPDATE_REQUISITO',
+                    $programaId,
+                    (int) $requisito['ID_Asignatura'],
+                    $existente->ID_Requisito,
+                    $valorAnterior,
+                    $valorNuevo
+                );
+            }
+        }
+    }
+
+    /**
+     * Clave natural de un requisito (misma lógica que el unique constraint de la tabla).
+     */
+    private function claveRequisito(int $idAsignatura, ?int $idPrograma, ?int $idAsignaturaRequerida): string
+    {
+        return $idAsignatura.'|'.($idPrograma ?? 'null').'|'.($idAsignaturaRequerida ?? 'null');
+    }
+
+    /**
+     * Normaliza un requisito (de BD o del batch) al subconjunto de campos auditable.
+     *
+     * @return array<string, mixed>
+     */
+    private function sanearRequisito(array $requisito, ?int $idPrograma): array
+    {
+        return [
+            'ID_Asignatura' => (int) ($requisito['ID_Asignatura'] ?? 0),
+            'ID_Programa' => $idPrograma,
+            'ID_Asignatura_Requerida' => isset($requisito['ID_Asignatura_Requerida'])
+                ? (int) $requisito['ID_Asignatura_Requerida']
+                : null,
+            'Tipo_Requisito' => (string) ($requisito['Tipo_Requisito'] ?? ''),
+            'Valor_Creditos' => isset($requisito['Valor_Creditos']) && $requisito['Valor_Creditos'] !== null
+                ? (int) $requisito['Valor_Creditos']
+                : null,
+            'Descripcion_Requisito' => ($requisito['Descripcion_Requisito'] ?? null) ?: null,
+        ];
+    }
+
+    /**
+     * Determina si un requisito existente cambió respecto al batch nuevo.
+     *
+     * @param  array<string, mixed>  $anterior
+     * @param  array<string, mixed>  $nuevo
+     */
+    private function requisitoCambio(array $anterior, array $nuevo): bool
+    {
+        return $anterior['Tipo_Requisito'] !== $nuevo['Tipo_Requisito']
+            || $anterior['Valor_Creditos'] !== $nuevo['Valor_Creditos']
+            || $anterior['Descripcion_Requisito'] !== $nuevo['Descripcion_Requisito'];
+    }
+
+    /**
+     * Registra un evento de cambio de requisito en logs_actividad.
+     *
+     * Detalle_Log (JSON):
+     * {
+     *   "ID_Carga": <int>,
+     *   "ID_Asignatura": <int>,
+     *   "ID_Programa": <int>,
+     *   "valor_anterior": {...} | null,
+     *   "valor_nuevo": {...} | null
+     * }
+     */
+    private function registrarLogRequisito(
+        string $accion,
+        int $programaId,
+        int $idAsignatura,
+        ?int $idRequisito,
+        ?array $valorAnterior,
+        ?array $valorNuevo
+    ): void {
+        // En invocaciones aisladas del servicio (tests unitarios de helpers)
+        // no hay carga asociada: no hay contexto de auditoría.
+        if (! isset($this->carga)) {
+            return;
+        }
+
+        LogActividad::create([
+            'ID_Usuario' => $this->carga->ID_Usuario,
+            'Accion_Log' => $accion,
+            'Entidad_Log' => 'requisitos',
+            'Entidad_ID_Log' => $idRequisito,
+            'Detalle_Log' => [
+                'ID_Carga' => $this->carga->ID_Carga,
+                'ID_Asignatura' => $idAsignatura,
+                'ID_Programa' => $programaId,
+                'valor_anterior' => $valorAnterior,
+                'valor_nuevo' => $valorNuevo,
+            ],
+        ]);
+    }
+
+    /**
      * Limpia requisitos obsoletos que ya no aparecen en el batch nuevo.
      *
      * Para cada combinación (ID_Asignatura, ID_Programa) presente en $batchRequisitos,
@@ -2345,8 +2526,8 @@ class ExcelParserService
      *
      * Clave de comparación: ID_Asignatura + ID_Programa + ID_Asignatura_Requerida (o NULL) + Descripcion_Requisito (o vacío)
      *
-     * @param array $batchRequisitos Array de requisitos a insertar/actualizar
-     * @param int $programaId ID del programa de esta malla
+     * @param  array  $batchRequisitos  Array de requisitos a insertar/actualizar
+     * @param  int  $programaId  ID del programa de esta malla
      */
     private function cleanupObsoleteRequisitos(array $batchRequisitos, int $programaId): void
     {
@@ -2356,7 +2537,7 @@ class ExcelParserService
 
         // 1. Agrupar asignaturas tocadas en el batch
         $asignaturasEnBatch = [];
-        $keysDel Batch = []; // Conjunto de claves válidas del batch
+        $keysDelBatch = []; // Conjunto de claves válidas del batch
 
         foreach ($batchRequisitos as $req) {
             $asigId = $req['ID_Asignatura'];
@@ -2366,7 +2547,7 @@ class ExcelParserService
             $reqKey = "{$asigId}|{$programaId}|".
                 ($req['ID_Asignatura_Requerida'] ?? 'null').'|'.
                 ($req['Descripcion_Requisito'] ?? '');
-            $keysDel Batch[$reqKey] = true;
+            $keysDelBatch[$reqKey] = true;
         }
 
         $asignaturaIds = array_keys($asignaturasEnBatch);
@@ -2375,7 +2556,7 @@ class ExcelParserService
         $requisitosExistentes = DB::table('requisitos')
             ->whereIn('ID_Asignatura', $asignaturaIds)
             ->where('ID_Programa', $programaId)
-            ->select('ID_Requisito', 'ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida', 'Descripcion_Requisito')
+            ->select('ID_Requisito', 'ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida', 'Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito')
             ->get();
 
         // 3. Identificar requisitos a eliminar (existentes pero no en el batch nuevo)
@@ -2385,13 +2566,28 @@ class ExcelParserService
                 ($reqExistente->ID_Asignatura_Requerida ?? 'null').'|'.
                 ($reqExistente->Descripcion_Requisito ?? '');
 
-            if (! isset($keysDel Batch[$existentKey])) {
+            if (! isset($keysDelBatch[$existentKey])) {
                 $requisitosAEliminar[] = $reqExistente->ID_Requisito;
             }
         }
 
-        // 4. Eliminar requisitos obsoletos
+        // 4. Eliminar requisitos obsoletos y auditar cada eliminación
         if (! empty($requisitosAEliminar)) {
+            foreach ($requisitosExistentes as $reqExistente) {
+                if (! in_array($reqExistente->ID_Requisito, $requisitosAEliminar, true)) {
+                    continue;
+                }
+
+                $this->registrarLogRequisito(
+                    'DELETE_REQUISITO_OBSOLETO',
+                    $reqExistente->ID_Programa,
+                    $reqExistente->ID_Asignatura,
+                    $reqExistente->ID_Requisito,
+                    $this->sanearRequisito((array) $reqExistente, $reqExistente->ID_Programa),
+                    null
+                );
+            }
+
             DB::table('requisitos')
                 ->whereIn('ID_Requisito', $requisitosAEliminar)
                 ->delete();

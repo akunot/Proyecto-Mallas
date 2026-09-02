@@ -66,6 +66,21 @@ interface Props {
     onClose: () => void;
     diffData: DiffResponse | null;
     loading: boolean;
+    historialRequisitos: Array<{
+        fecha: string;
+        asignatura_afectada: {
+            ID_Asignatura: number;
+            Codigo_Asignatura: string;
+            Nombre_Asignatura: string;
+        } | null;
+        tipo_cambio: string;
+        resumen: string;
+        normativa: {
+            Tipo_Normativa: string;
+            Numero_Normativa: string;
+            Anio_Normativa: string;
+        } | null;
+    }>;
 }
 
 const formatDate = (d: string): string => {
@@ -397,6 +412,7 @@ export default function MallaDiffView({
     onClose,
     diffData,
     loading,
+    historialRequisitos,
 }: Props) {
     const [search, setSearch] = useState('');
     const [showUnchanged, setShowUnchanged] = useState(false);
@@ -849,6 +865,136 @@ export default function MallaDiffView({
                                                             item={r}
                                                             type="removed"
                                                         />
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {historialRequisitos.length > 0 && (
+                                        <div>
+                                            <h3
+                                                style={{
+                                                    margin: '0 0 0.5rem 0',
+                                                    fontSize: '0.9rem',
+                                                    fontWeight: 600,
+                                                    color: '#6366f1',
+                                                }}
+                                            >
+                                                Historial de cambios de requisitos (
+                                                {historialRequisitos.length})
+                                            </h3>
+                                            <div
+                                                style={{
+                                                    display: 'flex',
+                                                    flexDirection: 'column',
+                                                    gap: '0.5rem',
+                                                }}
+                                            >
+                                                {historialRequisitos.map(
+                                                    (cambio, idx) => (
+                                                        <div
+                                                            key={idx}
+                                                            style={{
+                                                                border: '1px solid #e2e8f0',
+                                                                borderRadius: '0.5rem',
+                                                                padding: '0.75rem',
+                                                                backgroundColor: '#f8fafc',
+                                                            }}
+                                                        >
+                                                            <div
+                                                                style={{
+                                                                    display: 'flex',
+                                                                    alignItems: 'center',
+                                                                    justifyContent: 'space-between',
+                                                                }}
+                                                            >
+                                                                <span
+                                                                    style={{
+                                                                        fontSize: '0.75rem',
+                                                                        color: '#64748b',
+                                                                    }}
+                                                                >
+                                                                    {new Date(
+                                                                        cambio.fecha,
+                                                                    ).toLocaleString()}
+                                                                </span>
+                                                                <span
+                                                                    style={{
+                                                                        fontSize: '0.75rem',
+                                                                        fontWeight: 600,
+                                                                        padding: '0.15rem 0.5rem',
+                                                                        borderRadius: '9999px',
+                                                                        backgroundColor:
+                                                                            cambio.tipo_cambio ===
+                                                                            'INSERT_REQUISITO'
+                                                                                ? '#dcfce7'
+                                                                                : cambio.tipo_cambio ===
+                                                                                  'DELETE_REQUISITO_OBSOLETO'
+                                                                                  ? '#fee2e2'
+                                                                                  : '#fef9c3',
+                                                                        color:
+                                                                            cambio.tipo_cambio ===
+                                                                            'INSERT_REQUISITO'
+                                                                                ? '#166534'
+                                                                                : cambio.tipo_cambio ===
+                                                                                  'DELETE_REQUISITO_OBSOLETO'
+                                                                                  ? '#991b1b'
+                                                                                  : '#854d0e',
+                                                                    }}
+                                                                >
+                                                                    {cambio.tipo_cambio.replace(
+                                                                        /_/g,
+                                                                        ' ',
+                                                                    )}
+                                                                </span>
+                                                            </div>
+                                                            <p
+                                                                style={{
+                                                                    margin: '0.4rem 0 0',
+                                                                    fontSize: '0.85rem',
+                                                                    color: '#1e293b',
+                                                                }}
+                                                            >
+                                                                {cambio.asignatura_afectada?.Nombre_Asignatura ? (
+                                                                    <>
+                                                                        <strong>
+                                                                            {cambio.asignatura_afectada.Nombre_Asignatura}
+                                                                        </strong>
+                                                                        {cambio.asignatura_afectada.Codigo_Asignatura ? (
+                                                                            <span
+                                                                style={{
+                                                                    marginLeft: '0.4rem',
+                                                                    color: '#64748b',
+                                                                }}
+                                                            >
+                                                                ({cambio.asignatura_afectada.Codigo_Asignatura})
+                                                            </span>
+                                                        ) : null}
+                                                        <br />
+                                                        {cambio.resumen}
+                                                    </>
+                                                ) : (
+                                                    cambio.resumen
+                                                )}
+                                                            </p>
+                                                            {cambio.normativa ? (
+                                                                <p
+                                                                    style={{
+                                                                        margin: '0.35rem 0 0',
+                                                                        fontSize: '0.75rem',
+                                                                        color: '#64748b',
+                                                                    }}
+                                                                >
+                                                                    Normativa{' '}
+                                                                    {cambio.normativa.Tipo_Normativa}{' '}
+                                                                    N°{cambio.normativa.Numero_Normativa}
+                                                                    {cambio.normativa.Anio_Normativa
+                                                                        ? ` (${cambio.normativa.Anio_Normativa})`
+                                                                        : null}
+                                                                </p>
+                                                            ) : null}
+                                                        </div>
                                                     ),
                                                 )}
                                             </div>

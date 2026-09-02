@@ -97,6 +97,9 @@ Route::prefix('v1/public')->group(function () {
     // Ver historial de versiones completadas de un programa (público)
     Route::get('/programas/{id}/historial', [MallaController::class, 'publicHistory']);
 
+    // Historial legible de cambios de requisitos de un programa (público)
+    Route::get('/programas/{id}/historial-requisitos', [MallaController::class, 'publicHistorialRequisitos']);
+
     // Comparar dos versiones de malla de un mismo programa (público)
     Route::get('/mallas/{malla1Id}/diff/{malla2Id}', [MallaController::class, 'publicDiff']);
 });
