@@ -633,6 +633,8 @@ class ExcelParserService
             }
 
             if (! empty($batchRequisitos)) {
+                // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
+                $this->cleanupObsoleteRequisitos($batchRequisitos, $programaId);
                 $this->bulkInsertModel($batchRequisitos, 'requisitos');
             }
         }
@@ -1056,22 +1058,8 @@ class ExcelParserService
 
         // 7. Insertar requisitos (usando upsert para evitar duplicados por re-upload)
         if (! empty($batchRequisitos)) {
-            // Pre-cleanup: upsert no frena duplicados cuando ID_Asignatura_Requerida IS NULL
-            // (MySQL UNIQUE permite múltiples NULLs). Los eliminamos antes de insertar.
-            $nullReqSubjects = [];
-            foreach ($batchRequisitos as $req) {
-                if ($req['ID_Asignatura_Requerida'] === null) {
-                    $nullReqSubjects[] = $req['ID_Asignatura'];
-                }
-            }
-            $nullReqSubjects = array_unique($nullReqSubjects);
-            if (! empty($nullReqSubjects)) {
-                DB::table('requisitos')
-                    ->whereNull('ID_Asignatura_Requerida')
-                    ->whereIn('ID_Asignatura', $nullReqSubjects)
-                    ->where('ID_Programa', $this->malla->ID_Programa)
-                    ->delete();
-            }
+            // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
+            $this->cleanupObsoleteRequisitos($batchRequisitos, $this->malla->ID_Programa);
 
             $chunks = array_chunk($batchRequisitos, self::BATCH_SIZE);
             foreach ($chunks as $chunk) {
@@ -2347,5 +2335,66 @@ class ExcelParserService
 
         // Por defecto, si no se puede determinar
         return SlotAgrupacion::TIPO_LIBRE;
+    }
+
+    /**
+     * Limpia requisitos obsoletos que ya no aparecen en el batch nuevo.
+     *
+     * Para cada combinación (ID_Asignatura, ID_Programa) presente en $batchRequisitos,
+     * elimina los requisitos existentes en BD que NO coincidan con las claves del batch nuevo.
+     *
+     * Clave de comparación: ID_Asignatura + ID_Programa + ID_Asignatura_Requerida (o NULL) + Descripcion_Requisito (o vacío)
+     *
+     * @param array $batchRequisitos Array de requisitos a insertar/actualizar
+     * @param int $programaId ID del programa de esta malla
+     */
+    private function cleanupObsoleteRequisitos(array $batchRequisitos, int $programaId): void
+    {
+        if (empty($batchRequisitos)) {
+            return;
+        }
+
+        // 1. Agrupar asignaturas tocadas en el batch
+        $asignaturasEnBatch = [];
+        $keysDelBatch = []; // Conjunto de claves válidas del batch
+
+        foreach ($batchRequisitos as $req) {
+            $asigId = $req['ID_Asignatura'];
+            $asignaturasEnBatch[$asigId] = true;
+
+            // Construir clave única para comparación: asignatura + programa + req_asignatura + descripción
+            $reqKey = "{$asigId}|{$programaId}|".
+                ($req['ID_Asignatura_Requerida'] ?? 'null').'|'.
+                ($req['Descripcion_Requisito'] ?? '');
+            $keysDelBatch[$reqKey] = true;
+        }
+
+        $asignaturaIds = array_keys($asignaturasEnBatch);
+
+        // 2. Consultar requisitos existentes para estas asignaturas y programa (optimizado con whereIn)
+        $requisitosExistentes = DB::table('requisitos')
+            ->whereIn('ID_Asignatura', $asignaturaIds)
+            ->where('ID_Programa', $programaId)
+            ->select('ID_Requisito', 'ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida', 'Descripcion_Requisito')
+            ->get();
+
+        // 3. Identificar requisitos a eliminar (existentes pero no en el batch nuevo)
+        $requisitosAEliminar = [];
+        foreach ($requisitosExistentes as $reqExistente) {
+            $existentKey = "{$reqExistente->ID_Asignatura}|{$reqExistente->ID_Programa}|".
+                ($reqExistente->ID_Asignatura_Requerida ?? 'null').'|'.
+                ($reqExistente->Descripcion_Requisito ?? '');
+
+            if (! isset($keysDelBatch[$existentKey])) {
+                $requisitosAEliminar[] = $reqExistente->ID_Requisito;
+            }
+        }
+
+        // 4. Eliminar requisitos obsoletos
+        if (! empty($requisitosAEliminar)) {
+            DB::table('requisitos')
+                ->whereIn('ID_Requisito', $requisitosAEliminar)
+                ->delete();
+        }
     }
 }

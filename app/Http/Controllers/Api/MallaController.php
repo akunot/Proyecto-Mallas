@@ -54,7 +54,38 @@ class MallaController extends Controller
     }
 
     /**
-     * Endpoint público: historial de versiones de un programa.
+     * Endpoint público: retorna SOLO la malla vigente de un programa.
+     *
+     * Criterio único: Es_Vigente = 1
+     * Garantiza exactamente una malla por programa (o ninguna).
+     */
+    public function publicVigente(int $programaId): JsonResponse
+    {
+        $programa = Programa::find($programaId);
+
+        if (! $programa) {
+            return response()->json(['message' => 'Programa no encontrado.'], 404);
+        }
+
+        $mallaVigente = MallaCurricular::where('ID_Programa', $programaId)
+            ->where('Es_Vigente', 1)
+            ->first([
+                'ID_Malla', 'Version_Numero', 'Version_Etiqueta',
+                'Estado', 'Es_Vigente', 'Fecha_Vigencia',
+                'Fecha_Fin_Vigencia', 'created_at',
+            ]);
+
+        if (! $mallaVigente) {
+            return response()->json(['message' => 'No hay una malla vigente disponible.'], 404);
+        }
+
+        return response()->json(['data' => $mallaVigente]);
+    }
+
+    /**
+     * Endpoint público: historial de versiones completadas (activa + archivada) de un programa.
+     *
+     * Retorna solo mallas en estado 'activa' o 'archivada' (exluye borradores, rechazadas).
      */
     public function publicHistory(int $programaId): JsonResponse
     {

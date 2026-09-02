@@ -24,7 +24,8 @@ function EstadoIndicator({
     estado: string;
     esVigente: number | null;
 }) {
-    const isActive = estado === 'activa' || esVigente;
+    // Única fuente de verdad: Es_Vigente = 1 (no mezclar con Estado)
+    const isActive = esVigente === 1;
     const isArchived = estado === 'archivada';
 
     return (

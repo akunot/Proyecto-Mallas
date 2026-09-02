@@ -91,7 +91,10 @@ Route::prefix('v1/public')->group(function () {
     // Ver una versión específica de malla por ID (público)
     Route::get('/mallas/{id}', [MallaController::class, 'publicShow']);
 
-    // Ver historial de versiones de un programa (público)
+    // Ver SOLO la malla vigente de un programa (público)
+    Route::get('/programas/{id}/vigente', [MallaController::class, 'publicVigente']);
+
+    // Ver historial de versiones completadas de un programa (público)
     Route::get('/programas/{id}/historial', [MallaController::class, 'publicHistory']);
 
     // Comparar dos versiones de malla de un mismo programa (público)

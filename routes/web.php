@@ -52,12 +52,14 @@ $renderProgramasActivos = function () {
             ->keyBy('Codigo_Facultad');
 
         $programas = Programa::with(['mallas' => function ($query) {
-                $query->whereIn('Estado', ['activa', 'ACTIVO'])->orderBy('Fecha_Vigencia', 'desc');
+                // Obtener SOLO la malla vigente de cada programa (Es_Vigente = 1)
+                $query->where('Es_Vigente', 1);
             }])
             ->whereIn('Codigo_Facultad', $facultades->keys())
             ->where('Esta_Activo', 1)
             ->whereHas('mallas', function ($query) {
-                $query->whereIn('Estado', ['activa', 'ACTIVO']);
+                // Verificar que existe una malla vigente
+                $query->where('Es_Vigente', 1);
             })
             ->orderBy('Nombre_Programa')
             ->get()
@@ -79,7 +81,7 @@ $renderProgramasActivos = function () {
                     'ID_Malla' => $mallaActiva ? $mallaActiva->ID_Malla : null,
                     'Estado_Malla' => $mallaActiva ? $mallaActiva->Estado : null,
                 ];
-            })->filter(fn ($p) => in_array($p['Estado_Malla'], ['activa', 'ACTIVO']))->values()->toArray();
+            })->values()->toArray(); // Filter no es necesario, ya filtramos por Es_Vigente = 1 en query
 
             return [
                 'ID_Facultad' => $facultad->ID_Facultad,

@@ -18,14 +18,50 @@ test('vista pública retorna 404 para malla inexistente', function () {
     $response->assertStatus(404);
 });
 
-test('historial público retorna versiones de programa', function () {
+test('endpoint vigente retorna SOLO la malla vigente de un programa', function () {
     $programa = Programa::factory()->create();
-    MallaCurricular::factory()->create(['ID_Programa' => $programa->ID_Programa, 'Es_Vigente' => 0]);
-    MallaCurricular::factory()->activa()->create(['ID_Programa' => $programa->ID_Programa]);
+    $mallaAnterior = MallaCurricular::factory()->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Es_Vigente' => 0,
+        'Estado' => 'archivada',
+    ]);
+    $mallaVigente = MallaCurricular::factory()->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Es_Vigente' => 1,
+        'Estado' => 'activa',
+    ]);
+
+    $response = $this->getJson("/api/v1/public/programas/{$programa->ID_Programa}/vigente");
+
+    $response->assertStatus(200);
+    $response->assertJsonPath('data.ID_Malla', $mallaVigente->ID_Malla);
+});
+
+test('endpoint vigente retorna 404 si no hay malla vigente', function () {
+    $programa = Programa::factory()->create();
+    MallaCurricular::factory()->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Es_Vigente' => 0,
+    ]);
+
+    $response = $this->getJson("/api/v1/public/programas/{$programa->ID_Programa}/vigente");
+
+    $response->assertStatus(404);
+});
+
+test('historial público retorna versiones activas y archivadas', function () {
+    $programa = Programa::factory()->create();
+    $mallaArchivada = MallaCurricular::factory()->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Es_Vigente' => 0,
+        'Estado' => 'archivada',
+    ]);
+    $mallaVigente = MallaCurricular::factory()->activa()->create(['ID_Programa' => $programa->ID_Programa]);
 
     $response = $this->getJson("/api/v1/public/programas/{$programa->ID_Programa}/historial");
 
     $response->assertStatus(200);
+    $response->assertJsonCount(2, 'data');
 });
 
 test('historial público retorna 404 para programa inexistente', function () {
