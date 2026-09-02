@@ -33,3 +33,4 @@ phpunit.xml
 /tests_output.txt
 /migrate_status.txt
 /nul
+docker-compose.override.yml
