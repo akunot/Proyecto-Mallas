@@ -117,7 +117,11 @@ export default function ProgramasActivos({ facultades }: Props) {
 
     return (
         <div className="min-h-screen bg-[#f1f5f9] selection:bg-green-200">
-            <Head title="Mallas Curriculares - UNAL Manizales" />
+            <Head title="Mallas Curriculares - UNAL Manizales">
+                <meta name="description" content="Repositorio oficial de planes de estudio de la Universidad Nacional de Colombia. Información académica clara, actualizada y accesible." />
+                <meta property="og:title" content="Mallas Curriculares" />
+                <meta property="og:description" content="Repositorio oficial de planes de estudio de la Universidad Nacional de Colombia. Información académica clara, actualizada y accesible." />
+            </Head>
             <InstitutionalHeader />
 
             {/* 1. HERO SECTION - Altamente Atractiva */}
@@ -135,12 +139,11 @@ export default function ProgramasActivos({ facultades }: Props) {
                             <span className="text-white text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
                         </div>
                         <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
-                            Tu futuro <br />
-                            <span className="text-[#77c53f]">comienza aquí.</span>
+                            Mallas Curriculares
                         </h1>
                         <p className="text-blue-100 text-lg max-w-lg leading-relaxed opacity-80">
-                            Explora los planes de estudio actualizados de la Universidad Nacional de Colombia. 
-                            Transparencia y excelencia académica a un clic.
+                            Repositorio oficial de planes de estudio de la Universidad Nacional de Colombia. 
+                            Información académica clara, actualizada y accesible.
                         </p>
                         
                         {/* Buscador Integrado en Hero */}
