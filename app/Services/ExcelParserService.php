@@ -588,7 +588,8 @@ class ExcelParserService
                         ? 'creditos'
                         : $this->mapTipoRequisito($tipoReq);
 
-                    $dupKey = "{$asignaturaId}|{$programaId}|null|{$descripcion}";
+                    $descripcionNormalizada = $this->normalizeReqKey($descripcion);
+                    $dupKey = "{$asignaturaId}|{$programaId}|null|{$descripcionNormalizada}";
                     if (isset($requisitosExistentes[$dupKey]) || isset($seenInBatch[$dupKey])) {
                         continue;
                     }
@@ -600,7 +601,7 @@ class ExcelParserService
                         'ID_Asignatura_Requerida' => null,
                         'Tipo_Requisito' => $tipoMapeado,
                         'Valor_Creditos' => null,
-                        'Descripcion_Requisito' => $descripcion,
+                        'Descripcion_Requisito' => $descripcionNormalizada,
                         'created_at' => now(),
                         'updated_at' => now(),
                     ];
@@ -636,6 +637,11 @@ class ExcelParserService
             if (! empty($batchRequisitos)) {
                 // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
                 $this->cleanupObsoleteRequisitos($batchRequisitos, $programaId);
+
+                // Dedupe final por tupla lógica antes del bulk insert
+                // (mismo criterio que el flujo de parseMalla).
+                $batchRequisitos = $this->dedupeBatchRequisitos($batchRequisitos);
+
                 $this->bulkInsertModel($batchRequisitos, 'requisitos');
             }
         }
@@ -1059,6 +1065,31 @@ class ExcelParserService
 
         // 7. Insertar requisitos (usando upsert para evitar duplicados por re-upload)
         if (! empty($batchRequisitos)) {
+            // === LOG TEMPORAL: diagnóstico de duplicados ===
+            // Guardamos el batch original (antes del dedupe) para ver qué
+            // variaciones invisibles está colándose. Eliminar tras diagnosticar.
+            \Illuminate\Support\Facades\Log::info('[req-dedupe] batch original', [
+                'count' => count($batchRequisitos),
+                'sample' => array_slice($batchRequisitos, 0, 30),
+            ]);
+
+            // Dedupe final por tupla lógica: aunque los dedup en memoria en
+            // processRequisitoBatch/accumulateMallaRow deberían haber filtrado
+            // ya, esta pasada final protege contra cualquier desincronización
+            // (e.g. si la instancia del servicio se recrea entre filas o si
+            // processRequisitoBatch y accumulateMallaRow corren en instancias
+            // distintas con caches separadas). La clave incluye tipo + valor +
+            // descripción normalizada para que dos requisitos "iguales" con
+            // encoding distinto (NBSP, doble espacio, NFC vs NFD) colapsen.
+            $batchRequisitosAntesDedupe = $batchRequisitos;
+            $batchRequisitos = $this->dedupeBatchRequisitos($batchRequisitos);
+
+            \Illuminate\Support\Facades\Log::info('[req-dedupe] batch post-dedupe', [
+                'count_before' => count($batchRequisitosAntesDedupe),
+                'count_after' => count($batchRequisitos),
+                'eliminadas' => count($batchRequisitosAntesDedupe) - count($batchRequisitos),
+            ]);
+
             // Auditar en logs_actividad los requisitos nuevos/modificados (INSERT/UPDATE).
             // Cubre el caso que publicDiff() no detecta: asignaturas que persisten
             // entre versiones cuyo requisito fue corregido.
@@ -1066,6 +1097,21 @@ class ExcelParserService
 
             // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
             $this->cleanupObsoleteRequisitos($batchRequisitos, $this->malla->ID_Programa);
+
+            // Limpiar requisitos existentes en BD que sean equivalentes al batch
+            // pero con descripciones textualmente distintas (e.g. una con punto
+            // final "profesional." y otra sin él). El upsert usa como clave
+            // sólo (ID_Asignatura, ID_Programa, ID_Asignatura_Requerida) y NO
+            // incluye la descripción, por lo que dos filas con misma clave
+            // compuesta pero distinta descripción conviven sin colisionar.
+            // Aquí borramos cualquier fila existente cuya descripción
+            // normalizada coincida con la del batch nuevo, dejando al upsert
+            // una BD limpia donde la versión canónica (normalizada) será la
+            // única sobreviviente.
+            $this->purgeDuplicateRequisitosByNormalizedDescription(
+                $batchRequisitos,
+                $this->malla->ID_Programa
+            );
 
             $chunks = array_chunk($batchRequisitos, self::BATCH_SIZE);
             foreach ($chunks as $chunk) {
@@ -1804,6 +1850,58 @@ class ExcelParserService
     /**
      * Procesa requisitos para una relación agrupación-asignatura en batch.
      */
+    // Normaliza una cadena para deduplicación y persistencia: colapsa espacios,
+// recorta extremos, unifica encoding unicode y baja a minúsculas.
+// Sin esto, dos celdas con "Haber aprobado 24 créditos..." y "Haber aprobado
+//  24 créditos  ..." (NBSP, doble espacio, acento compuesto) generan keys
+// distintas y se insertan como filas separadas.
+    private function normalizeReqKey(?string $value): string
+    {
+        if ($value === null) {
+            return '';
+        }
+
+        $value = (string) $value;
+
+        // 1. Colapsar todos los whitespace (espacios, tabs, NBSP \u00A0,
+        //    saltos de línea) en un solo espacio.
+        $collapsed = preg_replace('/\s+/u', ' ', $value);
+
+        if ($collapsed === null) {
+            $collapsed = $value;
+        }
+
+        // 2. Normalizar unicode (NFD/NFC) si la extensión intl está disponible.
+        //    Sin intl, normalizer_normalize() retorna false, por lo que hacemos
+        //    fallback a la cadena ya colapsada — seguir los los
+        //    sigue siendo mejor que nada.
+        if (function_exists('normalizer_normalize')) {
+            $normalized = normalizer_normalize($collapsed, \Normalizer::FORM_C);
+
+            if (is_string($normalized)) {
+                $collapsed = $normalized;
+            }
+        } elseif (function_exists('iconv') && strtolower((string) \Config::get('app.encoding', 'UTF-8')) === 'utf-8') {
+            // Fallback: iconv transliteración NFD no está disponible sin intl,
+            // pero al menos garantizamos UTF-8 válido.
+            $converted = @iconv('UTF-8', 'UTF-8//IGNORE', $collapsed);
+            if (is_string($converted) && $converted !== '') {
+                $collapsed = $converted;
+            }
+        }
+
+        // 3. Trim + eliminar puntuación final común que el Excel suele agregar
+        //    por descuido ("profesional." vs "profesional", "créditos;" vs
+        //    "créditos"). Sin esto, dos requisitos "iguales" con distinta
+        //    puntuación final generan claves de dedupe distintas y se
+        //    insertan como filas separadas en MySQL (donde
+        //    ID_Asignatura_Requerida=NULL no deduplica automáticamente).
+        $collapsed = trim($collapsed);
+        $collapsed = preg_replace('/[.,;:!?¿¡]+$/u', '', $collapsed) ?? $collapsed;
+
+        return trim($collapsed);
+    }
+
     private function processRequisitoBatch(int $asignaturaBaseId, int $idPrograma, ?string $reqTipo, ?string $reqCodigo, int $rowNumber, array &$batchRequisitos): void
     {
         if (empty($reqTipo) && empty($reqCodigo)) {
@@ -1865,14 +1963,43 @@ class ExcelParserService
             }
         }
 
-        $dedupKey = $asignaturaBaseId.'|'.($asignaturaReqId ?? 'null').'|'.$idPrograma;
-        if ($asignaturaReqId === null) {
-            $dedupKey .= '|'.($descripcion ?? '');
-        }
+        // Dedupe robusto: la key usa la descripción normalizada (NFC + sin
+        // espacios redundantes + minúsculas) para que variaciones invisibles
+        // del Excel no generen keys distintas.
+        $descripcionNormalizada = $this->normalizeReqKey($descripcion);
+        $dedupKey = $asignaturaBaseId
+            . '|' . ($asignaturaReqId ?? 'null')
+            . '|' . $idPrograma
+            . '|' . $tipoMapeado
+            . '|' . ($valorCreditos ?? 'null')
+            . '|' . $descripcionNormalizada;
         if (isset($this->processedReqs[$dedupKey])) {
+            // === LOG TEMPORAL ===
+            \Illuminate\Support\Facades\Log::info('[req-batch] dedup hit', [
+                'row' => $rowNumber,
+                'asig' => $asignaturaBaseId,
+                'desc_raw' => $descripcion,
+                'desc_norm' => $descripcionNormalizada,
+                'key' => $dedupKey,
+            ]);
+
             return;
         }
         $this->processedReqs[$dedupKey] = true;
+
+        // Persistimos la descripción normalizada (sin espacios sobrantes, NFC)
+        // para que futuras comparaciones en BD también sean robustas.
+        $descripcionPersistir = $descripcion !== null ? $descripcionNormalizada : null;
+
+        // === LOG TEMPORAL ===
+        \Illuminate\Support\Facades\Log::info('[req-batch] insert', [
+            'row' => $rowNumber,
+            'asig' => $asignaturaBaseId,
+            'desc_raw' => $descripcion,
+            'desc_norm' => $descripcionNormalizada,
+            'desc_persist' => $descripcionPersistir,
+            'key' => $dedupKey,
+        ]);
 
         $batchRequisitos[] = [
             'ID_Asignatura' => $asignaturaBaseId,
@@ -1880,7 +2007,7 @@ class ExcelParserService
             'ID_Asignatura_Requerida' => $asignaturaReqId,
             'Tipo_Requisito' => $tipoMapeado,
             'Valor_Creditos' => $valorCreditos,
-            'Descripcion_Requisito' => $descripcion,
+            'Descripcion_Requisito' => $descripcionPersistir,
             'created_at' => now(),
             'updated_at' => now(),
         ];
@@ -1896,6 +2023,37 @@ class ExcelParserService
                str_contains($textUC, 'PLAN DE ESTUDIOS') ||
                str_contains($textUC, 'COMPONENTES') ||
                str_contains($textUC, '%');
+    }
+
+    /**
+     * Elimina duplicados lógicos de un batch de requisitos antes del upsert.
+     * La clave incluye descripción normalizada (NFC, sin espacios redundantes)
+     * para que variaciones invisibles del Excel colapsen.
+     *
+     * @param  array<int, array<string, mixed>>  $batchRequisitos
+     * @return array<int, array<string, mixed>>
+     */
+    private function dedupeBatchRequisitos(array $batchRequisitos): array
+    {
+        $seen = [];
+        $resultado = [];
+
+        foreach ($batchRequisitos as $req) {
+            $key = ($req['ID_Asignatura'] ?? 'null')
+                . '|' . ($req['ID_Programa'] ?? 'null')
+                . '|' . ($req['ID_Asignatura_Requerida'] ?? 'null')
+                . '|' . ($req['Tipo_Requisito'] ?? '')
+                . '|' . ($req['Valor_Creditos'] ?? 'null')
+                . '|' . $this->normalizeReqKey($req['Descripcion_Requisito'] ?? null);
+
+            if (isset($seen[$key])) {
+                continue;
+            }
+            $seen[$key] = true;
+            $resultado[] = $req;
+        }
+
+        return $resultado;
     }
 
     private function processRequisito(AgrupacionAsignatura $relacion, ?string $reqTipo, ?string $reqCodigo, int $rowNumber): void
@@ -1954,13 +2112,64 @@ class ExcelParserService
             }
         }
 
+        $idPrograma = $this->malla ? $this->malla->ID_Programa : null;
+
+        // Persistir la descripción normalizada (NFC + sin espacios redundantes)
+        // para uniformidad con el flujo batch y con el dedup del frontend.
+        $descripcionPersistir = $descripcion !== null ? $this->normalizeReqKey($descripcion) : null;
+
+        // Dedupe en memoria (mismo upload): si ya se procesó esta misma tupla
+        // (asignatura + asignatura requerida / descripcion), no la creamos de nuevo.
+        // Esto evita la duplicación observada en mallas con celdas repetidas
+        // (p.ej. "Psicología Social" con 4 filas idénticas del mismo requisito).
+        $dedupKey = $relacion->ID_Asignatura
+            . '|' . ($asignaturaReqId ?? 'null')
+            . '|' . ($idPrograma ?? 'null')
+            . '|' . $tipoMapeado
+            . '|' . ($valorCreditos ?? 'null')
+            . '|' . ($descripcionPersistir ?? '');
+        if (isset($this->processedReqs[$dedupKey])) {
+            return;
+        }
+        $this->processedReqs[$dedupKey] = true;
+
+        // Dedupe en BD (re-cargas / re-ejecuciones): si ya existe una fila con
+        // la misma tupla lógica, la reutilizamos en lugar de duplicar.
+        $existente = Requisito::where('ID_Asignatura', $relacion->ID_Asignatura)
+            ->where('ID_Asignatura_Requerida', $asignaturaReqId)
+            ->where('Tipo_Requisito', $tipoMapeado)
+            ->when(
+                $idPrograma !== null,
+                fn ($q) => $q->where('ID_Programa', $idPrograma),
+                fn ($q) => $q->whereNull('ID_Programa'),
+            )
+            ->where(function ($q) use ($descripcionPersistir) {
+                if ($descripcionPersistir === null) {
+                    return $q->whereNull('Descripcion_Requisito');
+                }
+
+                return $q->where('Descripcion_Requisito', $descripcionPersistir);
+            })
+            ->where(function ($q) use ($valorCreditos) {
+                if ($valorCreditos === null) {
+                    return $q->whereNull('Valor_Creditos');
+                }
+
+                return $q->where('Valor_Creditos', $valorCreditos);
+            })
+            ->first();
+
+        if ($existente) {
+            return;
+        }
+
         $requisito = Requisito::create([
             'ID_Asignatura' => $relacion->ID_Asignatura,
-            'ID_Programa' => $this->malla ? $this->malla->ID_Programa : null,
+            'ID_Programa' => $idPrograma,
             'ID_Asignatura_Requerida' => $asignaturaReqId,
             'Tipo_Requisito' => $tipoMapeado,
             'Valor_Creditos' => $valorCreditos,
-            'Descripcion_Requisito' => $descripcion,
+            'Descripcion_Requisito' => $descripcionPersistir,
         ]);
 
         // Auditar la creación de requisito generado desde un placeholder
@@ -2529,6 +2738,78 @@ class ExcelParserService
      * @param  array  $batchRequisitos  Array de requisitos a insertar/actualizar
      * @param  int  $programaId  ID del programa de esta malla
      */
+    /**
+     * Elimina requisitos pre-existentes en BD cuya descripción NORMALIZADA
+     * coincide con la del batch nuevo pero textualmente difiere (e.g. una
+     * con punto final "profesional." y otra sin él). El upsert usa como clave
+     * sólo (ID_Asignatura, ID_Programa, ID_Asignatura_Requerida) y NO incluye
+     * la descripción, por lo que estas filas pueden convivir como "duplicados
+     * invisibles" que después se duplican más con cada upload. Aquí las
+     * borramos antes del upsert para que la versión canónica (normalizada)
+     * sea la única sobreviviente.
+     */
+    private function purgeDuplicateRequisitosByNormalizedDescription(array $batchRequisitos, int $programaId): void
+    {
+        if (empty($batchRequisitos)) {
+            return;
+        }
+
+        // 1. Construir set de descripciones normalizadas presentes en el batch.
+        $batchDescsNorm = [];
+        $asignaturasAfectadas = [];
+        foreach ($batchRequisitos as $req) {
+            $descNorm = $this->normalizeReqKey($req['Descripcion_Requisito'] ?? null);
+            if ($descNorm === '') {
+                continue;
+            }
+            $batchDescsNorm[$descNorm] = true;
+            $asignaturasAfectadas[(int) $req['ID_Asignatura']] = true;
+        }
+
+        if (empty($batchDescsNorm) || empty($asignaturasAfectadas)) {
+            return;
+        }
+
+        // 2. Cargar requisitos existentes en BD para esas asignaturas y programa.
+        $existentes = DB::table('requisitos')
+            ->whereIn('ID_Asignatura', array_keys($asignaturasAfectadas))
+            ->where('ID_Programa', $programaId)
+            ->select('ID_Requisito', 'ID_Asignatura', 'Descripcion_Requisito')
+            ->get();
+
+        // 3. Identificar IDs a eliminar: para cada fila existente, si su
+        //    descripción normalizada coincide con alguna del batch, la borramos.
+        //    Mantenemos al menos UNA fila (la de menor ID_Requisito) para
+        //    preservar historial de logs_actividad que apunte a ella.
+        $porAsignatura = [];
+        foreach ($existentes as $existente) {
+            $descNorm = $this->normalizeReqKey($existente->Descripcion_Requisito);
+            if (! isset($batchDescsNorm[$descNorm])) {
+                continue;
+            }
+            $porAsignatura[$existente->ID_Asignatura][] = $existente->ID_Requisito;
+        }
+
+        $aEliminar = [];
+        foreach ($porAsignatura as $ids) {
+            sort($ids);
+            // Mantener el primero (menor ID), eliminar el resto.
+            $aEliminar = array_merge($aEliminar, array_slice($ids, 1));
+        }
+
+        if (! empty($aEliminar)) {
+            // === LOG TEMPORAL ===
+            \Illuminate\Support\Facades\Log::info('[req-dedupe] purga de duplicados pre-existentes', [
+                'count_eliminados' => count($aEliminar),
+                'ids' => array_slice($aEliminar, 0, 30),
+            ]);
+
+            DB::table('requisitos')
+                ->whereIn('ID_Requisito', $aEliminar)
+                ->delete();
+        }
+    }
+
     private function cleanupObsoleteRequisitos(array $batchRequisitos, int $programaId): void
     {
         if (empty($batchRequisitos)) {

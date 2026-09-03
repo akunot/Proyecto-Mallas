@@ -1,6 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import React, { useMemo, useState, useCallback } from 'react';
 import Layout from '@/Layout/MainLayout';
+import {
+    type Requisito,
+    getUniqueRequisitos,
+} from '../../lib/requisitos';
 
 const PLACEHOLDER_RE = /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i;
 
@@ -66,17 +70,6 @@ const formatTipoRequisito = (tipo: string): string => {
     return tipo;
 };
 
-interface Requisito {
-    ID_Asignatura_Requerida: number | null;
-    Tipo_Requisito: string;
-    Descripcion_Requisito?: string;
-    Valor_Creditos?: number;
-    asignatura_requerida?: {
-        Nombre_Asignatura: string;
-        Codigo_Asignatura: string;
-    };
-}
-
 interface Asignatura {
     ID_Asignatura: number;
     Nombre_Asignatura: string;
@@ -102,23 +95,12 @@ interface Slot {
     Nombre_Agrupacion?: string;
 }
 
-interface ElectivaRequisito {
-    ID_Asignatura_Requerida: number | null;
-    Tipo_Requisito: string;
-    Descripcion_Requisito?: string;
-    Valor_Creditos?: number;
-    asignatura_requerida?: {
-        Nombre_Asignatura: string;
-        Codigo_Asignatura: string;
-    } | null;
-}
-
 interface Electiva {
     ID_Asignatura: number;
     Codigo_Asignatura: string;
     Nombre_Asignatura: string;
     Creditos_Asignatura: number;
-    requisitos?: ElectivaRequisito[];
+    requisitos?: Requisito[];
 }
 
 interface OptativaGroup {
@@ -544,7 +526,7 @@ export default function MallaGrafica({ malla }: Props) {
             return true;
         }
 
-        const reqs = selectedAsigData.requisitos || [];
+        const reqs = getUniqueRequisitos(selectedAsigData.requisitos || []);
         const matchesReq = reqs.some((r) => {
             if (r.ID_Asignatura_Requerida != asigId) {
                 return false;
@@ -881,7 +863,9 @@ export default function MallaGrafica({ malla }: Props) {
                                         );
 
                                         const hasPre =
-                                            asig.requisitos?.some((r) => {
+                                            getUniqueRequisitos(
+                                                asig.requisitos,
+                                            ).some((r) => {
                                                 const t = (
                                                     r.Tipo_Requisito || ''
                                                 ).toLowerCase();
@@ -892,13 +876,16 @@ export default function MallaGrafica({ malla }: Props) {
                                                 );
                                             }) ?? false;
                                         const hasCo =
-                                            asig.requisitos?.some((r) =>
+                                            getUniqueRequisitos(
+                                                asig.requisitos,
+                                            ).some((r) =>
                                                 (r.Tipo_Requisito || '')
                                                     .toLowerCase()
                                                     .includes('co'),
                                             ) ?? false;
                                         const reqCount =
-                                            asig.requisitos?.length ?? 0;
+                                            getUniqueRequisitos(asig.requisitos)
+                                                .length;
 
                                         return (
                                             <React.Fragment key={key}>
@@ -1112,11 +1099,13 @@ export default function MallaGrafica({ malla }: Props) {
                                 <h5 className="mb-2 text-[10px] font-black tracking-widest text-slate-400 uppercase">
                                     Requisitos
                                 </h5>
-                                {selectedAsigData.requisitos &&
-                                selectedAsigData.requisitos.length > 0 ? (
-                                    <ul className="space-y-2">
-                                        {selectedAsigData.requisitos.map(
-                                            (req, i) => {
+                                {(() => {
+                                    const unicos = getUniqueRequisitos(
+                                        selectedAsigData.requisitos,
+                                    );
+                                    return unicos.length > 0 ? (
+                                        <ul className="space-y-2">
+                                            {unicos.map((req, i) => {
                                                 const t = (
                                                     req.Tipo_Requisito ?? ''
                                                 ).toLowerCase();
@@ -1147,14 +1136,14 @@ export default function MallaGrafica({ malla }: Props) {
                                                         </span>
                                                     </li>
                                                 );
-                                            },
-                                        )}
-                                    </ul>
-                                ) : (
-                                    <p className="text-xs text-slate-400 italic">
-                                        Sin requisitos registrados.
-                                    </p>
-                                )}
+                                            })}
+                                        </ul>
+                                    ) : (
+                                        <p className="text-xs text-slate-400 italic">
+                                            Sin requisitos registrados.
+                                        </p>
+                                    );
+                                })()}
                             </div>
                         </div>
                     </div>
@@ -1559,8 +1548,9 @@ export default function MallaGrafica({ malla }: Props) {
                                                         {group.asignaturas.map(
                                                             (e) => {
                                                                 const reqs =
-                                                                    e.requisitos ??
-                                                                    [];
+                                                                    getUniqueRequisitos(
+                                                                        e.requisitos,
+                                                                    );
                                                                 const isOpen =
                                                                     expandedOptativa ===
                                                                     e.ID_Asignatura;

@@ -64,15 +64,25 @@ const StatusPill = ({ tipo }: { tipo: string }) => {
 };
 
 export default function MallaShow({ malla }: Props) {
-    // Cálculo de estadísticas globales para el Dashboard
+    // Cálculo de estadísticas globales para el Dashboard.
+    // Importante: dedupe por ID_Asignatura porque la misma asignatura puede
+    // aparecer en varias agrupaciones (p.ej. una optativa listada en su
+    // agrupación de origen Y en Libre Elección). Sin dedupe, sus créditos
+    // se contarían dos veces — mismo patrón aplicado en
+    // resources/js/pages/Mallas/DetallePublico.tsx (creditosPorComponente).
     const stats = useMemo(() => {
+        const seenAsignaturas = new Set<number>();
         let totalCreditos = 0;
         let totalMaterias = 0;
         malla.agrupaciones.forEach((ag) => {
-            totalMaterias += ag.asignaturas.length;
-            ag.asignaturas.forEach(
-                (as) => (totalCreditos += as.Creditos_Asignatura),
-            );
+            ag.asignaturas.forEach((as) => {
+                if (seenAsignaturas.has(as.ID_Asignatura)) {
+                    return;
+                }
+                seenAsignaturas.add(as.ID_Asignatura);
+                totalMaterias += 1;
+                totalCreditos += as.Creditos_Asignatura;
+            });
         });
 
         return { totalCreditos, totalMaterias };
@@ -175,8 +185,19 @@ export default function MallaShow({ malla }: Props) {
                     {malla.agrupaciones
                         .filter((agrup) => agrup.asignaturas.length > 0)
                         .map((agrup) => {
+                            // Dedupe por ID_Asignatura dentro de la agrupación
+                            // para evitar contar dos veces créditos si la misma
+                            // materia aparece repetida en esta agrupación.
+                            const seenInAgrup = new Set<number>();
                             const areaCreditos = agrup.asignaturas.reduce(
-                                (s, a) => s + a.Creditos_Asignatura,
+                                (s, a) => {
+                                    if (seenInAgrup.has(a.ID_Asignatura)) {
+                                        return s;
+                                    }
+                                    seenInAgrup.add(a.ID_Asignatura);
+
+                                    return s + a.Creditos_Asignatura;
+                                },
                                 0,
                             );
 

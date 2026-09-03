@@ -10,18 +10,10 @@ import InstitutionalHeader from '../../components/InstitutionalHeader';
 import MallaHistoryModal from '../../components/MallaHistoryModal';
 import SlotSelectorModal from '../../components/SlotSelectorModal';
 import VersionBadge from '../../components/VersionBadge';
-
-// --- Interfaces (adaptadas / copiadas desde Mallas/Visualizer.tsx) ---
-interface Requisito {
-    ID_Asignatura_Requerida: number | null;
-    Tipo_Requisito: string;
-    Descripcion_Requisito?: string;
-    Valor_Creditos?: number;
-    asignatura_requerida?: {
-        Nombre_Asignatura: string;
-        Codigo_Asignatura: string;
-    } | null;
-}
+import {
+    type Requisito,
+    getUniqueRequisitos,
+} from '../../lib/requisitos';
 
 interface Asignatura {
     ID_Asignatura: number;
@@ -213,24 +205,6 @@ const ROMAN: Record<number, string> = {
     20: 'XX',
 };
 const PLACEHOLDER_RE = /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i;
-
-const getUniqueRequisitos = (requisitos: Requisito[] = []): Requisito[] => {
-    const seen = new Set<string>();
-    const unicos: Requisito[] = [];
-
-    requisitos.forEach((r) => {
-        const key = r.ID_Asignatura_Requerida
-            ? `${r.ID_Asignatura_Requerida}|${r.Tipo_Requisito}`
-            : `${r.Tipo_Requisito}|${r.Valor_Creditos ?? 0}|${r.Descripcion_Requisito ?? ''}`;
-
-        if (!seen.has(key)) {
-            seen.add(key);
-            unicos.push(r);
-        }
-    });
-
-    return unicos;
-};
 
 export default function DetallePublico({
     disponible,
