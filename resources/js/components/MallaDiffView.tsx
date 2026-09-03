@@ -3,6 +3,9 @@ import React, { useState, useMemo } from 'react';
 interface MallaInfo {
     ID_Malla: number;
     Version_Numero: number;
+    /** Ordinal público denso (1, 2, 3...) provisto por /diff; si el
+     * endpoint aún no lo envía, se muestra el número interno. */
+    Version_Publicada?: number;
     Estado: string;
     Fecha_Vigencia: string;
 }
@@ -482,8 +485,12 @@ export default function MallaDiffView({
                             <h2>Comparar versiones</h2>
                             {diffData && (
                                 <p>
-                                    V{diffData.malla1.Version_Numero} &rarr; V
-                                    {diffData.malla2.Version_Numero}
+                                    V
+                                    {diffData.malla1.Version_Publicada ??
+                                        diffData.malla1.Version_Numero}{' '}
+                                    &rarr; V
+                                    {diffData.malla2.Version_Publicada ??
+                                        diffData.malla2.Version_Numero}
                                 </p>
                             )}
                         </div>
@@ -573,7 +580,9 @@ export default function MallaDiffView({
                                                 color: '#1e293b',
                                             }}
                                         >
-                                            V{diffData.malla1.Version_Numero}
+                                            V
+                                            {diffData.malla1.Version_Publicada ??
+                                                diffData.malla1.Version_Numero}
                                         </p>
                                         <p
                                             style={{
@@ -613,7 +622,9 @@ export default function MallaDiffView({
                                                 color: '#1e293b',
                                             }}
                                         >
-                                            V{diffData.malla2.Version_Numero}
+                                            V
+                                            {diffData.malla2.Version_Publicada ??
+                                                diffData.malla2.Version_Numero}
                                         </p>
                                         <p
                                             style={{

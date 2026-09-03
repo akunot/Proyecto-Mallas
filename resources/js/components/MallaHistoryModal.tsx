@@ -3,6 +3,9 @@ import React, { useState, useMemo } from 'react';
 interface MallaVersion {
     ID_Malla: number;
     Version_Numero: number;
+    /** Ordinal público denso (1, 2, 3...) calculado por /historial; si el
+     * endpoint no lo envía, se muestra el número interno como fallback. */
+    Version_Publicada?: number;
     Version_Etiqueta: string | null;
     Estado: string;
     Es_Vigente: number | null;
@@ -225,7 +228,10 @@ export default function VersionHistoryModalMejorado({
                                                         color: '#1e293b',
                                                     }}
                                                 >
-                                                    v{version.Version_Numero}.
+                                                    v
+                                                    {version.Version_Publicada ??
+                                                        version.Version_Numero}
+                                                    .
                                                     {version.Version_Etiqueta ||
                                                         '0'}
                                                 </h3>
@@ -571,7 +577,8 @@ export default function VersionHistoryModalMejorado({
                                                         >
                                                             v
                                                             {
-                                                                version.Version_Numero
+                                                                version.Version_Publicada ??
+                                                                    version.Version_Numero
                                                             }
                                                             .
                                                             {version.Version_Etiqueta ||

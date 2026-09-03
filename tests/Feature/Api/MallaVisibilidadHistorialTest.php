@@ -145,6 +145,47 @@ test('versión archivada ocultada no accesible por URL directa', function () {
         ->assertStatus(200);
 });
 
+test('ocultar una versión renumera el ordinal público de las posteriores', function () {
+    $programa = Programa::factory()->create();
+    $v1 = MallaCurricular::factory()->version(1)->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Estado' => 'archivada',
+        'Es_Vigente' => null,
+    ]);
+    $v2 = MallaCurricular::factory()->version(2)->create([
+        'ID_Programa' => $programa->ID_Programa,
+        'Estado' => 'archivada',
+        'Es_Vigente' => null,
+    ]);
+    $v3 = MallaCurricular::factory()->version(3)->activa()->create([
+        'ID_Programa' => $programa->ID_Programa,
+    ]);
+
+    $historial = fn () => $this->getJson(
+        "/api/v1/public/programas/{$programa->ID_Programa}/historial",
+    );
+
+    // Numeración inicial densa: v1→1, v2→2, v3→3
+    $data = $historial()->assertJsonCount(3, 'data')->json('data');
+    expect($data[0]['ID_Malla'])->toBe($v3->ID_Malla)
+        ->and($data[0]['Version_Publicada'])->toBe(3)
+        ->and($data[1]['Version_Publicada'])->toBe(2)
+        ->and($data[2]['Version_Publicada'])->toBe(1);
+
+    // Al ocultar v2, el ordinal de v3 desciende (numeración densa sobre
+    // el conjunto visible, variante A1)
+    $this->actingAs($this->usuario)->patchJson(
+        "/api/v1/mallas/{$v2->ID_Malla}/visibilidad-historial",
+        ['Visible_Historial' => false],
+    )->assertStatus(200);
+
+    $data = $historial()->assertJsonCount(2, 'data')->json('data');
+    expect($data[0]['ID_Malla'])->toBe($v3->ID_Malla)
+        ->and($data[0]['Version_Publicada'])->toBe(2)
+        ->and($data[1]['ID_Malla'])->toBe($v1->ID_Malla)
+        ->and($data[1]['Version_Publicada'])->toBe(1);
+});
+
 test('validación requiere el campo Visible_Historial', function () {
     $malla = MallaCurricular::factory()->create([
         'Estado' => 'archivada',

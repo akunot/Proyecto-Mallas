@@ -123,6 +123,8 @@ interface MallaData {
 interface MallaVersion {
     ID_Malla: number;
     Version_Numero: number;
+    /** Ordinal público denso (1, 2, 3...) provisto por /historial */
+    Version_Publicada?: number;
     Version_Etiqueta: string | null;
     Estado: string;
     Es_Vigente: number | null;

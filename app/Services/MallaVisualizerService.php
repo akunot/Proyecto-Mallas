@@ -106,6 +106,28 @@ final class MallaVisualizerService
     }
 
     /**
+     * Ordinal denso (1, 2, 3...) que ocupa la malla en el historial público
+     * de su programa: cantidad de versiones visibles con Version_Numero
+     * menor o igual al de esta malla. Debe mantenerse consistente con la
+     * numeración calculada en MallaController::publicHistory.
+     */
+    public function versionPublicadaOrdinal(MallaCurricular $malla): int
+    {
+        if (! $malla->ID_Programa) {
+            return $malla->Version_Numero;
+        }
+
+        return MallaCurricular::where('ID_Programa', $malla->ID_Programa)
+            ->whereIn('Estado', ['activa', 'archivada'])
+            ->where(function ($q): void {
+                $q->where('Estado', '!=', 'archivada')
+                    ->orWhere('Visible_Historial', 1);
+            })
+            ->where('Version_Numero', '<=', $malla->Version_Numero)
+            ->count();
+    }
+
+    /**
      * @return array<string, mixed>
      */
     public function toPayload(MallaCurricular $malla): array

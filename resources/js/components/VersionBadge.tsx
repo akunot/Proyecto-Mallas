@@ -3,6 +3,8 @@ import React, { useState } from 'react';
 interface MallaVersion {
     ID_Malla: number;
     Version_Numero: number;
+    /** Numeración densa pública calculada por el backend (historial). */
+    Version_Publicada?: number;
     Version_Etiqueta: string | null;
     Estado: string;
     Es_Vigente: number | null;
@@ -69,7 +71,10 @@ export default function VersionBadge({
                         fontWeight: 700,
                     }}
                 >
-                    V{current?.Version_Numero ?? '?'}
+                    V
+                    {current?.Version_Publicada ??
+                        current?.Version_Numero ??
+                        '?'}
                 </span>
                 {current?.Version_Etiqueta && (
                     <span
@@ -238,7 +243,9 @@ export default function VersionBadge({
                                                 esVigente={v.Es_Vigente}
                                             />
                                             <span>
-                                                Version {v.Version_Numero}
+                                                Version{' '}
+                                                {v.Version_Publicada ??
+                                                    v.Version_Numero}
                                             </span>
                                             {v.Es_Vigente ? (
                                                 <span

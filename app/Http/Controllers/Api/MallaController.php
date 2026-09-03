@@ -94,6 +94,11 @@ class MallaController extends Controller
      * rechazadas). Las archivadas aparecen únicamente cuando el administrador
      * no las ocultó del historial público (Visible_Historial = 1); la malla
      * activa siempre se muestra.
+     *
+     * Cada versión incluye Version_Publicada: numeración densa (1, 2, 3...)
+     * calculada sobre el conjunto visible, para que el público nunca vea
+     * huecos generados por números consumidos por borradores o mallas
+     * rechazadas. El número interno real sigue expuesto como Version_Numero.
      */
     public function publicHistory(int $programaId): JsonResponse
     {
@@ -109,14 +114,24 @@ class MallaController extends Controller
                 $q->where('Estado', '!=', 'archivada')
                     ->orWhere('Visible_Historial', 1);
             })
-            ->orderBy('Version_Numero', 'desc')
+            ->orderBy('Version_Numero')
             ->get([
                 'ID_Malla', 'Version_Numero', 'Version_Etiqueta',
                 'Estado', 'Es_Vigente', 'Fecha_Vigencia',
                 'Fecha_Fin_Vigencia', 'created_at',
             ]);
 
-        return response()->json(['data' => $versiones]);
+        // Numeración densa de presentación: el ordinal se asigna sobre el
+        // conjunto visible ordenado por Version_Numero, de modo que la
+        // secuencia pública queda 1, 2, 3... sin importar cuántos números
+        // se quemaron en cargas que nunca se publicaron.
+        $versiones->values()->each(
+            fn ($malla, $i) => $malla->setAttribute('Version_Publicada', $i + 1),
+        );
+
+        return response()->json([
+            'data' => $versiones->sortByDesc('Version_Numero')->values(),
+        ]);
     }
 
     /**
@@ -435,12 +450,16 @@ class MallaController extends Controller
                 'malla1' => [
                     'ID_Malla' => $malla1->ID_Malla,
                     'Version_Numero' => $malla1->Version_Numero,
+                    'Version_Publicada' => app(MallaVisualizerService::class)
+                        ->versionPublicadaOrdinal($malla1),
                     'Estado' => $malla1->Estado,
                     'Fecha_Vigencia' => $malla1->Fecha_Vigencia,
                 ],
                 'malla2' => [
                     'ID_Malla' => $malla2->ID_Malla,
                     'Version_Numero' => $malla2->Version_Numero,
+                    'Version_Publicada' => app(MallaVisualizerService::class)
+                        ->versionPublicadaOrdinal($malla2),
                     'Estado' => $malla2->Estado,
                     'Fecha_Vigencia' => $malla2->Fecha_Vigencia,
                 ],
