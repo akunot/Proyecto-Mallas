@@ -34,34 +34,36 @@ interface Props {
 export const PROGRAMA_IMAGE_BASE = '/images/programas';
 
 // Mapeo de programas a archivos de imagen local.
-// Nombres basados en los archivos disponibles en public/images/programas/.
+// Cada entrada apunta al archivo completo (con extensión) en public/images/programas/.
+// Las imágenes se movieron de public/programas/ a public/images/programas/ para
+// evitar colisión con la ruta SPA /programas manejada por Inertia/React.
 const imagesPorPrograma: Record<string, string> = {
-    'INGENIERÍA CIVIL': `${PROGRAMA_IMAGE_BASE}/Ingenieria civil`,
-    'INGENIERÍA ELÉCTRICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrica`,
+    'INGENIERÍA CIVIL': `${PROGRAMA_IMAGE_BASE}/Ingenieria civil.jpg`,
+    'INGENIERÍA ELÉCTRICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrica.jpg`,
     'INGENIERÍA MECÁNICA': 'unsplash', // Fallback Unsplash
-    'INGENIERÍA INDUSTRIAL': `${PROGRAMA_IMAGE_BASE}/Ing. Industrial`,
-    'INGENIERÍA QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica`,
-    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': `${PROGRAMA_IMAGE_BASE}/Administración de Sistemas Informáticos`,
+    'INGENIERÍA INDUSTRIAL': `${PROGRAMA_IMAGE_BASE}/Ing. Industrial.jpg`,
+    'INGENIERÍA QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica.jpg`,
+    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': `${PROGRAMA_IMAGE_BASE}/Administración de Sistemas Informáticos.jpg`,
     'INGENIERÍA AGRÍCOLA': 'unsplash', // Fallback Unsplash
-    'ADMINISTRACIÓN DE EMPRESAS DIURNO': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas- diurna`,
-    'ADMINISTRACIÓN DE EMPRESAS NOCTURNO': `${PROGRAMA_IMAGE_BASE}/Administracion de empresas - Noctura`,
-    'ADMINISTRACIÓN DE EMPRESAS': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas`,
+    'ADMINISTRACIÓN DE EMPRESAS DIURNO': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas- diurna.jpg`,
+    'ADMINISTRACIÓN DE EMPRESAS NOCTURNO': `${PROGRAMA_IMAGE_BASE}/Administracion de empresas - Noctura.png`,
+    'ADMINISTRACIÓN DE EMPRESAS': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas.jpg`,
     'CONTADURÍA PÚBLICA': 'unsplash', // Fallback Unsplash
     'DERECHO': 'unsplash', // Fallback Unsplash
-    'ARQUITECTURA': `${PROGRAMA_IMAGE_BASE}/ARQUITECTURA`,
+    'ARQUITECTURA': `${PROGRAMA_IMAGE_BASE}/ARQUITECTURA.jpg`,
     'MEDICINA': 'unsplash', // Fallback Unsplash
     'ENFERMERÍA': 'unsplash', // Fallback Unsplash
-    'BIOLOGÍA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica`,
-    'MATEMÁTICAS': `${PROGRAMA_IMAGE_BASE}/Matemáticas`,
-    'FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica`,
-    'QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica`,
+    'BIOLOGÍA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica.png`,
+    'MATEMÁTICAS': `${PROGRAMA_IMAGE_BASE}/Matemáticas.jpg`,
+    'FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica.jpg`,
+    'QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica.jpg`,
     'CIENCIAS HUMANAS': 'unsplash', // Fallback Unsplash
-    'CIENCIAS DE LA COMPUTACIÓN': `${PROGRAMA_IMAGE_BASE}/Ciencias de la Computación`,
-    'ESTADÍSTICA': `${PROGRAMA_IMAGE_BASE}/Estadistica`,
-    'GESTIÓN CULTURAL': `${PROGRAMA_IMAGE_BASE}/Gestión Cultural`,
-    'INGENIERÍA ELECTRÓNICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrónica`,
-    'INGENIERÍA FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica`,
-    'INGENIERÍA BIOLÓGICA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica`,
+    'CIENCIAS DE LA COMPUTACIÓN': `${PROGRAMA_IMAGE_BASE}/Ciencias de la Computación.jpg`,
+    'ESTADÍSTICA': `${PROGRAMA_IMAGE_BASE}/Estadistica.jpg`,
+    'GESTIÓN CULTURAL': `${PROGRAMA_IMAGE_BASE}/Gestión Cultural.jpg`,
+    'INGENIERÍA ELECTRÓNICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrónica.jpg`,
+    'INGENIERÍA FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica.jpg`,
+    'INGENIERÍA BIOLÓGICA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica.png`,
 };
 
 // URLs de fallback Unsplash para programas sin imagen local
@@ -78,16 +80,36 @@ const unsplashFallbacks: Record<string, string> = {
 const getImageForPrograma = (nombre: string): string => {
     const upper = nombre.toUpperCase().trim();
 
-    // Buscar coincidencia exacta o parcial en el mapeo
+    // 1) Match específico: la clave aparece como sub-cadena del nombre
+    //    (resuelve "Administración de Empresas Nocturno" → clave nocturna,
+    //     antes que la genérica de Empresas).
     for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
-        if (upper.includes(key) || key.includes(upper.split(' ')[0])) {
+        if (upper.includes(key)) {
             if (imagePath === 'unsplash') {
-                // Retornar URL de Unsplash específica para este programa
-                return unsplashFallbacks[key] || 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80';
+                return (
+                    unsplashFallbacks[key] ||
+                    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
+                );
             }
-            // Retornar ruta local con extensión correcta
-            // Intentar .png primero (si existe), sino .jpg
-            return `${imagePath}.jpg`;
+            return imagePath;
+        }
+    }
+
+    // 2) Match por primera palabra, solo si es inequívoco (no "ADMINISTRACIÓN"
+    //    porque colisiona entre Empresas / Sistemas / etc).
+    const firstWord = upper.split(' ')[0];
+    const EQUIVOCAL_FIRST_WORDS = new Set(['ADMINISTRACIÓN', 'INGENIERÍA']);
+    if (!EQUIVOCAL_FIRST_WORDS.has(firstWord)) {
+        for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
+            if (key.startsWith(firstWord)) {
+                if (imagePath === 'unsplash') {
+                    return (
+                        unsplashFallbacks[key] ||
+                        'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
+                    );
+                }
+                return imagePath;
+            }
         }
     }
 

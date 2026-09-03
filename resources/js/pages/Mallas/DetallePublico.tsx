@@ -1518,14 +1518,14 @@ export default function DetallePublico({
             {selectedAsig && selectedAsigData && (
                 <>
                     <div
-                        className="fixed inset-0 z-[400] bg-black/20 sm:pointer-events-none sm:bg-transparent"
+                        className="fixed inset-0 z-[20025] bg-black/20 sm:pointer-events-none sm:bg-transparent"
                         onClick={() => setSelectedAsig(null)}
                         aria-hidden="true"
                     />
                     <div
                         role="dialog"
                         aria-label={`Detalle de ${selectedAsigData.Nombre_Asignatura}`}
-                        className="fixed inset-x-0 bottom-0 z-[410] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
+                        className="fixed inset-x-0 bottom-0 z-[20030] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
                         onClick={(e) => e.stopPropagation()}
                     >
                         <div className="bg-[#00236f] p-6 text-white">
