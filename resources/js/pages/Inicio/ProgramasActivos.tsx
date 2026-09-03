@@ -28,33 +28,40 @@ interface Props {
     facultades: Facultad[];
 }
 
-// Mapeo de programas a archivos de imagen local
-// Nombres basados en los archivos disponibles en public/programas/
+// Ruta base única para los assets de imagen de programas.
+// Las imágenes viven en public/images/programas/ para evitar colisión
+// con la ruta SPA /programas manejada por Inertia/React.
+export const PROGRAMA_IMAGE_BASE = '/images/programas';
+
+// Mapeo de programas a archivos de imagen local.
+// Nombres basados en los archivos disponibles en public/images/programas/.
 const imagesPorPrograma: Record<string, string> = {
-    'INGENIERÍA CIVIL': '/programas/Ingenieria civil',
-    'INGENIERÍA ELÉCTRICA': '/programas/Ing. Electrica',
+    'INGENIERÍA CIVIL': `${PROGRAMA_IMAGE_BASE}/Ingenieria civil`,
+    'INGENIERÍA ELÉCTRICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrica`,
     'INGENIERÍA MECÁNICA': 'unsplash', // Fallback Unsplash
-    'INGENIERÍA INDUSTRIAL': '/programas/Ing. Industrial',
-    'INGENIERÍA QUÍMICA': '/programas/Ing. Quimica',
-    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': '/programas/Administración de Sistemas Informáticos',
+    'INGENIERÍA INDUSTRIAL': `${PROGRAMA_IMAGE_BASE}/Ing. Industrial`,
+    'INGENIERÍA QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica`,
+    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': `${PROGRAMA_IMAGE_BASE}/Administración de Sistemas Informáticos`,
     'INGENIERÍA AGRÍCOLA': 'unsplash', // Fallback Unsplash
-    'ADMINISTRACIÓN DE EMPRESAS': '/programas/Administración de Empresas',
+    'ADMINISTRACIÓN DE EMPRESAS DIURNO': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas- diurna`,
+    'ADMINISTRACIÓN DE EMPRESAS NOCTURNO': `${PROGRAMA_IMAGE_BASE}/Administracion de empresas - Noctura`,
+    'ADMINISTRACIÓN DE EMPRESAS': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas`,
     'CONTADURÍA PÚBLICA': 'unsplash', // Fallback Unsplash
     'DERECHO': 'unsplash', // Fallback Unsplash
-    'ARQUITECTURA': '/programas/ARQUITECTURA',
+    'ARQUITECTURA': `${PROGRAMA_IMAGE_BASE}/ARQUITECTURA`,
     'MEDICINA': 'unsplash', // Fallback Unsplash
     'ENFERMERÍA': 'unsplash', // Fallback Unsplash
-    'BIOLOGÍA': '/programas/Ingeniería Biológica',
-    'MATEMÁTICAS': '/programas/Matemáticas',
-    'FÍSICA': '/programas/Ing. Fisica',
-    'QUÍMICA': '/programas/Ing. Quimica',
+    'BIOLOGÍA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica`,
+    'MATEMÁTICAS': `${PROGRAMA_IMAGE_BASE}/Matemáticas`,
+    'FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica`,
+    'QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica`,
     'CIENCIAS HUMANAS': 'unsplash', // Fallback Unsplash
-    'CIENCIAS DE LA COMPUTACIÓN': '/programas/Ciencias de la Computación',
-    'ESTADÍSTICA': '/programas/Estadistica',
-    'GESTIÓN CULTURAL': '/programas/Gestión Cultural',
-    'INGENIERÍA ELECTRÓNICA': '/programas/Ing. Electrónica',
-    'INGENIERÍA FÍSICA': '/programas/Ing. Fisica',
-    'INGENIERÍA BIOLÓGICA': '/programas/Ingeniería Biológica',
+    'CIENCIAS DE LA COMPUTACIÓN': `${PROGRAMA_IMAGE_BASE}/Ciencias de la Computación`,
+    'ESTADÍSTICA': `${PROGRAMA_IMAGE_BASE}/Estadistica`,
+    'GESTIÓN CULTURAL': `${PROGRAMA_IMAGE_BASE}/Gestión Cultural`,
+    'INGENIERÍA ELECTRÓNICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrónica`,
+    'INGENIERÍA FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica`,
+    'INGENIERÍA BIOLÓGICA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica`,
 };
 
 // URLs de fallback Unsplash para programas sin imagen local
