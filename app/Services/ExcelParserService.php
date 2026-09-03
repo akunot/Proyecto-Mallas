@@ -638,11 +638,47 @@ class ExcelParserService
                 // Limpiar requisitos obsoletos que no aparecen en el nuevo batch
                 $this->cleanupObsoleteRequisitos($batchRequisitos, $programaId);
 
-                // Dedupe final por tupla lógica antes del bulk insert
+                // Dedupe final por tupla lógica antes del insert
                 // (mismo criterio que el flujo de parseMalla).
                 $batchRequisitos = $this->dedupeBatchRequisitos($batchRequisitos);
 
-                $this->bulkInsertModel($batchRequisitos, 'requisitos');
+                // Limpiar duplicados pre-existentes en BD con la misma descripción
+                // normalizada (deja una sola fila canónica por asignatura).
+                $this->purgeDuplicateRequisitosByNormalizedDescription($batchRequisitos, $programaId);
+
+                // Los requisitos con FK a asignatura se insertan vía upsert
+                // (la clave única los deduplica). Los requisitos sin FK
+                // (texto libre / créditos) usan update-or-insert, porque MySQL
+                // no considera NULL = NULL en un índice único: un upsert simple
+                // duplicaría estos requisitos en cada re-carga.
+                [$sinFk, $conFk] = $this->splitBatchRequisitos($batchRequisitos);
+
+                if (! empty($conFk)) {
+                    $chunks = array_chunk($conFk, self::BATCH_SIZE);
+                    foreach ($chunks as $chunk) {
+                        try {
+                            DB::transaction(function () use ($chunk) {
+                                DB::table('requisitos')->upsert(
+                                    $chunk,
+                                    ['ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida'],
+                                    ['Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito', 'updated_at']
+                                );
+                            });
+                        } catch (\Throwable $e) {
+                            $this->recordError(
+                                0,
+                                'Optativa',
+                                'Error en upsert de requisitos: '.$e->getMessage(),
+                                null,
+                                'error'
+                            );
+                        }
+                    }
+                }
+
+                if (! empty($sinFk)) {
+                    $this->updateOrInsertRequisitosSinFk($sinFk);
+                }
             }
         }
     }
@@ -1113,25 +1149,40 @@ class ExcelParserService
                 $this->malla->ID_Programa
             );
 
-            $chunks = array_chunk($batchRequisitos, self::BATCH_SIZE);
-            foreach ($chunks as $chunk) {
-                try {
-                    DB::transaction(function () use ($chunk) {
-                        DB::table('requisitos')->upsert(
-                            $chunk,
-                            ['ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida'],
-                            ['Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito', 'updated_at']
+            // IMPORTANTE: los requisitos SIN ID_Asignatura_Requerida (condiciones
+            // de créditos / texto libre) NO se pueden deduplicar vía upsert, porque
+            // MySQL trata NULL como valor distinto en el índice único
+            // uq_requisitos_asig_prog_asigreq: dos filas (ID_Asignatura, ID_Programa,
+            // NULL) conviven sin colisionar. Por eso se parte el batch: los que tienen
+            // FK a asignatura conservan el upsert (la clave única los deduplica), y
+            // los que no tienen FK usan update-or-insert explícito.
+            [$sinFk, $conFk] = $this->splitBatchRequisitos($batchRequisitos);
+
+            if (! empty($conFk)) {
+                $chunks = array_chunk($conFk, self::BATCH_SIZE);
+                foreach ($chunks as $chunk) {
+                    try {
+                        DB::transaction(function () use ($chunk) {
+                            DB::table('requisitos')->upsert(
+                                $chunk,
+                                ['ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida'],
+                                ['Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito', 'updated_at']
+                            );
+                        });
+                    } catch (\Throwable $e) {
+                        $this->recordError(
+                            0,
+                            'Requisitos',
+                            'Error en upsert de requisitos: '.$e->getMessage(),
+                            null,
+                            'error'
                         );
-                    });
-                } catch (\Throwable $e) {
-                    $this->recordError(
-                        0,
-                        'Requisitos',
-                        'Error en upsert de requisitos: '.$e->getMessage(),
-                        null,
-                        'error'
-                    );
+                    }
                 }
+            }
+
+            if (! empty($sinFk)) {
+                $this->updateOrInsertRequisitosSinFk($sinFk);
             }
         }
 
@@ -2056,6 +2107,111 @@ class ExcelParserService
         return $resultado;
     }
 
+    /**
+     * Divide el batch en dos grupos:
+     * - sinFk: requisitos con ID_Asignatura_Requerida NULL (texto libre,
+     *   condiciones de créditos). MySQL no los deduplica con un índice único
+     *   porque NULL != NULL, así que requieren update-or-insert manual.
+     * - conFk: requisitos que apuntan a una asignatura (prerrequisito /
+     *   correquisito). La clave única de la tabla los deduplica vía upsert.
+     *
+     * @param  array<int, array<string, mixed>>  $batchRequisitos
+     * @return array{0: array<int, array<string, mixed>>, 1: array<int, array<string, mixed>>}
+     */
+    private function splitBatchRequisitos(array $batchRequisitos): array
+    {
+        $sinFk = [];
+        $conFk = [];
+
+        foreach ($batchRequisitos as $req) {
+            if (($req['ID_Asignatura_Requerida'] ?? null) === null) {
+                $sinFk[] = $req;
+            } else {
+                $conFk[] = $req;
+            }
+        }
+
+        return [$sinFk, $conFk];
+    }
+
+    /**
+     * Update-or-insert para requisitos SIN ID_Asignatura_Requerida (NULL).
+     *
+     * La clave natural (ID_Asignatura, ID_Programa, ID_Asignatura_Requerida)
+     * no sirve como clave de deduplicación para estos requisitos: MySQL permite
+     * N filas con (X, programa, NULL) porque NULL = NULL es desconocido. Por eso
+     * buscamos explícitamente la fila existente por la tupla lógica completa
+     * (asignatura + programa + tipo + valor de créditos + descripción) y la
+     * actualizamos en lugar de insertar. Si no existe, se inserta una nueva.
+     *
+     * @param  array<int, array<string, mixed>>  $requisitos
+     */
+    private function updateOrInsertRequisitosSinFk(array $requisitos): void
+    {
+        if (empty($requisitos)) {
+            return;
+        }
+
+        DB::transaction(function () use ($requisitos) {
+            foreach ($requisitos as $req) {
+                $descripcionNorm = $this->normalizeReqKey($req['Descripcion_Requisito'] ?? null);
+                $valorCreditos = isset($req['Valor_Creditos']) && $req['Valor_Creditos'] !== null
+                    ? (int) $req['Valor_Creditos']
+                    : null;
+
+                $existente = Requisito::where('ID_Asignatura', $req['ID_Asignatura'])
+                    ->whereNull('ID_Asignatura_Requerida')
+                    ->where(function ($q) use ($req) {
+                        if (isset($req['ID_Programa']) && $req['ID_Programa'] !== null) {
+                            return $q->where('ID_Programa', $req['ID_Programa']);
+                        }
+
+                        return $q->whereNull('ID_Programa');
+                    })
+                    ->where('Tipo_Requisito', $req['Tipo_Requisito'] ?? 'opcional')
+                    ->where(function ($q) use ($descripcionNorm) {
+                        if ($descripcionNorm === '' || $descripcionNorm === null) {
+                            return $q->whereNull('Descripcion_Requisito');
+                        }
+
+                        return $q->where('Descripcion_Requisito', $descripcionNorm);
+                    })
+                    ->where(function ($q) use ($valorCreditos) {
+                        if ($valorCreditos === null) {
+                            return $q->whereNull('Valor_Creditos');
+                        }
+
+                        return $q->where('Valor_Creditos', $valorCreditos);
+                    })
+                    ->orderBy('ID_Requisito')
+                    ->limit(1)
+                    ->first();
+
+                if ($existente) {
+                    $existente->update([
+                        'Tipo_Requisito' => $req['Tipo_Requisito'] ?? 'opcional',
+                        'Valor_Creditos' => $valorCreditos,
+                        'Descripcion_Requisito' => $descripcionNorm === '' ? null : $descripcionNorm,
+                        'updated_at' => now(),
+                    ]);
+
+                    continue;
+                }
+
+                DB::table('requisitos')->insert([
+                    'ID_Asignatura' => $req['ID_Asignatura'],
+                    'ID_Programa' => $req['ID_Programa'] ?? null,
+                    'ID_Asignatura_Requerida' => null,
+                    'Tipo_Requisito' => $req['Tipo_Requisito'] ?? 'opcional',
+                    'Valor_Creditos' => $valorCreditos,
+                    'Descripcion_Requisito' => $descripcionNorm === '' ? null : $descripcionNorm,
+                    'created_at' => now(),
+                    'updated_at' => now(),
+                ]);
+            }
+        });
+    }
+
     private function processRequisito(AgrupacionAsignatura $relacion, ?string $reqTipo, ?string $reqCodigo, int $rowNumber): void
     {
         if (empty($reqTipo) && empty($reqCodigo)) {
@@ -2781,19 +2937,24 @@ class ExcelParserService
         //    descripción normalizada coincide con alguna del batch, la borramos.
         //    Mantenemos al menos UNA fila (la de menor ID_Requisito) para
         //    preservar historial de logs_actividad que apunte a ella.
-        $porAsignatura = [];
+        $porClave = [];
         foreach ($existentes as $existente) {
             $descNorm = $this->normalizeReqKey($existente->Descripcion_Requisito);
             if (! isset($batchDescsNorm[$descNorm])) {
                 continue;
             }
-            $porAsignatura[$existente->ID_Asignatura][] = $existente->ID_Requisito;
+            // Agrupar por (asignatura, descripción normalizada): la misma
+            // asignatura puede tener legalmente DOS requisitos de texto
+            // distintos (e.g. "Sistemas Operativos" y "Bases de Datos").
+            $clave = $existente->ID_Asignatura.'|'.$descNorm;
+            $porClave[$clave][] = $existente->ID_Requisito;
         }
 
         $aEliminar = [];
-        foreach ($porAsignatura as $ids) {
+        foreach ($porClave as $ids) {
             sort($ids);
-            // Mantener el primero (menor ID), eliminar el resto.
+            // Mantener el primero (menor ID) por (asignatura, descripción),
+            // eliminar el resto.
             $aEliminar = array_merge($aEliminar, array_slice($ids, 1));
         }
 

@@ -176,3 +176,206 @@ test('cleanup maneja correctamente requisitos con ID_Asignatura_Requerida NULL',
     expect($requisitos->count())->toBe(1);
     expect($requisitos->first()->Descripcion_Requisito)->toBe('40 créditos');
 });
+test('splitBatchRequisitos separa requisitos con y sin asignatura requerida', function () {
+    $programa = Programa::factory()->create();
+    $asigA = Asignatura::factory()->create(['Codigo_Base' => 'A']);
+    $asigB = Asignatura::factory()->create(['Codigo_Base' => 'B']);
+
+    $batch = [
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => null,
+            'Tipo_Requisito' => 'creditos',
+            'Valor_Creditos' => 100,
+            'Descripcion_Requisito' => 'Haber aprobado 100 créditos (60%) del plan de estudios',
+        ],
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => $asigB->ID_Asignatura,
+            'Tipo_Requisito' => 'prerrequisito',
+            'Valor_Creditos' => null,
+            'Descripcion_Requisito' => null,
+        ],
+    ];
+
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+    $method = $reflection->getMethod('splitBatchRequisitos');
+    $method->setAccessible(true);
+
+    [$sinFk, $conFk] = $method->invoke($service, $batch);
+
+    expect($sinFk)->toHaveCount(1);
+    expect($sinFk[0]['Tipo_Requisito'])->toBe('creditos');
+    expect($conFk)->toHaveCount(1);
+    expect($conFk[0]['ID_Asignatura_Requerida'])->toBe($asigB->ID_Asignatura);
+});
+
+test('updateOrInsertRequisitosSinFk no duplica requisitos de créditos al re-procesar', function () {
+    $programa = Programa::factory()->create();
+    $asigA = Asignatura::factory()->create(['Codigo_Base' => 'A']);
+
+    $requisito = [
+        'ID_Asignatura' => $asigA->ID_Asignatura,
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Asignatura_Requerida' => null,
+        'Tipo_Requisito' => 'creditos',
+        'Valor_Creditos' => 100,
+        'Descripcion_Requisito' => 'Haber aprobado 100 créditos (60%) del plan de estudios',
+    ];
+
+    // Simular la re-carga del mismo archivo dos veces (flujo de parseMalla):
+    // el upsert normal no es suficiente para clave NULL en MySQL.
+    foreach ([1, 2] as $carga) {
+        $service = new ExcelParserService();
+        $reflection = new ReflectionClass($service);
+        $method = $reflection->getMethod('updateOrInsertRequisitosSinFk');
+        $method->setAccessible(true);
+        $method->invoke($service, [$requisito]);
+    }
+
+    $filas = Requisito::where('ID_Asignatura', $asigA->ID_Asignatura)
+        ->where('ID_Programa', $programa->ID_Programa)
+        ->get();
+
+    expect($filas)->toHaveCount(1);
+    expect($filas->first()->Tipo_Requisito)->toBe('creditos');
+    expect($filas->first()->Valor_Creditos)->toBe(100);
+});
+test('dos re-cargas del mismo archivo no duplican requisitos de créditos (flujo parseMalla)', function () {
+    $programa = Programa::factory()->create();
+    $asigA = Asignatura::factory()->create(['Codigo_Base' => 'A']);
+    $asigB = Asignatura::factory()->create(['Codigo_Base' => 'B']);
+
+    // Batch equivalente al que produce processRequisitoBatch para el archivo
+    // "FORMATO DE CARGA - ADM. SISTEMAS.xlsx": un requisito de créditos en texto
+    // (sin FK) y un prerrequisito con código (con FK).
+    $batch = [
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => null,
+            'Tipo_Requisito' => 'creditos',
+            'Valor_Creditos' => 100,
+            'Descripcion_Requisito' => 'Haber aprobado 100 créditos (60%) del plan de estudios',
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => $asigB->ID_Asignatura,
+            'Tipo_Requisito' => 'prerrequisito',
+            'Valor_Creditos' => null,
+            'Descripcion_Requisito' => null,
+            'created_at' => now(),
+            'updated_at' => now(),
+        ],
+    ];
+
+    foreach ([1, 2] as $carga) {
+        $service = new ExcelParserService();
+        $reflection = new ReflectionClass($service);
+
+        $dedupe = $reflection->getMethod('dedupeBatchRequisitos');
+        $dedupe->setAccessible(true);
+        $batch = $dedupe->invoke($service, $batch);
+
+        $cleanup = $reflection->getMethod('cleanupObsoleteRequisitos');
+        $cleanup->setAccessible(true);
+        $cleanup->invoke($service, $batch, $programa->ID_Programa);
+
+        $purge = $reflection->getMethod('purgeDuplicateRequisitosByNormalizedDescription');
+        $purge->setAccessible(true);
+        $purge->invoke($service, $batch, $programa->ID_Programa);
+
+        $split = $reflection->getMethod('splitBatchRequisitos');
+        $split->setAccessible(true);
+        [$sinFk, $conFk] = $split->invoke($service, $batch);
+
+        if (! empty($conFk)) {
+            DB::table('requisitos')->upsert(
+                $conFk,
+                ['ID_Asignatura', 'ID_Programa', 'ID_Asignatura_Requerida'],
+                ['Tipo_Requisito', 'Valor_Creditos', 'Descripcion_Requisito', 'updated_at']
+            );
+        }
+
+        if (! empty($sinFk)) {
+            $updateOrInsert = $reflection->getMethod('updateOrInsertRequisitosSinFk');
+            $updateOrInsert->setAccessible(true);
+            $updateOrInsert->invoke($service, $sinFk);
+        }
+    }
+
+    $creditos = Requisito::where('ID_Asignatura', $asigA->ID_Asignatura)
+        ->where('ID_Programa', $programa->ID_Programa)
+        ->where('Tipo_Requisito', 'creditos')
+        ->get();
+    $prerrequisito = Requisito::where('ID_Asignatura', $asigA->ID_Asignatura)
+        ->where('ID_Programa', $programa->ID_Programa)
+        ->where('Tipo_Requisito', 'prerrequisito')
+        ->get();
+
+    expect($creditos)->toHaveCount(1);
+    expect($creditos->first()->Descripcion_Requisito)->toBe('Haber aprobado 100 créditos (60%) del plan de estudios');
+    expect($prerrequisito)->toHaveCount(1);
+    expect($prerrequisito->first()->ID_Asignatura_Requerida)->toBe($asigB->ID_Asignatura);
+});
+
+test('purge de duplicados conserva dos requisitos de texto distintos de la misma asignatura', function () {
+    $programa = Programa::factory()->create();
+    $asigA = Asignatura::factory()->create(['Codigo_Base' => 'A']);
+
+    Requisito::create([
+        'ID_Asignatura' => $asigA->ID_Asignatura,
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Asignatura_Requerida' => null,
+        'Tipo_Requisito' => 'opcional',
+        'Valor_Creditos' => null,
+        'Descripcion_Requisito' => 'Sistemas Operativos',
+    ]);
+
+    Requisito::create([
+        'ID_Asignatura' => $asigA->ID_Asignatura,
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Asignatura_Requerida' => null,
+        'Tipo_Requisito' => 'opcional',
+        'Valor_Creditos' => null,
+        'Descripcion_Requisito' => 'Bases de Datos',
+    ]);
+
+    $batch = [
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => null,
+            'Tipo_Requisito' => 'opcional',
+            'Valor_Creditos' => null,
+            'Descripcion_Requisito' => 'Sistemas Operativos',
+        ],
+        [
+            'ID_Asignatura' => $asigA->ID_Asignatura,
+            'ID_Programa' => $programa->ID_Programa,
+            'ID_Asignatura_Requerida' => null,
+            'Tipo_Requisito' => 'opcional',
+            'Valor_Creditos' => null,
+            'Descripcion_Requisito' => 'Bases de Datos',
+        ],
+    ];
+
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+    $purge = $reflection->getMethod('purgeDuplicateRequisitosByNormalizedDescription');
+    $purge->setAccessible(true);
+    $purge->invoke($service, $batch, $programa->ID_Programa);
+
+    $restantes = Requisito::where('ID_Asignatura', $asigA->ID_Asignatura)
+        ->where('ID_Programa', $programa->ID_Programa)
+        ->count();
+
+    // Ambas descripciones distintas deben sobrevivir (antes se borraba una).
+    expect($restantes)->toBe(2);
+});
