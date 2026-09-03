@@ -177,6 +177,9 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
 
     // Mallas - reordenación de bloques en el visualizador
     Route::patch('/mallas/{mallaId}/reordenar', [MallaController::class, 'reordenar']);
+
+    // Visibilidad de mallas archivadas en el historial público
+    Route::patch('/mallas/{mallaId}/visibilidad-historial', [MallaController::class, 'updateVisibilidadHistorial']);
     Route::get('/mallas/{mallaId}/optativas', [MallaController::class, 'optativas']);
 
     // Gestión administrativa de optativas por agrupación

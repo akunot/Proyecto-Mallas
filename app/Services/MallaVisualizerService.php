@@ -35,7 +35,15 @@ final class MallaVisualizerService
         $cacheKey = "malla_visualizer:v:{$versionId}";
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($versionId): ?array {
+            // Misma regla de visibilidad que publicHistory(): una malla
+            // archivada solo es pública cuando Visible_Historial está
+            // activo; la activa siempre lo es. Esto evita que una versión
+            // ocultada siga accesible por URL directa.
             $programaId = MallaCurricular::whereIn('Estado', ['activa', 'archivada'])
+                ->where(function ($q): void {
+                    $q->where('Estado', '!=', 'archivada')
+                        ->orWhere('Visible_Historial', 1);
+                })
                 ->where('ID_Malla', $versionId)
                 ->value('ID_Programa');
 
@@ -45,6 +53,10 @@ final class MallaVisualizerService
 
             $malla = MallaCurricular::with($this->eagerLoads($programaId))
                 ->whereIn('Estado', ['activa', 'archivada'])
+                ->where(function ($q): void {
+                    $q->where('Estado', '!=', 'archivada')
+                        ->orWhere('Visible_Historial', 1);
+                })
                 ->find($versionId);
 
             if (! $malla) {

@@ -13,6 +13,7 @@ use App\Models\Programa;
 use App\Models\ProgramaElectiva;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
+use App\Services\LogActividadService;
 use App\Services\MallaVisualizerService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
@@ -89,7 +90,10 @@ class MallaController extends Controller
     /**
      * Endpoint público: historial de versiones completadas (activa + archivada) de un programa.
      *
-     * Retorna solo mallas en estado 'activa' o 'archivada' (exluye borradores, rechazadas).
+     * Retorna solo mallas en estado 'activa' o 'archivada' (excluye borradores,
+     * rechazadas). Las archivadas aparecen únicamente cuando el administrador
+     * no las ocultó del historial público (Visible_Historial = 1); la malla
+     * activa siempre se muestra.
      */
     public function publicHistory(int $programaId): JsonResponse
     {
@@ -101,6 +105,10 @@ class MallaController extends Controller
 
         $versiones = MallaCurricular::where('ID_Programa', $programaId)
             ->whereIn('Estado', ['activa', 'archivada'])
+            ->where(function ($q): void {
+                $q->where('Estado', '!=', 'archivada')
+                    ->orWhere('Visible_Historial', 1);
+            })
             ->orderBy('Version_Numero', 'desc')
             ->get([
                 'ID_Malla', 'Version_Numero', 'Version_Etiqueta',
@@ -109,6 +117,66 @@ class MallaController extends Controller
             ]);
 
         return response()->json(['data' => $versiones]);
+    }
+
+    /**
+     * Endpoint protegido: define si una malla archivada se muestra en el
+     * historial público del programa.
+     *
+     * Solo aplica a mallas en estado 'archivada': la malla activa siempre
+     * es pública. Al cambiar la visibilidad se invalida la caché del
+     * visualizador para que el cambio sea inmediato en la ruta pública.
+     */
+    public function updateVisibilidadHistorial(Request $request, int $mallaId): JsonResponse
+    {
+        $datos = $request->validate([
+            'Visible_Historial' => 'required|boolean',
+        ]);
+
+        $malla = MallaCurricular::find($mallaId);
+
+        if (! $malla) {
+            return response()->json(['message' => 'Malla no encontrada.'], 404);
+        }
+
+        if ($malla->Estado !== 'archivada') {
+            return response()->json([
+                'message' => 'Solo las mallas archivadas pueden gestionar su visibilidad en el historial público.',
+            ], 422);
+        }
+
+        $valorAnterior = (bool) $malla->Visible_Historial;
+        $malla->Visible_Historial = (bool) $datos['Visible_Historial'];
+        $malla->save();
+
+        // El payload público de esta versión está cacheado: invalidarlo.
+        app(MallaVisualizerService::class)->forgetVersionCache($malla->ID_Malla);
+
+        $usuario = $request->user();
+        if ($usuario) {
+            LogActividadService::registrar(
+                $usuario,
+                'UPDATE_VISIBILIDAD_HISTORIAL',
+                'malla_curricular',
+                $malla->ID_Malla,
+                [
+                    'ID_Programa' => $malla->ID_Programa,
+                    'visible_anterior' => $valorAnterior,
+                    'visible_nuevo' => (bool) $malla->Visible_Historial,
+                ],
+            );
+        }
+
+        return response()->json([
+            'data' => [
+                'ID_Malla' => $malla->ID_Malla,
+                'Estado' => $malla->Estado,
+                'Visible_Historial' => (bool) $malla->Visible_Historial,
+            ],
+            'message' => $malla->Visible_Historial
+                ? 'La malla ahora es visible en el historial público.'
+                : 'La malla fue ocultada del historial público.',
+        ]);
     }
 
     /**

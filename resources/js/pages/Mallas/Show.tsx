@@ -1,5 +1,5 @@
 import { Head, Link } from '@inertiajs/react';
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import Layout from '@/Layout/MainLayout';
 
 interface Asignatura {
@@ -23,6 +23,8 @@ interface Props {
     malla: {
         ID_Malla: number;
         Codigo_Plan: string;
+        Estado?: string;
+        Visible_Historial?: boolean;
         programa: {
             Nombre_Programa: string;
         };
@@ -64,6 +66,51 @@ const StatusPill = ({ tipo }: { tipo: string }) => {
 };
 
 export default function MallaShow({ malla }: Props) {
+    // Visibilidad en el historial público: solo las mallas archivadas
+    // pueden ocultarse/mostrarse; la activa siempre es pública.
+    const esArchivada = malla.Estado === 'archivada';
+    const [visibleHistorial, setVisibleHistorial] = useState(
+        malla.Visible_Historial ?? true,
+    );
+    const [guardandoVisibilidad, setGuardandoVisibilidad] = useState(false);
+
+    const toggleVisibilidadHistorial = async () => {
+        if (guardandoVisibilidad) {
+            return;
+        }
+
+        const nuevoValor = !visibleHistorial;
+        setGuardandoVisibilidad(true);
+        setVisibleHistorial(nuevoValor); // Optimista
+
+        try {
+            const res = await fetch(
+                `/api/v1/mallas/${malla.ID_Malla}/visibilidad-historial`,
+                {
+                    method: 'PATCH',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                    body: JSON.stringify({ Visible_Historial: nuevoValor }),
+                },
+            );
+
+            if (!res.ok) {
+                throw new Error('Error al actualizar visibilidad');
+            }
+        } catch {
+            setVisibleHistorial(!nuevoValor); // Revertir
+            alert(
+                'No se pudo actualizar la visibilidad de la malla en el historial público.',
+            );
+        } finally {
+            setGuardandoVisibilidad(false);
+        }
+    };
+
     // Cálculo de estadísticas globales para el Dashboard.
     // Importante: dedupe por ID_Asignatura porque la misma asignatura puede
     // aparecer en varias agrupaciones (p.ej. una optativa listada en su
@@ -125,6 +172,35 @@ export default function MallaShow({ malla }: Props) {
                     </div>
 
                     <div className="flex items-center gap-3">
+                        {/* Visibilidad en historial público (solo archivadas) */}
+                        {esArchivada && (
+                            <button
+                                type="button"
+                                onClick={toggleVisibilidadHistorial}
+                                disabled={guardandoVisibilidad}
+                                title={
+                                    visibleHistorial
+                                        ? 'Visible en el historial público. Clic para ocultar.'
+                                        : 'Oculta del historial público. Clic para mostrar.'
+                                }
+                                className={`flex items-center gap-2 rounded-xl border px-6 py-3 font-bold transition-all hover:scale-[1.02] active:scale-95 disabled:cursor-not-allowed disabled:opacity-60 ${
+                                    visibleHistorial
+                                        ? 'border-emerald-200 bg-emerald-50 text-emerald-700 hover:bg-emerald-100'
+                                        : 'border-slate-200 bg-slate-50 text-slate-500 hover:bg-slate-100'
+                                }`}
+                            >
+                                <span className="material-symbols-outlined !text-xl">
+                                    {guardandoVisibilidad
+                                        ? 'progress_activity'
+                                        : visibleHistorial
+                                          ? 'visibility'
+                                          : 'visibility_off'}
+                                </span>
+                                {visibleHistorial
+                                    ? 'Visible en Historial'
+                                    : 'Oculta del Historial'}
+                            </button>
+                        )}
                         <Link
                             href={`/mallas/${malla.ID_Malla}/optativas-asignacion`}
                             className="flex items-center gap-2 rounded-xl border border-amber-200 bg-amber-50 px-6 py-3 font-bold text-amber-700 transition-all hover:scale-[1.02] hover:bg-amber-100 active:scale-95"

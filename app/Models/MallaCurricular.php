@@ -29,12 +29,14 @@ class MallaCurricular extends Model
         'Fecha_Fin_Vigencia',
         'Estado',
         'Es_Vigente',
+        'Visible_Historial',
     ];
 
     protected $casts = [
         'Fecha_Vigencia' => 'date',
         'Fecha_Fin_Vigencia' => 'date',
         'Es_Vigente' => 'boolean',
+        'Visible_Historial' => 'boolean',
     ];
 
     public function normativa(): BelongsTo
