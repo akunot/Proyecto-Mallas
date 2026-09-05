@@ -18,23 +18,23 @@ class AuditoriaController extends Controller
         $query = LogActividad::with(['usuario']);
 
         // Filtros
-        if ($request->has('usuario_id')) {
+        if ($request->filled('usuario_id')) {
             $query->where('ID_Usuario', $request->usuario_id);
         }
 
-        if ($request->has('accion')) {
+        if ($request->filled('accion')) {
             $query->where('Accion_Log', $request->accion);
         }
 
-        if ($request->has('entidad')) {
+        if ($request->filled('entidad')) {
             $query->where('Entidad_Log', $request->entidad);
         }
 
-        if ($request->has('desde')) {
+        if ($request->filled('desde')) {
             $query->whereDate('Creacion_Log', '>=', $request->desde);
         }
 
-        if ($request->has('hasta')) {
+        if ($request->filled('hasta')) {
             $query->whereDate('Creacion_Log', '<=', $request->hasta);
         }
 
@@ -93,11 +93,11 @@ class AuditoriaController extends Controller
         $query = LogActividad::query();
 
         // Filtros de fecha
-        if ($request->has('desde')) {
+        if ($request->filled('desde')) {
             $query->whereDate('Creacion_Log', '>=', $request->desde);
         }
 
-        if ($request->has('hasta')) {
+        if ($request->filled('hasta')) {
             $query->whereDate('Creacion_Log', '<=', $request->hasta);
         }
 
@@ -162,23 +162,23 @@ class AuditoriaController extends Controller
         $query = LogActividad::with(['usuario']);
 
         // Aplicar mismos filtros que index()
-        if ($request->has('usuario_id')) {
+        if ($request->filled('usuario_id')) {
             $query->where('ID_Usuario', $request->usuario_id);
         }
 
-        if ($request->has('accion')) {
+        if ($request->filled('accion')) {
             $query->where('Accion_Log', $request->accion);
         }
 
-        if ($request->has('entidad')) {
+        if ($request->filled('entidad')) {
             $query->where('Entidad_Log', $request->entidad);
         }
 
-        if ($request->has('desde')) {
+        if ($request->filled('desde')) {
             $query->whereDate('Creacion_Log', '>=', $request->desde);
         }
 
-        if ($request->has('hasta')) {
+        if ($request->filled('hasta')) {
             $query->whereDate('Creacion_Log', '<=', $request->hasta);
         }
 
@@ -222,8 +222,11 @@ class AuditoriaController extends Controller
                 $log->Creacion_Log->format('Y-m-d H:i:s'),
             ];
 
-            // Escapar comas y comillas
+            // Escapar comas y comillas ((string) evita pasar null a str_contains
+            // cuando IP_Origen_Log, Entidad_ID_Log, etc. vienen vacíos)
             $row = array_map(function ($value) {
+                $value = (string) $value;
+
                 if (str_contains($value, ',') || str_contains($value, '"')) {
                     return '"'.str_replace('"', '""', $value).'"';
                 }

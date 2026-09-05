@@ -2308,10 +2308,12 @@ export default function DetallePublico({
 
             <InstitutionalFooter />
 
-            {/* MODAL: ¿Cómo leer la malla? — Guía visual rediseñada con explicación de agrupaciones */}
+            {/* MODAL: ¿Cómo leer la malla? — Guía visual rediseñada con explicación de agrupaciones
+                z-[30000]: misma capa que .modal-overlay en app.css, para quedar SIEMPRE
+                encima del header UNAL (z-[300]) y del footer de componentes (z-[20020]). */}
             {showGuideModal && (
                 <div
-                    className="fixed inset-0 z-[400] flex items-center justify-center bg-black/50 px-4"
+                    className="fixed inset-0 z-[30000] flex items-center justify-center bg-black/50 px-4"
                     onClick={() => setShowGuideModal(false)}
                 >
                     <div

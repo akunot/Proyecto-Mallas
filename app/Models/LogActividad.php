@@ -29,6 +29,7 @@ class LogActividad extends Model
 
     protected $casts = [
         'Detalle_Log' => 'array',
+        'Creacion_Log' => 'datetime',
     ];
 
     public function usuario(): BelongsTo
