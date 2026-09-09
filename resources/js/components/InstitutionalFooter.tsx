@@ -7,7 +7,7 @@ const institutionalLinks = [
     ['Concurso docente', 'https://docentes.unal.edu.co/concurso-profesoral/'],
     ['Pago Virtual', 'https://pagovirtual.unal.edu.co/'],
     ['Control interno', 'https://controlinterno.unal.edu.co/'],
-    ['Calidad', 'http://siga.unal.edu.co'],
+    ['Calidad', 'https://siga.unal.edu.co'],
     ['Buzón de notificaciones', 'https://unal.edu.co/buzon-de-notificaciones/'],
 ];
 
@@ -24,8 +24,21 @@ const serviceLinks = [
     ['Glosario', '#'],
 ];
 
+// Fecha de actualización del sitio mostrada en el footer.
+// La plantilla UNAL la muestra automática ("Fecha de actualización automática"), formato dd/MM/yy.
+const FECHA_ACTUALIZACION = (() => {
+    const hoy = new Date();
+    const dd = String(hoy.getDate()).padStart(2, '0');
+    const mm = String(hoy.getMonth() + 1).padStart(2, '0');
+    const yy = String(hoy.getFullYear()).slice(-2);
+
+    return `${dd}/${mm}/${yy}`;
+})();
+
 function LinkColumn({ links }: { links: string[][] }) {
-    return <nav className="flex flex-col gap-[1px] text-[13px] leading-[1.3]">{links.map(([label, href]) => {
+    // Plantilla UNAL: footer nav a { display:inline-block; width:49% } → 2 columnas en desktop (≥992px).
+    // En tablet (768–991px) y móvil la plantilla usa width:100% → 1 columna.
+    return <nav className="grid grid-cols-1 gap-x-4 gap-y-[1px] text-[13px] leading-[1.3] lg:grid-cols-2">{links.map(([label, href]) => {
         const isExternal = href.startsWith('http') || href.startsWith('mailto:');
 
         return <a key={label} href={href} target={isExternal ? '_blank' : undefined} rel={isExternal ? 'noreferrer' : undefined} className="text-white no-underline hover:text-[#eee] hover:underline">{label}</a>;
@@ -40,12 +53,19 @@ export default function InstitutionalFooter() {
             <div className="col-span-2 border-t border-[#555] pt-5 text-[13px] lg:col-span-1 lg:border-l lg:border-t-0 lg:pl-5 lg:pt-0">
                 <div className="grid grid-cols-2 items-start gap-4">
                     <p className="m-0"><strong>Contacto página web:</strong><br />cra 27 # 64-60<br />Bloque D piso 4<br />Manizales, Colombia<br />(+57 1) 8879307 Ext.50442</p>
-                    <p className="m-0 text-right border-r border-[#555] pr-4 lg:pr-5"><a href="https://unal.edu.co/archivos/user_upload/docs/legal.pdf" target="_blank" rel="noreferrer" className="text-white hover:underline">© Copyright 2016</a><br />Algunos derechos reservados.<br /><a href="mailto:diracam_man@unal.edu.co" className="text-white hover:underline">diracman_man@unal.edu.co</a><br /><a href="#" className="text-white hover:underline">Acerca de este sitio web</a><br />Actualización: 01/02/17</p>
+                    <p className="m-0 text-right border-r border-[#555] pr-4 lg:pr-5"><a href="https://unal.edu.co/archivos/user_upload/docs/legal.pdf" target="_blank" rel="noreferrer" className="text-white hover:underline">© Copyright 2019</a><br />Algunos derechos reservados.<br /><a href="mailto:diracam_man@unal.edu.co" className="text-white hover:underline">diracman_man@unal.edu.co</a><br /><a href="#" className="text-white hover:underline">Acerca de este sitio web</a><br />Actualización: {FECHA_ACTUALIZACION}</p>
                 </div>
             </div>
             <div className="col-span-2 grid grid-cols-4 items-start gap-3 border-t border-[#555] pt-5 lg:col-span-1 lg:grid-cols-2 lg:gap-5 lg:border-t-0 lg:pl-5 lg:pt-0">
-                <a href="https://orgullo.unal.edu.co" target="_blank" rel="noreferrer"><img src="/unal/images/log_orgullo.png" alt="Orgullo UN" width="78" height="21" className="mx-auto block max-h-[37px] w-auto" /></a>
-                <a href="https://agenciadenoticias.unal.edu.co" target="_blank" rel="noreferrer"><img src="/unal/images/log_agenc.png" alt="Agencia de Noticias" width="94" height="25" className="mx-auto block max-h-[37px] w-auto" /></a>
+                <a href="https://orgullo.unal.edu.co" target="_blank" rel="noreferrer">
+                    {/* Plantilla UNAL: variante en blanco y negro para impresión (hidden-print / d-print-block) */}
+                    <img src="/unal/images/log_orgullo.png" alt="Orgullo UN" width="78" height="21" className="mx-auto block max-h-[37px] w-auto print:hidden" />
+                    <img src="/unal/images/log_orgullo_black.png" alt="Orgullo UN" width="94" height="37" className="mx-auto hidden max-h-[37px] w-auto print:block" />
+                </a>
+                <a href="https://agenciadenoticias.unal.edu.co" target="_blank" rel="noreferrer">
+                    <img src="/unal/images/log_agenc.png" alt="Agencia de Noticias" width="94" height="25" className="mx-auto block max-h-[37px] w-auto print:hidden" />
+                    <img src="/unal/images/log_agenc_black.png" alt="Agencia de Noticias" width="94" height="37" className="mx-auto hidden max-h-[37px] w-auto print:block" />
+                </a>
                 <a href="https://www.gov.co/" target="_blank" rel="noreferrer"><img src="/unal/images/log_gobiern.png" alt="Portal Único del Estado Colombiano" width="67" height="51" className="mx-auto block max-h-[51px] w-auto" /></a>
                 <a href="http://www.contaduria.gov.co/" target="_blank" rel="noreferrer"><img src="/unal/images/log_contra.png" alt="Contaduría General de la República" width="67" height="51" className="mx-auto block max-h-[51px] w-auto" /></a>
             </div>

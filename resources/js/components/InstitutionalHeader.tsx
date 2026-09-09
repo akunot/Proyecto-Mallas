@@ -93,6 +93,7 @@ export default function InstitutionalHeader() {
   const [campusesOpen, setCampusesOpen] = useState(false);
   const [servicesOpen, setServicesOpen] = useState(false);
   const [accessibilityOpen, setAccessibilityOpen] = useState(false);
+  const [mobileServicesOpen, setMobileServicesOpen] = useState(false);
   const [socialHover, setSocialHover] = useState<string | null>(null);
   const [navigationOpen, setNavigationOpen] = useState<string | null>(null);
 
@@ -101,6 +102,7 @@ export default function InstitutionalHeader() {
   const [invertedColors, setInvertedColors] = useState(false);
 
   const navRef = useRef<HTMLElement>(null);
+  const accessibilityRef = useRef<HTMLDivElement>(null);
 
   // Manejo de accesibilidad global
   useEffect(() => {
@@ -137,11 +139,22 @@ export default function InstitutionalHeader() {
         setCampusesOpen(false);
         setAccessibilityOpen(false);
         setServicesOpen(false);
+        setMobileServicesOpen(false);
       }
     };
     window.addEventListener('keydown', handleKeyDown);
+
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, []);
+
+  // Refuerzo: si el panel abierto no cabe completo en el viewport, desplazar
+  // suavemente la vista hasta mostrarlo entero (con flujo normal normalmente
+  // no hace falta, el contenido ya queda empujado debajo)
+  useEffect(() => {
+    if (accessibilityOpen) {
+      accessibilityRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    }
+  }, [accessibilityOpen]);
 
   return (
     <header className="relative z-[300] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
@@ -182,7 +195,6 @@ export default function InstitutionalHeader() {
               />
             ))}
           </nav>
-
         </div>
       </div>
 
@@ -232,16 +244,14 @@ export default function InstitutionalHeader() {
           className="absolute z-[200] right-[10px] top-[4px] hidden h-[66px] w-[66px] md:block"
         />
 
-        {/* Botón Menú Móvil */}
+        {/* Botón Menú Móvil — plantilla UNAL (#btn_hamburguer: 54x54 con Icons/menu.svg) */}
         <button
           type="button"
           onClick={() => setMobileOpen((prev) => !prev)}
           aria-expanded={mobileOpen}
           aria-label="Abrir menú de navegación"
-          className="ml-auto shrink-0 border-0 bg-transparent p-2 text-2xl text-white md:hidden"
-        >
-          ☰
-        </button>
+          className="ml-auto h-[50px] w-[54px] shrink-0 border-0 bg-[url('/unal/images/menu.svg')] bg-[position:95%_50%] bg-no-repeat p-0 md:hidden"
+        />
       </div>
 
       {/* Navegación Secundaria - Desktop */}
@@ -368,26 +378,49 @@ export default function InstitutionalHeader() {
               ))}
             </div>
           )}
+
+          {/* Servicios — sección móvil de la plantilla (#container_servicios_mobil, sin iconos) */}
+          <button
+            type="button"
+            onClick={() => setMobileServicesOpen((prev) => !prev)}
+            aria-expanded={mobileServicesOpen}
+            className="flex w-full justify-between px-2 py-3 text-left uppercase font-bold"
+          >
+            Servicios <span className="text-[#94b43b]">▼</span>
+          </button>
+          {mobileServicesOpen && (
+            <ul className="pb-2">
+              {SERVICES.map(({ label, href }) => (
+                <li key={label}>
+                  <a
+                    href={href}
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    className="block px-3 py-1.5 text-sm text-white no-underline hover:bg-[#4b4b4b]"
+                  >
+                    {label}
+                  </a>
+                </li>
+              ))}
+            </ul>
+          )}
         </div>
       )}
 
-      {/* Panel de Accesibilidad */}
-      <div className="absolute right-0 top-full z-[100]">
-        <button
-          type="button"
-          onClick={() => setAccessibilityOpen((prev) => !prev)}
-          aria-expanded={accessibilityOpen}
-          aria-haspopup="true"
-          className="relative h-[35px] bg-[rgba(41,41,41,0.8)] pl-[45px] pr-[10px] text-[13px] font-bold leading-[35px] text-white sm:text-[14px]"
-        >
-          <span
-            className="absolute left-0 top-0 h-[35px] w-[35px] bg-cover bg-center bg-[url('/unal/images/access-icon.jpg')]"
-            aria-hidden="true"
-          />
-          Panel de Accesibilidad
-        </button>
+      {/* Panel de Accesibilidad — cerrado: pestaña flotante pegada al borde derecho (plantilla UNAL).
+          Abierto: recuadro blanco a todo el ancho en el flujo del header que empuja el contenido hacia
+          abajo; la pestaña queda superpuesta justo bajo el borde del recuadro, SIN franja de color
+          alrededor (transparente sobre la página). */}
+      <div
+        ref={accessibilityRef}
+        className={
+          accessibilityOpen
+            ? 'relative z-[100] w-full'
+            : 'absolute top-full right-0 z-[100]'
+        }
+      >
         {accessibilityOpen && (
-          <div className="absolute right-0 top-[35px] grid w-[min(100vw-2rem,960px)] grid-cols-1 gap-5 border border-[#444] bg-white p-5 text-sm text-[#333] shadow-lg sm:grid-cols-2 lg:grid-cols-4">
+          <div className="grid w-full grid-cols-1 gap-7 border-b-[3px] border-b-[#292929] bg-white p-7 text-sm text-[#333] sm:grid-cols-2 sm:p-10 lg:grid-cols-4 lg:gap-10">
             <div>
               <h4 className="mb-2 text-xl font-normal text-[#111]">Tamaño letra</h4>
               <div className="flex items-center gap-2">
@@ -455,6 +488,27 @@ export default function InstitutionalHeader() {
             </div>
           </div>
         )}
+        <div
+          className={
+            accessibilityOpen
+              ? 'absolute right-0 top-full flex w-full justify-end px-4 md:px-10'
+              : 'flex justify-end px-4 md:px-10'
+          }
+        >
+          <button
+            type="button"
+            onClick={() => setAccessibilityOpen((prev) => !prev)}
+            aria-expanded={accessibilityOpen}
+            aria-haspopup="true"
+            className="relative h-[35px] bg-[rgba(41,41,41,0.8)] pl-[45px] pr-[10px] text-[13px] font-bold leading-[35px] text-white sm:text-[14px]"
+          >
+            <span
+              className="absolute left-0 top-0 h-[35px] w-[35px] bg-cover bg-center bg-[url('/unal/images/access-icon.jpg')]"
+              aria-hidden="true"
+            />
+            Panel de Accesibilidad
+          </button>
+        </div>
       </div>
 
       {/* Menú Lateral de Servicios */}
