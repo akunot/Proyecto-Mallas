@@ -1,4 +1,3 @@
-```bash
 #!/bin/bash
 
 set -e
@@ -25,11 +24,18 @@ echo "OK: rama master"
 echo
 
 echo "[2/6] Verificando cambios locales..."
-if ! git diff --quiet || ! git diff --cached --quiet; then
-    echo "ERROR: Hay cambios locales sin guardar."
-    echo "Revisa con: git status"
+
+if [ -n "$(git status --porcelain --untracked-files=no)" ]; then
+    echo "ERROR: Hay cambios locales en archivos versionados."
+    echo
+    git status --short --untracked-files=no
+    echo
+    echo "Revisa los cambios antes de desplegar."
     exit 1
 fi
+
+echo "OK: no hay cambios locales en archivos versionados"
+echo
 
 echo "OK: árbol de trabajo limpio"
 echo
@@ -59,4 +65,3 @@ echo
 echo "========================================"
 echo "   DESPLIEGUE FINALIZADO"
 echo "========================================"
-```
