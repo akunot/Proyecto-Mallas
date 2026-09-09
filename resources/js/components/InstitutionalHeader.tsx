@@ -53,23 +53,10 @@ const NAVIGATION_ITEMS: NavigationItem[] = [
   {
     label: 'INFORMACIÓN DE INTERÉS',
     submenu: [
-      { label: 'Promedios', href: 'http://www.sae.unal.edu.co/promedios/' },
-      { label: 'Cupo De Créditos', href: 'http://www.sae.unal.edu.co/cupo-de-creditos/' },
-      { label: 'Dirección Académica', href: 'https://diracademica.manizales.unal.edu.co/' },
-      { label: 'Guías Primer Semestre', href: 'http://www.sae.unal.edu.co/informacion-sae/primer-semestre/manizales/' },
-      { label: 'Estímulos Y Distinciones', href: 'http://www.sae.unal.edu.co/estimulos-y-distinciones/' },
-      { label: 'Procedimientos Administrativos', href: 'http://www.sae.unal.edu.co/procedimientos-administrativos/' },
-      { label: 'Pérdida De Calidad De Estudiante', href: 'http://www.sae.unal.edu.co/perdida-de-calidad-de-estudiante/' },
-    ],
-  },
-  {
-    label: 'ENLACES NORMATIVA',
-    submenu: [
-      { label: 'Admisiones', href: 'https://admisiones.unal.edu.co/' },
-      { label: 'Estatuto De Bienestar', href: 'https://legal.unal.edu.co/sisjurun/normas/Norma1.jsp?i=37192' },
-      { label: 'Estatuto Estudiantil', href: 'https://legal.unal.edu.co/sisjurun/normas/Norma1.jsp?i=34983' },
-      { label: 'Lineamientos Básicos De Formación', href: 'https://legal.unal.edu.co/sisjurun/normas/Norma1.jsp?i=34245' },
-      { label: 'Sistema De Acompañamiento Estudiantil', href: 'http://www.sae.unal.edu.co/' },
+      { label: 'Registro Y Matrícula', href: 'https://registroymatricula.manizales.unal.edu.co/' },
+      { label: 'Dirección Académica', href: 'https://dama.manizales.unal.edu.co/' },
+      { label: 'Calendario', href: 'https://dama.manizales.unal.edu.co/index.php/calendario-academico/' },
+      { label: 'Preguntas Frecuentes', href: 'https://dama.manizales.unal.edu.co/index.php/preguntas-frecuentes-v2/' },
     ],
   },
 ];
@@ -211,7 +198,7 @@ export default function InstitutionalHeader() {
           <img
             src="/unal/images/escudoUnal.svg"
             alt="Universidad Nacional de Colombia"
-            className="h-10 w-auto"
+            className="h-11 w-auto"
           />
         </a>
 
@@ -220,13 +207,13 @@ export default function InstitutionalHeader() {
            href="https://unal.edu.co"
            target="_blank"
            rel="noreferrer noopener"
-           className="absolute z-[200] -top-[30px] left-0 hidden h-[114px] w-[195px] items-center justify-center bg-[url('/unal/images/sealBck.png')] bg-contain bg-bottom bg-no-repeat px-5 md:flex lg:left-[10px] lg:h-[135px] lg:w-[234px] lg:px-7"
+           className="absolute z-[200] -top-[30px] left-0 hidden h-[114px] w-[195px] items-center justify-center bg-[url('/unal/images/sealBck.png')] bg-contain bg-bottom bg-no-repeat md:flex lg:left-[10px] lg:h-[135px] lg:w-[234px]"
            aria-label="Universidad Nacional de Colombia"
          >
           <img
             src="/unal/images/escudoUnal.svg"
             alt="Escudo de la Universidad Nacional de Colombia"
-            className="h-auto w-full"
+            className="h-auto w-[93%]"
           />
         </a>
 
