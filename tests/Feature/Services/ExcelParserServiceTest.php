@@ -1,8 +1,15 @@
 <?php
 
+use App\Models\Agrupacion;
+use App\Models\AgrupacionAsignatura;
 use App\Models\Asignatura;
+use App\Models\Componente;
+use App\Models\MallaCurricular;
+use App\Models\Normativa;
+use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
 use App\Models\Requisito;
+use App\Models\SlotAgrupacion;
 use App\Services\ExcelParserService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -378,4 +385,104 @@ test('purge de duplicados conserva dos requisitos de texto distintos de la misma
 
     // Ambas descripciones distintas deben sobrevivir (antes se borraba una).
     expect($restantes)->toBe(2);
+});
+
+test('esPlaceholder reconoce optativas con sufijos mayores a 8 (OPTATIVA9, OPTATIVA10)', function () {
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+    $method = $reflection->getMethod('esPlaceholder');
+    $method->setAccessible(true);
+
+    // Cualquier sufijo numérico es placeholder (sin límite hardcodeado).
+    foreach (['OPTATIVA9', 'OPTATIVA10', 'OPTATIVA11', 'LIBRE12', 'NIVELATORIO3'] as $codigo) {
+        expect($method->invoke($service, $codigo))->toBeTrue();
+    }
+
+    // Variantes de formato que pueden llegar desde el Excel.
+    expect($method->invoke($service, 'OPTATIVA 9'))->toBeTrue();
+    expect($method->invoke($service, 'optativa10'))->toBeTrue();
+    expect($method->invoke($service, ' NIVELATORIO 1 '))->toBeTrue();
+
+    // Regresión: los rangos históricos siguen siendo placeholders.
+    foreach (['OPTATIVA1', 'OPTATIVA8', 'LIBRE1', 'LIBRE11', 'NIVELATORIO2'] as $codigo) {
+        expect($method->invoke($service, $codigo))->toBeTrue();
+    }
+
+    // Casos negativos: no son placeholders.
+    foreach (['OPTATIVA', 'OPTATIVA9A', 'OPTATIVAFOO', '4201294', 'LIBRE ELECTIVA', 'INGLES I'] as $codigo) {
+        expect($method->invoke($service, $codigo))->toBeFalse();
+    }
+});
+
+test('placeholders OPTATIVA9 y OPTATIVA10 crean slots en lugar de relaciones de asignatura', function () {
+    // Datos base equivalentes a las filas 68/69 de
+    // "FORMATO DE CARGA - ADM. SISTEMAS.xlsx" con la plantilla 25
+    // "Profesionales Optativas" del programa de ADM. SISTEMAS (4035).
+    $programa = Programa::factory()->create();
+    $normativa = Normativa::factory()->create([
+        'Codigo_Programa' => $programa->Codigo_Programa,
+    ]);
+    $malla = MallaCurricular::factory()->create([
+        'ID_Normativa' => $normativa->ID_Normativa,
+        'ID_Programa' => $programa->ID_Programa,
+        'Estado' => 'borrador',
+    ]);
+    $componente = Componente::factory()->create();
+
+    $plantilla = PlantillaAgrupacion::create([
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Componente' => $componente->ID_Componente,
+        'Nombre_Agrupacion' => 'Profesionales Optativas',
+        'Tipo_Agrupacion' => 'OPTATIVA',
+        'Creditos_Requeridos' => 9,
+        'Es_Obligatoria' => false,
+    ]);
+
+    // Fila del Excel (columnas: Normativa, Componente, Agrupación, Código,
+    // Obligatoria, Tipo requisito, Código requisito, Semestre).
+    $filas = [
+        [$normativa->ID_Normativa, $componente->ID_Componente, (string) $plantilla->ID_Plantilla_Agrupacion, 'OPTATIVA9', 'NO', '', '', 4],
+        [$normativa->ID_Normativa, $componente->ID_Componente, (string) $plantilla->ID_Plantilla_Agrupacion, 'OPTATIVA10', 'NO', '', '', 8],
+    ];
+
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+
+    $mallaProp = $reflection->getProperty('malla');
+    $mallaProp->setAccessible(true);
+    $mallaProp->setValue($service, $malla);
+
+    $method = $reflection->getMethod('procesarPlaceholder');
+    $method->setAccessible(true);
+    foreach ($filas as $index => $fila) {
+        $method->invoke($service, $fila, $index + 1);
+    }
+
+    // El placeholder crea la agrupación desde la plantilla y coloca los slots allí.
+    $agrupacion = Agrupacion::where('ID_Malla', $malla->ID_Malla)
+        ->where('Nombre_Agrupacion', 'Profesionales Optativas')
+        ->first();
+    expect($agrupacion)->not->toBeNull();
+
+    $slots = SlotAgrupacion::where('ID_Agrupacion', $agrupacion->ID_Agrupacion)
+        ->orderBy('Nombre_Slot')
+        ->get();
+    expect($slots)->toHaveCount(2);
+
+    $slot9 = $slots->firstWhere('Nombre_Slot', 'OPTATIVA9');
+    $slot10 = $slots->firstWhere('Nombre_Slot', 'OPTATIVA10');
+
+    expect($slot9)->not->toBeNull();
+    expect($slot9->Tipo_Slot)->toBe('optativa');
+    expect($slot9->Semestre)->toBe(4);
+
+    expect($slot10)->not->toBeNull();
+    expect($slot10->Tipo_Slot)->toBe('optativa');
+    expect($slot10->Semestre)->toBe(8);
+
+    // Nunca deben quedar vinculadas como asignaturas de la malla, aunque
+    // existan en el catálogo (el placeholder se detecta antes de buscarlo).
+    expect(
+        AgrupacionAsignatura::where('ID_Agrupacion', $agrupacion->ID_Agrupacion)->exists()
+    )->toBeFalse();
 });

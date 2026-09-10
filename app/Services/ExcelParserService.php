@@ -1186,7 +1186,8 @@ class ExcelParserService
             }
         }
 
-        // 8. Segunda pasada: procesar placeholders (LIBRE1-11, OPTATIVA1-8, NIVELATORIO1-2).
+        // 8. Segunda pasada: procesar placeholders (OPTATIVA*, LIBRE*, NIVELATORIO*,
+        // con cualquier sufijo numérico, ej: OPTATIVA9, OPTATIVA10).
         // No se pueden acumular en batch porque crean slots, no relaciones.
         // Se ejecutan después de los inserts para que las agrupaciones ya existan.
         for ($i = 1; $i < count($rows); $i++) {
@@ -2618,19 +2619,18 @@ class ExcelParserService
 
     /**
      * Verifica si un código de asignatura es un placeholder (slot).
+     *
+     * Acepta cualquier sufijo numérico (OPTATIVA9, OPTATIVA10, LIBRE12,
+     * NIVELATORIO3, etc.) para que agregar nuevas optativas/libres/nivelatorios
+     * al Excel no requiera modificar este código. Mantiene paridad con el regex
+     * PLACEHOLDER_RE usado en el frontend (Visualizer.tsx / DetallePublico.tsx):
+     * /^(LIBRE|OPTATIVA|NIVELATORIO)\s*\d+$/i
      */
     private function esPlaceholder(string $codigoAsignatura): bool
     {
-        $placeholders = [
-            'OPTATIVA1', 'OPTATIVA2', 'OPTATIVA3', 'OPTATIVA4', 'OPTATIVA5', 'OPTATIVA6', 'OPTATIVA7', 'OPTATIVA8',
-            'LIBRE1', 'LIBRE2', 'LIBRE3', 'LIBRE4', 'LIBRE5',
-            'LIBRE6', 'LIBRE7', 'LIBRE8', 'LIBRE9', 'LIBRE10', 'LIBRE11',
-            'NIVELATORIO1', 'NIVELATORIO2',
-        ];
-
         $normalized = preg_replace('/\s+/', '', strtoupper(trim($codigoAsignatura)));
 
-        return in_array($normalized, $placeholders);
+        return preg_match('/^(OPTATIVA|LIBRE|NIVELATORIO)\d+$/', $normalized) === 1;
     }
 
     /**

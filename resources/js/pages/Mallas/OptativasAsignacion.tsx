@@ -488,7 +488,8 @@ export default function OptativasAsignacion({ malla }: Props) {
         } catch {
             setError('Error de conexión.');
         } finally {
-            setLoading(false);
+            setActionLoading(false);
+            setConfirmRemove(null);
         }
     };
 
