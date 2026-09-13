@@ -91,6 +91,7 @@ const getImageForPrograma = (nombre: string): string => {
                     'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
                 );
             }
+
             return imagePath;
         }
     }
@@ -99,6 +100,7 @@ const getImageForPrograma = (nombre: string): string => {
     //    porque colisiona entre Empresas / Sistemas / etc).
     const firstWord = upper.split(' ')[0];
     const EQUIVOCAL_FIRST_WORDS = new Set(['ADMINISTRACIÓN', 'INGENIERÍA']);
+
     if (!EQUIVOCAL_FIRST_WORDS.has(firstWord)) {
         for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
             if (key.startsWith(firstWord)) {
@@ -108,6 +110,7 @@ const getImageForPrograma = (nombre: string): string => {
                         'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
                     );
                 }
+
                 return imagePath;
             }
         }
@@ -145,7 +148,7 @@ export default function ProgramasActivos({ facultades }: Props) {
     })).filter(f => f.programas.length > 0);
 
     return (
-        <div className="min-h-screen bg-[#f1f5f9] selection:bg-green-200">
+        <div className="min-h-screen bg-[var(--acc-page-bg)] selection:bg-green-200">
             <Head title="Mallas Curriculares - UNAL Manizales">
                 <meta name="description" content="Repositorio oficial de planes de estudio de la Universidad Nacional de Colombia. Información académica clara, actualizada y accesible." />
                 <meta property="og:title" content="Mallas Curriculares" />
@@ -154,7 +157,7 @@ export default function ProgramasActivos({ facultades }: Props) {
             <InstitutionalHeader />
 
             {/* 1. HERO SECTION - Altamente Atractiva */}
-            <div className="relative bg-[#00236f] py-20 lg:py-32 overflow-hidden">
+            <div className="relative bg-[var(--acc-hero-bg)] py-20 lg:py-32 overflow-hidden">
                 <div className="absolute inset-0">
                     {/* Elementos orgánicos de fondo */}
                     <div className="absolute -top-24 -left-20 w-96 h-96 bg-[#77c53f] rounded-full blur-[120px] opacity-20" />
@@ -165,12 +168,12 @@ export default function ProgramasActivos({ facultades }: Props) {
                     <div className="space-y-6">
                         <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 animate-in fade-in">
                             <span className="w-2 h-2 rounded-full bg-[#77c53f] animate-pulse" />
-                            <span className="text-white text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
+                            <span className="text-[var(--acc-hero-text)] text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
                         </div>
-                        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-white leading-[1.1] tracking-tight">
+                        <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-[var(--acc-hero-text)] leading-[1.1] tracking-tight">
                             Mallas Curriculares
                         </h1>
-                        <p className="text-blue-100 text-lg max-w-lg leading-relaxed opacity-80">
+                        <p className="text-[var(--acc-hero-muted)] text-lg max-w-lg leading-relaxed opacity-80">
                             Repositorio oficial de planes de estudio de la Universidad Nacional de Colombia. 
                             Información académica clara, actualizada y accesible.
                         </p>
@@ -190,24 +193,24 @@ export default function ProgramasActivos({ facultades }: Props) {
                     {/* Stats rápidos */}
                     <div className="hidden lg:grid grid-cols-2 gap-4">
                         <div className="bg-white/5 backdrop-blur-sm p-8 rounded-[2.5rem] border border-white/10">
-                            <span className="text-4xl font-black text-white block mb-1">+{facultades.reduce((s,f) => s+f.programas.length, 0)}</span>
-                            <span className="text-blue-200 text-xs font-bold uppercase tracking-widest">Programas Activos</span>
+                            <span className="text-4xl font-black text-[var(--acc-hero-text)] block mb-1">+{facultades.reduce((s,f) => s+f.programas.length, 0)}</span>
+                            <span className="text-[var(--acc-hero-muted)] text-xs font-bold uppercase tracking-widest">Programas Activos</span>
                         </div>
                         <div className="bg-[#77c53f]/10 backdrop-blur-sm p-8 rounded-[2.5rem] border border-[#77c53f]/20">
                             <span className="text-4xl font-black text-[#77c53f] block mb-1">{facultades.length}</span>
-                            <span className="text-blue-200 text-xs font-bold uppercase tracking-widest">Facultades</span>
+                            <span className="text-[var(--acc-hero-muted)] text-xs font-bold uppercase tracking-widest">Facultades</span>
                         </div>
                     </div>
                 </div>
             </div>
 
             {/* 2. BARRA DE NAVEGACIÓN RÁPIDA (Sticky) */}
-            <div className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled ? 'bg-white shadow-md py-2 sm:py-3' : 'bg-transparent py-0 opacity-0 pointer-events-none'}`}>
+            <div className={`sticky top-0 z-40 w-full transition-all duration-300 ${scrolled ? 'bg-[var(--acc-surface)] shadow-md py-2 sm:py-3' : 'bg-transparent py-0 opacity-0 pointer-events-none'}`}>
                 <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center gap-2 sm:gap-4 overflow-x-auto scroll-hide">
-                    <span className="hidden sm:inline text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Ir a:</span>
-                    <span className="sm:hidden text-[10px] font-black text-slate-400 uppercase tracking-widest shrink-0">Ir:</span>
+                    <span className="hidden sm:inline text-[10px] font-black text-[var(--acc-text-muted)] uppercase tracking-widest shrink-0">Ir a:</span>
+                    <span className="sm:hidden text-[10px] font-black text-[var(--acc-text-muted)] uppercase tracking-widest shrink-0">Ir:</span>
                     {facultades.map(f => (
-                        <a key={f.ID_Facultad} href={`#fac-${f.ID_Facultad}`} className="text-[10px] sm:text-xs font-bold text-slate-600 hover:text-[#00236f] whitespace-nowrap px-2 sm:px-3 py-1 rounded-full hover:bg-slate-100 transition-all">
+                        <a key={f.ID_Facultad} href={`#fac-${f.ID_Facultad}`} className="text-[10px] sm:text-xs font-bold text-[var(--acc-text-muted)] hover:text-[var(--acc-link)] whitespace-nowrap px-2 sm:px-3 py-1 rounded-full hover:bg-slate-100 transition-all">
                             {f.Nombre_Facultad.replace('FACULTAD DE ', '').replace('FACULTAD ', '')}
                         </a>
                     ))}
@@ -226,10 +229,10 @@ export default function ProgramasActivos({ facultades }: Props) {
                                     <span className="material-symbols-outlined !text-3xl">account_balance</span>
                                 </div>
                                 <div>
-                                    <h2 className="text-xl sm:text-3xl font-black text-slate-900 tracking-tight uppercase">
+                                    <h2 className="text-xl sm:text-3xl font-black text-[var(--acc-text)] tracking-tight uppercase">
                                         {facultad.Nombre_Facultad}
                                     </h2>
-                                    <p className="text-slate-500 text-sm font-medium tracking-wide">
+                                    <p className="text-[var(--acc-text-muted)] text-sm font-medium tracking-wide">
                                         {facultad.programas.length} Ofertas académicas vigentes
                                     </p>
                                 </div>
@@ -299,9 +302,9 @@ export default function ProgramasActivos({ facultades }: Props) {
             {/* Empty State */}
             {filteredFacultades.length === 0 && (
                 <div className="py-40 text-center">
-                    <span className="material-symbols-outlined !text-8xl text-slate-200">sentiment_dissatisfied</span>
-                    <h3 className="text-2xl font-black text-slate-400 mt-4 uppercase">No encontramos lo que buscas</h3>
-                    <p className="text-slate-500">Prueba con otro término de búsqueda.</p>
+                    <span className="material-symbols-outlined !text-8xl text-[var(--acc-text-muted)] opacity-40">sentiment_dissatisfied</span>
+                    <h3 className="text-2xl font-black text-[var(--acc-text-muted)] mt-4 uppercase">No encontramos lo que buscas</h3>
+                    <p className="text-[var(--acc-text-muted)]">Prueba con otro término de búsqueda.</p>
                 </div>
             )}
 

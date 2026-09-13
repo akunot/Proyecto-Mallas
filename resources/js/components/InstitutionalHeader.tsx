@@ -1,5 +1,68 @@
 import { useEffect, useRef, useState } from 'react';
 
+import InstitutionalSearch from './InstitutionalSearch';
+
+// Indicador desplegable compacto (punto 1 de la revisión): sustituye al
+// carácter "▼" que heredaba el tamaño completo del texto del botón; replica
+// el caret pequeño de la plantilla UNAL (~8x5 px) conservando el contraste.
+function CaretDown() {
+  return (
+    <svg
+      aria-hidden="true"
+      className="ml-1 inline-block align-middle text-[#94b43b]"
+      width="8"
+      height="5"
+      viewBox="0 0 8 5"
+      fill="currentColor"
+    >
+      <path d="M0 0h8L4 5Z" />
+    </svg>
+  );
+}
+
+// Preferencias del panel de accesibilidad persistidas en localStorage
+// (punto 4 de la revisión): sobreviven a la navegación entre páginas.
+const FONT_MIN = 100;
+const FONT_MAX = 200;
+
+const readStoredNumber = (key: string, fallback: number): number => {
+  if (typeof window === 'undefined') {
+return fallback;
+}
+
+  const stored = window.localStorage.getItem(key);
+  const parsed = stored === null ? Number.NaN : Number(stored);
+
+  if (Number.isNaN(parsed)) {
+return fallback;
+}
+
+  return Math.min(FONT_MAX, Math.max(FONT_MIN, parsed));
+};
+
+// El contraste usa su propio lector: 0 = paleta normal (sin clase), 1 =
+// negro/blanco, 2 = amarillo/azul, 3 = negro/magenta (valores de la
+// referencia UNAL). No usa el rango 100..200 del tamaño de letra.
+const readStoredContrast = (): number => {
+  if (typeof window === 'undefined') {
+    return 0;
+  }
+
+  const stored = Number(window.localStorage.getItem('accContraste'));
+
+  return stored === 1 || stored === 2 || stored === 3 ? stored : 0;
+};
+
+const readStoredFlag = (key: string, fallback: boolean): boolean => {
+  if (typeof window === 'undefined') {
+return fallback;
+}
+
+  const stored = window.localStorage.getItem(key);
+
+  return stored === null ? fallback : stored === 'true';
+};
+
 // Tipado explícito de los datos de configuración
 interface Profile {
   label: string;
@@ -84,39 +147,41 @@ export default function InstitutionalHeader() {
   const [socialHover, setSocialHover] = useState<string | null>(null);
   const [navigationOpen, setNavigationOpen] = useState<string | null>(null);
 
-  const [fontPercent, setFontPercent] = useState(100);
-  const [contrast, setContrast] = useState(0);
-  const [invertedColors, setInvertedColors] = useState(false);
+  const [fontPercent, setFontPercent] = useState<number>(() =>
+    readStoredNumber('accTamanoLetra', 100),
+  );
+  // Contraste activo: 0 = paleta normal (sin clase), 1 = negro/blanco,
+  // 2 = amarillo/azul, 3 = negro/magenta (mismos valores de la referencia).
+  const [contrast, setContrast] = useState<number>(() => readStoredContrast());
+  const [invertedColors, setInvertedColors] = useState<boolean>(() =>
+    readStoredFlag('accInvertirColores', false),
+  );
 
   const navRef = useRef<HTMLElement>(null);
   const accessibilityRef = useRef<HTMLDivElement>(null);
 
-  // Manejo de accesibilidad global
+  // Manejo de accesibilidad global: el tamaño de letra se aplica en <html>,
+  // el contraste como clase toggleable en <body> — sin clase = paleta normal;
+  // contraste-1 = negro/blanco, contraste-2 = amarillo/azul, contraste-3 =
+  // negro/magenta (los colores los resuelven las variables CSS en la vista,
+  // sin estilos por componente). La inversión se aplica como clase en <html>.
   useEffect(() => {
     document.documentElement.style.fontSize = `${fontPercent}%`;
-    const contrastFilter =
-      contrast === 1
-        ? 'contrast(1.15)'
-        : contrast === 2
-          ? 'contrast(1.35) saturate(1.1)'
-          : contrast === 3
-            ? 'contrast(1.6) grayscale(1)'
-            : '';
-    document.documentElement.style.filter = [
-      contrastFilter,
-      invertedColors ? 'invert(100%)' : '',
-    ]
-      .filter(Boolean)
-      .join(' ');
-    document.body.dataset.accessibilityContrast = contrast
-      ? String(contrast)
-      : '';
+    document.body.classList.remove('contraste-1', 'contraste-2', 'contraste-3');
 
-    return () => {
-      document.documentElement.style.fontSize = '';
-      document.documentElement.style.filter = '';
-      delete document.body.dataset.accessibilityContrast;
-    };
+    if (contrast === 1 || contrast === 2 || contrast === 3) {
+      document.body.classList.add(`contraste-${contrast}`);
+    }
+
+    document.documentElement.classList.toggle('acc-invertir', invertedColors);
+
+    try {
+      window.localStorage.setItem('accTamanoLetra', String(fontPercent));
+      window.localStorage.setItem('accContraste', String(contrast));
+      window.localStorage.setItem('accInvertirColores', String(invertedColors));
+    } catch {
+      // localStorage puede no estar disponible (p. ej. navegación privada).
+    }
   }, [contrast, fontPercent, invertedColors]);
 
   // Cerrar menús al presionar la tecla Escape
@@ -144,7 +209,8 @@ export default function InstitutionalHeader() {
   }, [accessibilityOpen]);
 
   return (
-    <header className="relative z-[300] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
+    <>
+      <header className="relative z-[300] font-['Ancizar_Sans'] text-[14px] leading-normal" ref={navRef}>
       {/* Barra Superior - Desktop */}
       <div className="relative hidden h-[30px] bg-[#666] md:block">
         <div className="flex h-full items-stretch justify-end pr-[70px] lg:pr-[85px]">
@@ -218,11 +284,19 @@ export default function InstitutionalHeader() {
         </a>
 
         {/* Dominio de Sede */}
-        <div className="hidden items-center gap-2 text-[22px] leading-[18px] sm:text-[27px] md:flex">
+        <div className="hidden items-center gap-2 text-[22px] leading-[18px] sm:text-[27px] md:flex md:pr-[320px] lg:pr-0">
           <span className="h-[17px] w-[14px] shrink-0 bg-[url('/unal/images/locDot.png')] bg-no-repeat" aria-hidden="true" />
-          <a href="/" className="truncate text-white no-underline hover:text-white">
+          <a href="/" className="min-w-0 truncate text-white no-underline hover:text-white">
             mallas.manizales.unal.edu.co
           </a>
+        </div>
+
+        {/* Buscador institucional — réplica del de la plantilla UNAL: caja
+            blanca con lupa en la franja del dominio, alineado a la derecha
+            (a la izquierda del escudo de Colombia); envía la búsqueda a los
+            resultados de unal.edu.co en ventana nueva */}
+        <div className="absolute right-[90px] top-[7px] z-[210] hidden md:block">
+          <InstitutionalSearch />
         </div>
 
         <img
@@ -253,13 +327,13 @@ export default function InstitutionalHeader() {
                 aria-haspopup="true"
                 className="flex h-full items-center px-3 py-0 text-[15px] font-sans-serif uppercase no-underline transition-colors duration-150 hover:bg-[#666] hover:text-white"
               >
-                {label} <span className="ml-1 text-[#94b43b]">▼</span>
+                {label} <CaretDown />
               </button>
                  {navigationOpen === label && (
-                   <ul className="absolute left-0 top-full z-[350] min-w-56 border border-[#222] bg-[#333] py-1 shadow-lg">
+                   <ul className="absolute left-0 top-[calc(100%-3px)] z-[350] min-w-56 border border-[#222] bg-[#333] py-0 shadow-lg">
                     {submenu.map(({ label, href }) => (
                       <li key={label}>
-                        <a href={href} className="block whitespace-nowrap px-3 py-1 text-[14px] text-white hover:bg-[#4b4b4b]">
+                        <a href={href} className="block whitespace-nowrap px-[10px] py-[3px] text-left text-[13px] font-bold leading-[18px] text-white hover:bg-[#4b4b4b]">
                           {label}
                         </a>
                       </li>
@@ -279,17 +353,17 @@ export default function InstitutionalHeader() {
             aria-haspopup="true"
             className="flex h-full items-center px-4 py-0 text-[15px] font-bold uppercase transition-colors duration-150 hover:bg-[#666]"
           >
-            Sedes <span className="ml-1 text-[#94b43b]">▼</span>
+            Sedes <CaretDown />
           </button>
           {campusesOpen && (
-         <ul className="absolute right-0 top-full z-[350] min-w-44 border border-[#222] bg-[#333] py-1 shadow-lg">
+         <ul className="absolute left-0 top-[calc(100%-3px)] z-[350] min-w-[90px] border border-[#222] bg-[#333] py-0 shadow-lg">
               {CAMPUSES.map(({ label, href }) => (
                 <li key={label}>
                   <a
                     href={href}
                     target="_blank"
                     rel="noreferrer noopener"
-                    className="block px-4 py-1.5 text-white hover:bg-[#4b4b4b]"
+                    className="block whitespace-nowrap px-[10px] py-[3px] text-left text-[13px] font-bold leading-[18px] text-white hover:bg-[#4b4b4b]"
                   >
                     {label}
                   </a>
@@ -303,6 +377,10 @@ export default function InstitutionalHeader() {
       {/* Menú Desplegable Móvil */}
       {mobileOpen && (
         <div className="bg-[#333] p-4 text-white md:hidden">
+          <div className="mb-3 border-b border-white/20 pb-3">
+            <InstitutionalSearch fullWidth />
+          </div>
+
           <div className="mb-3 grid grid-cols-2 gap-2 border-b border-white/20 pb-3">
             {PROFILES.map(({ label, href, hoverClass }) => (
               <a
@@ -327,12 +405,12 @@ export default function InstitutionalHeader() {
                   className="flex w-full items-center justify-between py-2 text-left text-sm font-bold uppercase"
                 >
                   {label}
-                  <span className="text-[#94b43b]">▼</span>
+                  <CaretDown />
                 </button>
                 {navigationOpen === label && (
                   <div className="pb-2 pl-3">
                     {submenu.map(({ label, href }) => (
-                      <a key={label} href={href} className="block py-1 text-sm text-white hover:text-[#94b43b]">
+                      <a key={label} href={href} className="block py-1 text-sm hover:underline">
                         {label}
                       </a>
                     ))}
@@ -348,7 +426,7 @@ export default function InstitutionalHeader() {
             aria-expanded={campusesOpen}
             className="flex w-full justify-between border-b border-white/20 px-2 py-3 text-left uppercase font-bold"
           >
-            Sedes <span className="text-[#94b43b]">▼</span>
+            Sedes <CaretDown />
           </button>
           {campusesOpen && (
             <div className="grid grid-cols-2 gap-1 py-2">
@@ -373,7 +451,7 @@ export default function InstitutionalHeader() {
             aria-expanded={mobileServicesOpen}
             className="flex w-full justify-between px-2 py-3 text-left uppercase font-bold"
           >
-            Servicios <span className="text-[#94b43b]">▼</span>
+            Servicios <CaretDown />
           </button>
           {mobileServicesOpen && (
             <ul className="pb-2">
@@ -394,26 +472,21 @@ export default function InstitutionalHeader() {
         </div>
       )}
 
-      {/* Panel de Accesibilidad — cerrado: pestaña flotante pegada al borde derecho (plantilla UNAL).
-          Abierto: recuadro blanco a todo el ancho en el flujo del header que empuja el contenido hacia
-          abajo; la pestaña queda superpuesta justo bajo el borde del recuadro, SIN franja de color
-          alrededor (transparente sobre la página). */}
-      <div
-        ref={accessibilityRef}
-        className={
-          accessibilityOpen
-            ? 'relative z-[100] w-full'
-            : 'absolute top-full right-0 z-[100]'
-        }
-      >
-        {accessibilityOpen && (
+      {/* Panel de Accesibilidad — replicado de la plantilla UNAL. Abierto:
+          recuadro blanco a todo el ancho en el flujo del header (z-[100], por
+          debajo de la navegación para que los dropdowns queden encima de él,
+          como pide la revisión); la pestaña es un elemento independiente con
+          z-[400] para que ningún dropdown la tape (bug previo: el dropdown
+          SEDES la cubría porque vivía dentro del contenedor z-[100]). */}
+      {accessibilityOpen && (
+        <div ref={accessibilityRef} className="relative z-[100] w-full">
           <div className="grid w-full grid-cols-1 gap-7 border-b-[3px] border-b-[#292929] bg-white p-7 text-sm text-[#333] sm:grid-cols-2 sm:p-10 lg:grid-cols-4 lg:gap-10">
             <div>
               <h4 className="mb-2 text-xl font-normal text-[#111]">Tamaño letra</h4>
               <div className="flex items-center gap-2">
                 <button
                   type="button"
-                  className="bg-[#292929] px-3 py-2 font-bold text-white hover:bg-[#94b43b]"
+                  className="boton-panel"
                   onClick={() => setFontPercent((value) => Math.max(100, value - 10))}
                   aria-label="Disminuir tamaño de letra"
                 >
@@ -421,13 +494,13 @@ export default function InstitutionalHeader() {
                 </button>
                 <button
                   type="button"
-                  className="bg-[#292929] px-3 py-2 font-bold text-white hover:bg-[#94b43b]"
+                  className="boton-panel"
                   onClick={() => setFontPercent((value) => Math.min(200, value + 10))}
                   aria-label="Aumentar tamaño de letra"
                 >
                   A<sup>+</sup>
                 </button>
-                <span className="min-w-24 bg-[#d4d4d4] px-3 py-2 text-center font-bold text-[#31506f]">
+                <span className="letras-porcentaje inline-flex min-w-16 items-center justify-center text-[#31506f]">
                   {fontPercent}%
                 </span>
               </div>
@@ -439,8 +512,8 @@ export default function InstitutionalHeader() {
                   <button
                     key={value}
                     type="button"
-                    className={`px-3 py-2 font-bold text-white ${contrast === value ? 'bg-[#94b43b]' : 'bg-[#292929] hover:bg-[#94b43b]'}`}
-                    onClick={() => setContrast(value)}
+                    className={`boton-panel ${contrast === value ? 'boton-panel-activo' : ''}`}
+                    onClick={() => setContrast(contrast === value ? 0 : value)}
                     aria-pressed={contrast === value}
                   >
                     {value}
@@ -452,7 +525,7 @@ export default function InstitutionalHeader() {
               <h4 className="mb-2 text-xl font-normal text-[#111]">Invertir colores</h4>
               <button
                 type="button"
-                className={`px-3 py-2 font-bold text-white ${invertedColors ? 'bg-[#94b43b]' : 'bg-[#292929] hover:bg-[#94b43b]'}`}
+                className={`boton-panel ${invertedColors ? 'boton-panel-activo' : ''}`}
                 onClick={() => setInvertedColors((value) => !value)}
                 aria-pressed={invertedColors}
               >
@@ -463,7 +536,7 @@ export default function InstitutionalHeader() {
               <h4 className="mb-2 text-xl font-normal text-[#111]">Restablecer ajustes</h4>
               <button
                 type="button"
-                className="bg-[#292929] px-3 py-2 font-bold text-white hover:bg-[#94b43b]"
+                className="boton-panel"
                 onClick={() => {
                   setFontPercent(100);
                   setContrast(0);
@@ -474,37 +547,40 @@ export default function InstitutionalHeader() {
               </button>
             </div>
           </div>
-        )}
-        <div
-          className={
-            accessibilityOpen
-              ? 'absolute right-0 top-full flex w-full justify-end px-4 md:px-10'
-              : 'flex justify-end px-4 md:px-10'
-          }
-        >
-          <button
-            type="button"
-            onClick={() => setAccessibilityOpen((prev) => !prev)}
-            aria-expanded={accessibilityOpen}
-            aria-haspopup="true"
-            className="relative h-[35px] bg-[rgba(41,41,41,0.8)] pl-[45px] pr-[10px] text-[13px] font-bold leading-[35px] text-white sm:text-[14px]"
-          >
-            <span
-              className="absolute left-0 top-0 h-[35px] w-[35px] bg-cover bg-center bg-[url('/unal/images/access-icon.jpg')]"
-              aria-hidden="true"
-            />
-            Panel de Accesibilidad
-          </button>
         </div>
-      </div>
+      )}
 
-      {/* Menú Lateral de Servicios */}
+      {/* Pestaña del panel — su z se mantiene POR DEBAJO de la navegación
+          (nav z-[150]) para que los dropdowns (SEDES, Información de interés)
+          se muestren al frente del panel/pestaña, tal como pide la revisión. */}
+      <div className="absolute right-0 top-full z-[140] flex w-full justify-end px-4 md:px-10">
+        <button
+          type="button"
+          onClick={() => setAccessibilityOpen((prev) => !prev)}
+          aria-expanded={accessibilityOpen}
+          aria-haspopup="true"
+          className="relative h-[35px] bg-[rgba(41,41,41,0.8)] pl-[45px] pr-[10px] text-[13px] font-bold leading-[35px] text-white sm:text-[14px]"
+        >
+          <span
+            className="absolute left-0 top-0 h-[35px] w-[35px] bg-cover bg-center bg-[url('/unal/images/access-icon.jpg')]"
+            aria-hidden="true"
+          />
+          Panel de Accesibilidad
+        </button>
+      </div>
+      </header>
+
+      {/* Menú Lateral de Servicios — toggle y panel FUERA del <header>: el header crea
+          un contexto de apilamiento en z-[300] y sus hijos jamás quedarían encima del
+          footer de componentes (z-[20020]) de DetallePublico; como hermanos del header
+          con z-[35000] la barra lateral queda siempre encima de todo (contenido, footer
+          de componentes y modales internos). */}
       <button
         type="button"
         onClick={() => setServicesOpen((prev) => !prev)}
         aria-expanded={servicesOpen}
         aria-controls="institutional-services"
-        className="fixed top-[150px] right-0 z-[350] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
+        className="fixed top-[150px] right-0 z-[35000] hidden h-[126px] w-[34px] bg-[#94b43b] bg-[url('/unal/images/backServices.png')] bg-[position:0_0] bg-no-repeat text-transparent transition-transform duration-300 ease-in-out md:block"
         style={{ transform: servicesOpen ? 'translateX(-240px)' : 'translateX(0)' }}
       >
         Servicios
@@ -513,7 +589,7 @@ export default function InstitutionalHeader() {
       {servicesOpen && (
         <aside
           id="institutional-services"
-          className="fixed top-0 right-0 z-[350] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
+          className="fixed top-0 right-0 z-[35000] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
           aria-label="Servicios institucionales"
         >
           <ul className="m-0 h-full w-[240px] overflow-y-auto overflow-x-hidden px-[10px] py-[150px] text-[13px] leading-8">
@@ -536,6 +612,6 @@ export default function InstitutionalHeader() {
           </ul>
         </aside>
       )}
-    </header>
+      </>
   );
 }

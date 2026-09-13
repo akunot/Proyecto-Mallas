@@ -2986,3 +2986,142 @@ body {
     filter: brightness(0.9);
     transform: translateY(-2px);
 }
+
+/* ==========================================================================
+   Panel de Accesibilidad — modos de contraste, inversión y tamaño de letra
+   Réplica del comportamiento de la plantilla UNAL (clases toggleables en
+   <body>/<html> que sobrescriben variables CSS) con implementación propia.
+   El estado activo lo aplican los botones del panel (InstitutionalHeader).
+   ========================================================================== */
+
+:root {
+    /* Estado NORMAL (sin clase en <body>): paleta institucional de la VISTA.
+       El contraste recolorea el contenido de la página; el header y el
+       footer conservan siempre la paleta institucional */
+    --acc-body-bg: #ffffff;          /* fondo del <body> */
+    --acc-page-bg: #f1f5f9;          /* fondo general de la página pública */
+    --acc-surface: #ffffff;          /* tarjetas, paneles y modales */
+    --acc-surface-muted: #f8fafc;    /* superficies secundarias (chips, franjas) */
+    --acc-border: #e2e8f0;           /* bordes sobre superficies claras */
+    --acc-text: #0f172a;             /* texto principal sobre fondo claro */
+    --acc-text-muted: #64748b;       /* texto secundario sobre fondo claro */
+    --acc-link: #00236f;             /* enlaces sobre fondo claro */
+    --acc-hero-bg: #00236f;          /* cabecera/dashboard de la vista */
+    --acc-hero-text: #ffffff;
+    --acc-hero-muted: #dbeafe;
+    --acc-tint-ink: #475569;         /* texto sobre tintes claros (métricas CR/HP/HE) */
+}
+
+/* Contraste 1: fondo negro con texto blanco (ref. Agencia UNAL:
+   background #000, texto #fff) */
+body.contraste-1 {
+    --acc-body-bg: #000000;
+    --acc-page-bg: #000000;
+    --acc-surface: #000000;
+    --acc-surface-muted: #1a1a1a;
+    --acc-border: #ffffff;
+    --acc-text: #ffffff;
+    --acc-text-muted: #ffffff;
+    --acc-link: #ffffff;
+    --acc-hero-bg: #000000;
+    --acc-hero-text: #ffffff;
+    --acc-hero-muted: #ffffff;
+    --acc-tint-ink: #1f2937;         /* oscuro legible sobre los tintes claros */
+}
+
+/* Contraste 2: fondo amarillo, texto azul/negro (ref. Agencia UNAL:
+   background #f6f70a, texto y enlaces #1b14fa) */
+body.contraste-2 {
+    --acc-body-bg: #f6f70a;
+    --acc-page-bg: #f6f70a;
+    --acc-surface: #f6f70a;
+    --acc-surface-muted: #e8ec00;
+    --acc-border: #1a1a1a;
+    --acc-text: #1a1a1a;
+    --acc-text-muted: #1a1a1a;
+    --acc-link: #1b14fa;
+    --acc-hero-bg: #f6f70a;
+    --acc-hero-text: #1b14fa;
+    --acc-hero-muted: #1a1a1a;
+    --acc-tint-ink: #1a1a1a;
+}
+
+/* Contraste 3: fondo negro, texto y enlaces magenta (ref. Agencia UNAL:
+   background #000, texto y enlaces #fd00ff) */
+body.contraste-3 {
+    --acc-body-bg: #000000;
+    --acc-page-bg: #000000;
+    --acc-surface: #000000;
+    --acc-surface-muted: #1c001c;
+    --acc-border: #77007b;
+    --acc-text: #fd00ff;
+    --acc-text-muted: #fd00ff;
+    --acc-link: #fd00ff;
+    --acc-hero-bg: #000000;
+    --acc-hero-text: #fd00ff;
+    --acc-hero-muted: #fd00ff;
+    --acc-tint-ink: #fd00ff;
+}
+
+/* "Invertir colores": modo independiente de los contrastes numerados
+   (mismo mecanismo de la referencia: filter invert sobre <html>) */
+html.acc-invertir {
+    filter: invert(100%);
+}
+
+/* Fondo del body gobernado por el modo de contraste activo.
+   Nota (revisión): el contraste recolorea la VISTA (contenido de la página);
+   el header y el footer conservan siempre la paleta institucional. */
+body {
+    background-color: var(--acc-body-bg);
+}
+
+/* Botones del panel de accesibilidad con la estética de la plantilla UNAL
+   (.boton-panel: fondo #292929, hover/focus azul #0763c8) */
+.boton-panel {
+    background-color: #292929;
+    border: none;
+    color: #fff;
+    font-weight: bold;
+    padding: 10px;
+    margin-right: 5px;
+}
+
+.boton-panel:hover,
+.boton-panel:focus {
+    background-color: #0763c8;
+}
+
+/* Estado activo de los botones del panel (contraste seleccionado, inversión
+   aplicada); declarado después de .boton-panel para ganar la cascada */
+.boton-panel-activo,
+.boton-panel-activo:hover,
+.boton-panel-activo:focus {
+    background-color: #94b43b;
+}
+
+/* Caja del porcentaje de letra (input.letras-porcentaje de la plantilla) */
+.letras-porcentaje {
+    background-color: rgba(41, 41, 41, 0.2);
+    border: none;
+    font-weight: bold;
+    height: 35px;
+    line-height: 35px;
+    padding: 0 10px;
+    text-align: center;
+}
+
+/* Buscador institucional del header (réplica del estilo de la plantilla UNAL:
+   caja gris con lupa y texto claros) */
+.buscador input {
+    color: #e8e8e8;
+}
+
+.buscador input::placeholder {
+    color: #d6d6d6;
+}
+
+/* Variante a todo el ancho para el menú móvil */
+.buscador--full input {
+    width: 100%;
+}

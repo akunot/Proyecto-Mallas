@@ -1,19 +1,17 @@
 import { Head, Link } from '@inertiajs/react';
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import MallaDiffView, {
-    type DiffResponse,
-    type CambioItem,
-    type CambioModificado,
-} from '../../components/MallaDiffView';
 import InstitutionalFooter from '../../components/InstitutionalFooter';
 import InstitutionalHeader from '../../components/InstitutionalHeader';
+import MallaDiffView from '../../components/MallaDiffView';
+import type {DiffResponse, CambioItem, CambioModificado} from '../../components/MallaDiffView';
 import MallaHistoryModal from '../../components/MallaHistoryModal';
 import SlotSelectorModal from '../../components/SlotSelectorModal';
 import VersionBadge from '../../components/VersionBadge';
 import {
-    type Requisito,
-    getUniqueRequisitos,
+    
+    getUniqueRequisitos
 } from '../../lib/requisitos';
+import type {Requisito} from '../../lib/requisitos';
 
 interface Asignatura {
     ID_Asignatura: number;
@@ -365,17 +363,20 @@ export default function DetallePublico({
 
             if (next.has(id)) {
                 next.delete(id);
+
                 return next;
             }
 
             if (next.size >= 2) {
                 const first = next.values().next().value;
+
                 if (first !== undefined) {
                     next.delete(first);
                 }
             }
 
             next.add(id);
+
             return next;
         });
     };
@@ -424,6 +425,7 @@ export default function DetallePublico({
         setLoadingElectivas(true);
         setErrorElectivas(false);
         setElectivas([]);
+
         try {
             const res = await fetch(`/api/v1/public/electivas`, {
                 headers: {
@@ -454,6 +456,7 @@ export default function DetallePublico({
         setLoadingOptativas(true);
         setErrorOptativas(false);
         setOptativas([]);
+
         try {
             const url = `/api/v1/public/mallas/${activeMalla?.ID_Malla}/optativas${slot ? `?slot_id=${slot.ID_Slot}` : ''}`;
             const res = await fetch(url, {
@@ -729,7 +732,10 @@ export default function DetallePublico({
             const existeAgrupacion = map[compId].agrupaciones.some(
                 (r) => r.Nombre_Agrupacion === agrup.Nombre_Agrupacion,
             );
-            if (existeAgrupacion) return;
+
+            if (existeAgrupacion) {
+return;
+}
 
             map[compId].agrupaciones.push({
                 Nombre_Agrupacion: agrup.Nombre_Agrupacion,
@@ -791,10 +797,12 @@ export default function DetallePublico({
         if (semestreCarouselRef.current) {
             const container = semestreCarouselRef.current;
             const child = container.children[num - 1] as HTMLElement | undefined;
+
             if (child) {
                 child.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'start' });
             }
         }
+
         setActiveSemestre(num);
     };
     const listaSemestres = useMemo(
@@ -819,21 +827,21 @@ export default function DetallePublico({
     // --- Renderizado: No disponible ---
     if (!disponible) {
         return (
-            <div className="flex h-screen items-center justify-center bg-slate-50 p-6">
-                <div className="w-full max-w-md rounded-[2.5rem] border border-slate-200 bg-white p-12 text-center shadow-2xl">
+            <div className="flex h-screen items-center justify-center bg-[var(--acc-page-bg)] p-6">
+                <div className="w-full max-w-md rounded-[2.5rem] border border-[var(--acc-border)] bg-[var(--acc-surface)] p-12 text-center shadow-2xl">
                     <span className="material-symbols-outlined mb-4 !text-7xl text-amber-400">
                         error_outline
                     </span>
-                    <h1 className="text-2xl font-black text-slate-900">
+                    <h1 className="text-2xl font-black text-[var(--acc-text)]">
                         Malla no disponible
                     </h1>
-                    <p className="mt-2 mb-8 text-slate-500">
+                    <p className="mt-2 mb-8 text-[var(--acc-text-muted)]">
                         El programa <strong>{programa.Nombre_Programa}</strong>{' '}
                         no tiene una malla activa.
                     </p>
                     <Link
                         href="/"
-                        className="rounded-2xl bg-[#00236f] px-8 py-3 font-bold text-white transition-all hover:scale-105 active:scale-95"
+                        className="rounded-2xl bg-[var(--acc-link)] px-8 py-3 font-bold text-[var(--acc-surface)] transition-all hover:scale-105 active:scale-95"
                     >
                         Volver al inicio
                     </Link>
@@ -880,13 +888,13 @@ export default function DetallePublico({
     };
 
     return (
-        <div className="flex min-h-screen flex-col bg-[#f1f5f9] font-sans selection:bg-blue-100">
+        <div className="flex min-h-screen flex-col bg-[var(--acc-page-bg)] font-sans selection:bg-blue-100">
             <Head title={`${programa.Nombre_Programa} - Malla Curricular`} />
             <InstitutionalHeader />
 
             {/* 1. HEADER DASHBOARD — Identidad institucional + Quick Stats */}
-            <div className="bg-[#00236f] pt-10">
-                <header className="shrink-0 bg-[#00236f] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
+            <div className="bg-[var(--acc-hero-bg)] pt-10">
+                <header className="shrink-0 bg-[var(--acc-hero-bg)] shadow-[0_4px_24px_rgba(0,35,111,0.22)]">
                 {/* Barra superior: navegación + identidad */}
                 <div className="px-4 pt-3 pb-0 sm:px-8">
                     <div className="mx-auto flex max-w-[1800px] items-start justify-between gap-4">
@@ -896,7 +904,7 @@ export default function DetallePublico({
                                 href="/"
                                 aria-label="Volver al inicio"
                                 title="Volver al inicio"
-                                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-white/20 bg-white/10 text-white/80 transition-all duration-200 hover:bg-white hover:text-[#00236f] focus-visible:ring-2 focus-visible:ring-white/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[#00236f]"
+                                className="mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-[color-mix(in_srgb,var(--acc-hero-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--acc-hero-text)_10%,transparent)] text-[var(--acc-hero-text)] transition-all duration-200 hover:bg-[var(--acc-surface)] hover:text-[var(--acc-link)] focus-visible:ring-2 focus-visible:ring-[var(--acc-hero-text)]/60 focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--acc-hero-bg)]"
                             >
                                 <span
                                     className="material-symbols-outlined !text-[18px]"
@@ -908,7 +916,7 @@ export default function DetallePublico({
 
                             <div className="min-w-0 pt-0.5">
                                 {/* Eyebrow: mobile condensed */}
-                                <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase sm:hidden">
+                                <p className="mb-0.5 flex items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-[var(--acc-hero-muted)] uppercase sm:hidden">
                                     <span
                                         className="material-symbols-outlined !text-[11px] opacity-70"
                                         aria-hidden="true"
@@ -918,15 +926,15 @@ export default function DetallePublico({
                                     <span className="truncate">{programa.Facultad}</span>
                                     {activeMalla?.Codigo_Plan && (
                                         <>
-                                            <span className="mx-0.5 text-blue-400/60">·</span>
-                                            <span className="shrink-0 font-mono tracking-wider text-blue-300">
+                                            <span className="mx-0.5 text-[var(--acc-hero-muted)] opacity-60">·</span>
+                                            <span className="shrink-0 font-mono tracking-wider text-[var(--acc-hero-muted)]">
                                                 Plan {activeMalla.Codigo_Plan}
                                             </span>
                                         </>
                                     )}
                                 </p>
                                 {/* Eyebrow: desktop full */}
-                                <p className="mb-0.5 hidden items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-blue-200 uppercase sm:flex">
+                                <p className="mb-0.5 hidden items-center gap-1.5 truncate text-[10px] font-bold tracking-[0.12em] text-[var(--acc-hero-muted)] uppercase sm:flex">
                                     <span
                                         className="material-symbols-outlined !text-[11px] opacity-70"
                                         aria-hidden="true"
@@ -936,7 +944,7 @@ export default function DetallePublico({
                                     {programa.Facultad}
                                     {activeMalla?.normativa && (
                                         <>
-                                            <span className="mx-0.5 text-blue-400/60">
+                                            <span className="mx-0.5 text-[var(--acc-hero-muted)] opacity-60">
                                                 ·
                                             </span>
                                             {activeMalla.normativa.Url_Normativa ? (
@@ -944,7 +952,7 @@ export default function DetallePublico({
                                                     href={activeMalla.normativa.Url_Normativa}
                                                     target="_blank"
                                                     rel="noopener noreferrer"
-                                                    className="text-blue-100 underline decoration-blue-300/40 hover:decoration-blue-100 transition-all"
+                                                    className="text-[var(--acc-hero-muted)] underline decoration-current/40 hover:decoration-current transition-all"
                                                 >
                                                     {
                                                         activeMalla.normativa
@@ -962,7 +970,7 @@ export default function DetallePublico({
                                                         ` (${activeMalla.normativa.Instancia})`}
                                                 </a>
                                             ) : (
-                                                <span className="text-blue-100">
+                                                <span className="text-[var(--acc-hero-muted)]">
                                                     {
                                                         activeMalla.normativa
                                                             .Tipo_Normativa
@@ -983,23 +991,23 @@ export default function DetallePublico({
                                     )}
                                     {activeMalla?.Codigo_Plan && (
                                         <>
-                                            <span className="mx-0.5 text-blue-400/60">
+                                            <span className="mx-0.5 text-[var(--acc-hero-muted)] opacity-60">
                                                 ·
                                             </span>
-                                            <span className="font-mono tracking-wider text-blue-300">
+                                            <span className="font-mono tracking-wider text-[var(--acc-hero-muted)]">
                                                 Plan {activeMalla.Codigo_Plan}
                                             </span>
                                         </>
                                     )}
                                 </p>
                                 {/* Nombre del programa */}
-                                <h1 className="truncate text-sm leading-tight font-black tracking-tight text-white sm:text-lg lg:text-xl">
+                                <h1 className="truncate text-sm leading-tight font-black tracking-tight text-[var(--acc-hero-text)] sm:text-lg lg:text-xl">
                                     {programa.Nombre_Programa}
                                 </h1>
                                 {/* Subtítulo: título otorgado + SNIES */}
                                 {(programa.Titulo_Otorgado ||
                                     programa.Codigo_SNIES) && (
-                                    <p className="mt-0.5 truncate text-[9px] text-blue-200/70 sm:text-[10px]">
+                                    <p className="mt-0.5 truncate text-[9px] text-[var(--acc-hero-muted)] opacity-70 sm:text-[10px]">
                                         {programa.Titulo_Otorgado && (
                                             <span>
                                                 {programa.Titulo_Otorgado}
@@ -1007,7 +1015,7 @@ export default function DetallePublico({
                                         )}
                                         {programa.Titulo_Otorgado &&
                                             programa.Codigo_SNIES && (
-                                                <span className="mx-1.5 text-blue-400/50">
+                                                <span className="mx-1.5 text-[var(--acc-hero-muted)] opacity-50">
                                                     ·
                                                 </span>
                                             )}
@@ -1025,8 +1033,8 @@ export default function DetallePublico({
                         {/* Derecha: acciones */}
                         <div className="flex shrink-0 items-center gap-2 pt-0.5">
                             {loadingVersion ? (
-                                <span className="hidden items-center gap-1.5 rounded-lg border border-slate-400/30 bg-slate-500/20 px-3 py-1.5 text-[10px] font-bold tracking-wider text-slate-300 uppercase sm:flex">
-                                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-slate-400" />
+                                <span className="hidden items-center gap-1.5 rounded-lg border border-[color-mix(in_srgb,var(--acc-hero-text)_30%,transparent)] bg-[color-mix(in_srgb,var(--acc-hero-text)_12%,transparent)] px-3 py-1.5 text-[10px] font-bold tracking-wider text-[var(--acc-hero-muted)] uppercase sm:flex">
+                                    <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-[var(--acc-hero-muted)]" />
                                     Cargando...
                                 </span>
                             ) : (
@@ -1039,7 +1047,7 @@ export default function DetallePublico({
                             )}
                             <button
                                 onClick={() => setShowGuideModal(true)}
-                                className="flex items-center gap-1.5 rounded-lg border border-white/20 bg-white/10 px-3 py-1.5 text-[10px] font-bold tracking-wider text-white/80 uppercase transition-all duration-200 hover:bg-white hover:text-[#00236f] focus-visible:ring-2 focus-visible:ring-white/60"
+                                className="flex items-center gap-1.5 rounded-lg border border-[color-mix(in_srgb,var(--acc-hero-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--acc-hero-text)_10%,transparent)] px-3 py-1.5 text-[10px] font-bold tracking-wider text-[var(--acc-hero-text)] uppercase transition-all duration-200 hover:bg-[var(--acc-surface)] hover:text-[var(--acc-link)] focus-visible:ring-2 focus-visible:ring-[var(--acc-hero-text)]/60"
                                 aria-label="Abrir guía de lectura de la malla"
                             >
                                 <span
@@ -1058,7 +1066,7 @@ export default function DetallePublico({
 
                 {/* Quick Stats bar — separador visual entre identidad y canvas */}
                 <div className="mx-auto mt-3 max-w-[1800px] px-4 sm:px-8">
-                    <div className="flex items-stretch gap-0 overflow-x-auto rounded-t-xl border border-b-0 border-white/10 bg-white/5 sm:w-fit sm:overflow-hidden [&::-webkit-scrollbar]:hidden">
+                    <div className="flex items-stretch gap-0 overflow-x-auto rounded-t-xl border border-b-0 border-[var(--acc-border)] bg-[color-mix(in_srgb,var(--acc-hero-text)_10%,transparent)] sm:w-fit sm:overflow-hidden [&::-webkit-scrollbar]:hidden">
                         {[
                             {
                                 icon: 'stars',
@@ -1082,22 +1090,22 @@ export default function DetallePublico({
                         ].map((stat, i, arr) => (
                             <div
                                 key={stat.label}
-                                className={`flex shrink-0 items-center gap-2.5 px-4 py-2 ${i < arr.length - 1 ? 'border-r border-white/10' : ''}`}
+                                className={`flex shrink-0 items-center gap-2.5 px-4 py-2 ${i < arr.length - 1 ? 'border-r border-[var(--acc-border)]' : ''}`}
                             >
                                 <span
-                                    className="material-symbols-outlined shrink-0 !text-[16px] text-blue-300/70"
+                                    className="material-symbols-outlined shrink-0 !text-[16px] text-[var(--acc-hero-muted)] opacity-70"
                                     aria-hidden="true"
                                 >
                                     {stat.icon}
                                 </span>
                                 <div>
-                                    <span className="block text-[9px] font-bold tracking-[0.1em] text-blue-300/60 uppercase">
+                                    <span className="block text-[9px] font-bold tracking-[0.1em] text-[var(--acc-hero-muted)] opacity-60 uppercase">
                                         {stat.label}
                                     </span>
-                                    <span className="text-sm leading-tight font-black text-white">
+                                    <span className="text-sm leading-tight font-black text-[var(--acc-hero-text)]">
                                         {stat.value}
                                         {stat.unit && (
-                                            <span className="ml-1 text-[10px] font-medium text-blue-200/60">
+                                            <span className="ml-1 text-[10px] font-medium text-[var(--acc-hero-muted)] opacity-60">
                                                 {stat.unit}
                                             </span>
                                         )}
@@ -1122,8 +1130,8 @@ export default function DetallePublico({
                             onClick={() => scrollToSemestre(num)}
                             className={`h-1.5 rounded-full transition-all duration-300 ${
                                 activeSemestre === num
-                                    ? 'w-6 bg-[#00236f]'
-                                    : 'w-1.5 bg-slate-300'
+                                    ? 'w-6 bg-[var(--acc-link)]'
+                                    : 'w-1.5 bg-[var(--acc-border)]'
                             }`}
                             aria-label={`Ir al semestre ${ROMAN[num] || num}`}
                         />
@@ -1146,11 +1154,11 @@ export default function DetallePublico({
                             >
                                 <div className="mb-3 flex shrink-0 items-center justify-between px-1 sm:mb-1.5">
                                     <div className="flex items-center gap-1">
-                                        <span className="truncate text-[9px] font-black tracking-[1px] text-slate-400 uppercase">
+                                        <span className="truncate text-[9px] font-black tracking-[1px] text-[var(--acc-text-muted)] uppercase">
                                             Semestre
                                         </span>
                                     </div>
-                                    <span className="text-lg leading-none font-black text-slate-600 italic">
+                                    <span className="text-lg leading-none font-black text-[var(--acc-text)] italic">
                                         {ROMAN[num]}
                                     </span>
                                 </div>
@@ -1182,8 +1190,8 @@ export default function DetallePublico({
                                                       wrapper:
                                                           'border-[#4fc3f7]/50 bg-[#e1f5fe]/40 hover:bg-[#e1f5fe]/80 hover:border-[#4fc3f7]/80 hover:shadow-sm',
                                                       icon: 'text-[#4fc3f7]',
-                                                      label: 'text-slate-600',
-                                                      sub: 'text-slate-400',
+                                                      label: 'text-[var(--acc-text)]',
+                                                      sub: 'text-[var(--acc-text-muted)]',
                                                       iconName: 'shuffle',
                                                   }
                                                 : isOptativa
@@ -1191,16 +1199,16 @@ export default function DetallePublico({
                                                         wrapper:
                                                             'border-[#f9a825]/50 bg-[#fff8e1]/40 hover:bg-[#fff8e1]/80 hover:border-[#f9a825]/80 hover:shadow-sm',
                                                         icon: 'text-[#f9a825]',
-                                                        label: 'text-slate-600',
-                                                        sub: 'text-slate-400',
+                                                        label: 'text-[var(--acc-text)]',
+                                                        sub: 'text-[var(--acc-text-muted)]',
                                                         iconName: 'stars',
                                                     }
                                                   : {
                                                         wrapper:
-                                                            'border-slate-200/80 bg-slate-50/60 hover:bg-slate-100/80 hover:border-slate-300 hover:shadow-sm',
-                                                        icon: 'text-slate-300',
-                                                        label: 'text-slate-500',
-                                                        sub: 'text-slate-400',
+                                                            'border-[var(--acc-border)] bg-[var(--acc-surface-muted)] hover:brightness-90 hover:shadow-sm',
+                                                        icon: 'text-[var(--acc-text-muted)]',
+                                                        label: 'text-[var(--acc-text-muted)]',
+                                                        sub: 'text-[var(--acc-text-muted)]',
                                                         iconName: 'pending',
                                                     };
 
@@ -1362,11 +1370,11 @@ export default function DetallePublico({
                                                         );
                                                     }
                                                 }}
-                                                className={`group relative h-full cursor-pointer rounded-xl border-l-[5px] bg-white shadow-sm transition-all duration-300 ${style.border} flex flex-col justify-between overflow-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:outline-none ${isSelected ? 'z-30 shadow-xl ring-2 ring-blue-600' : 'hover:-translate-y-0.5 hover:shadow-md'} ${isPre ? 'z-20 bg-rose-50 ring-2 ring-rose-500' : ''} ${isCo ? 'z-20 bg-amber-50 ring-2 ring-amber-400' : ''} ${isDimmed ? 'opacity-30 grayscale-[0.8]' : 'opacity-100'} `}
+                                                className={`group relative h-full cursor-pointer rounded-xl border-l-[5px] bg-[var(--acc-surface)] shadow-sm transition-all duration-300 ${style.border} flex flex-col justify-between overflow-hidden focus-visible:ring-2 focus-visible:ring-blue-600 focus-visible:ring-offset-1 focus-visible:outline-none ${isSelected ? 'z-30 shadow-xl ring-2 ring-blue-600' : 'hover:-translate-y-0.5 hover:shadow-md'} ${isPre ? 'z-20 bg-rose-50 ring-2 ring-rose-500' : ''} ${isCo ? 'z-20 bg-amber-50 ring-2 ring-amber-400' : ''} ${isDimmed ? 'opacity-30 grayscale-[0.8]' : 'opacity-100'} `}
                                             >
                                                 {/* Métricas Top */}
                                                 <div
-                                                    className={`${style.bg} flex shrink-0 justify-around border-b border-white/50 py-1 text-[9px] font-black text-slate-600 sm:py-0.5`}
+                                                    className={`${style.bg} flex shrink-0 justify-around border-b border-[var(--acc-border)] py-1 text-[9px] font-black text-[var(--acc-tint-ink)] sm:py-0.5`}
                                                 >
                                                     <span>
                                                         {
@@ -1386,14 +1394,14 @@ export default function DetallePublico({
 
                                                 {/* Nombre Central */}
                                                 <div className="flex min-h-0 flex-1 items-center justify-center px-3 py-2 text-center sm:px-2 sm:py-1">
-                                                    <h4 className="line-clamp-3 text-[11px] leading-tight font-bold text-slate-800">
+                                                    <h4 className="line-clamp-3 text-[11px] leading-tight font-bold text-[var(--acc-text)]">
                                                         {asig.Nombre_Asignatura}
                                                     </h4>
                                                 </div>
 
                                                 {/* Footer Info: código + un único indicador de requisitos (evita saturación de íconos) */}
-                                                <div className="flex shrink-0 items-center justify-between bg-slate-50/50 px-3 py-1.5 sm:px-2 sm:py-1">
-                                                    <span className="truncate font-mono text-[9px] font-bold text-slate-500">
+                                                <div className="flex shrink-0 items-center justify-between bg-[var(--acc-surface-muted)] px-3 py-1.5 sm:px-2 sm:py-1">
+                                                    <span className="truncate font-mono text-[9px] font-bold text-[var(--acc-text-muted)]">
                                                         {asig.Codigo_Asignatura}
                                                     </span>
                                                     <div className="flex items-center gap-1">
@@ -1462,7 +1470,7 @@ export default function DetallePublico({
                                                                     aria-label={
                                                                         label
                                                                     }
-                                                                    className={`inline-flex items-center gap-0.5 ${dotColor} h-4 rounded-full px-1.5 text-[9px] font-bold text-white ring-2 ring-white`}
+                                                                    className={`inline-flex items-center gap-0.5 ${dotColor} h-4 rounded-full px-1.5 text-[9px] font-bold text-white ring-2 ring-[var(--acc-surface)]`}
                                                                 >
                                                                     {reqCount}
                                                                 </span>
@@ -1501,18 +1509,18 @@ export default function DetallePublico({
                     <div
                         role="dialog"
                         aria-label={`Detalle de ${selectedAsigData.Nombre_Asignatura}`}
-                        className="fixed inset-x-0 bottom-0 z-[20030] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-slate-200 bg-white shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
+                        className="fixed inset-x-0 bottom-0 z-[20030] max-h-[80vh] w-full overflow-y-auto rounded-t-[2rem] border border-[var(--acc-border)] bg-[var(--acc-surface)] shadow-[0_20px_50px_rgba(0,0,0,0.2)] duration-300 animate-in slide-in-from-bottom sm:inset-x-auto sm:right-8 sm:bottom-8 sm:max-h-[calc(100vh-4rem)] sm:w-80 sm:rounded-[2.5rem] sm:slide-in-from-right"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="bg-[#00236f] p-6 text-white">
+                        <div className="bg-[var(--acc-hero-bg)] p-6 text-[var(--acc-hero-text)]">
                             <div className="mb-4 flex items-start justify-between">
-                                <span className="rounded border border-white/20 bg-white/10 px-2 py-0.5 text-[9px] font-black tracking-widest uppercase">
+                                <span className="rounded border border-[color-mix(in_srgb,var(--acc-hero-text)_20%,transparent)] bg-[color-mix(in_srgb,var(--acc-hero-text)_10%,transparent)] px-2 py-0.5 text-[9px] font-black tracking-widest uppercase">
                                     Expediente Académico
                                 </span>
                                 <button
                                     onClick={() => setSelectedAsig(null)}
                                     aria-label="Cerrar detalle"
-                                    className="rounded text-white/60 transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-white/60"
+                                    className="rounded text-[var(--acc-hero-muted)] opacity-60 transition-colors hover:text-[var(--acc-hero-text)] hover:opacity-100 focus-visible:ring-2 focus-visible:ring-[var(--acc-hero-text)]/60"
                                 >
                                     <span
                                         className="material-symbols-outlined"
@@ -1525,31 +1533,31 @@ export default function DetallePublico({
                             <h3 className="text-lg leading-tight font-black">
                                 {selectedAsigData.Nombre_Asignatura}
                             </h3>
-                            <p className="mt-1 font-mono text-xs tracking-widest text-blue-200">
+                            <p className="mt-1 font-mono text-xs tracking-widest text-[var(--acc-hero-muted)]">
                                 #{selectedAsigData.Codigo_Asignatura}
                             </p>
                         </div>
 
                         <div className="space-y-6 p-8">
                             <div className="grid grid-cols-2 gap-4">
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-slate-400 uppercase">
+                                <div className="rounded-2xl border border-[var(--acc-border)] bg-[var(--acc-surface-muted)] p-3">
+                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-[var(--acc-text-muted)] uppercase">
                                         Horas Directas
                                     </span>
-                                    <span className="text-lg font-black text-slate-800">
+                                    <span className="text-lg font-black text-[var(--acc-text)]">
                                         {selectedAsigData.Horas_Presencial}h{' '}
-                                        <small className="text-[10px] font-medium text-slate-400">
+                                        <small className="text-[10px] font-medium text-[var(--acc-text-muted)]">
                                             /sem
                                         </small>
                                     </span>
                                 </div>
-                                <div className="rounded-2xl border border-slate-100 bg-slate-50 p-3">
-                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-slate-400 uppercase">
+                                <div className="rounded-2xl border border-[var(--acc-border)] bg-[var(--acc-surface-muted)] p-3">
+                                    <span className="mb-1 block text-[9px] font-black tracking-tighter text-[var(--acc-text-muted)] uppercase">
                                         Trabajo Auto.
                                     </span>
-                                    <span className="text-lg font-black text-slate-800">
+                                    <span className="text-lg font-black text-[var(--acc-text)]">
                                         {selectedAsigData.Horas_Estudiante}h{' '}
-                                        <small className="text-[10px] font-medium text-slate-400">
+                                        <small className="text-[10px] font-medium text-[var(--acc-text-muted)]">
                                             /sem
                                         </small>
                                     </span>
@@ -1557,8 +1565,8 @@ export default function DetallePublico({
                             </div>
 
                             <div>
-                                <h5 className="mb-3 flex items-center gap-2 text-[10px] font-black tracking-widest text-slate-500 uppercase">
-                                    <span className="h-[1px] w-4 bg-slate-200" />{' '}
+                                <h5 className="mb-3 flex items-center gap-2 text-[10px] font-black tracking-widest text-[var(--acc-text-muted)] uppercase">
+                                    <span className="h-[1px] w-4 bg-[var(--acc-border)]" />{' '}
                                     Prerrequisitos de área
                                 </h5>
                                 {requisitosUnicos.length > 0 ? (
@@ -1595,7 +1603,7 @@ export default function DetallePublico({
                                         )}
                                     </ul>
                                 ) : (
-                                    <p className="py-4 text-center text-xs text-slate-400 italic">
+                                    <p className="py-4 text-center text-xs text-[var(--acc-text-muted)] italic">
                                         Materia de libre acceso sin
                                         prerrequisitos.
                                     </p>
@@ -1637,13 +1645,13 @@ export default function DetallePublico({
                         );
 
                         return (
-                            <div className="absolute right-0 bottom-full left-0 z-[20020] max-h-[58vh] overflow-y-auto border-t border-slate-100 bg-white/95 shadow-[0_-12px_40px_rgba(0,0,0,0.13)] backdrop-blur-md duration-300 animate-in slide-in-from-bottom">
+                            <div className="absolute right-0 bottom-full left-0 z-[20020] max-h-[58vh] overflow-y-auto border-t border-[var(--acc-border)] bg-[var(--acc-surface)] shadow-[0_-12px_40px_rgba(0,0,0,0.13)] duration-300 animate-in slide-in-from-bottom">
                                 <div className="mx-auto max-w-[1800px] px-5 py-5 sm:px-8">
                                     {/* Header del panel */}
                                     <div className="mb-5 flex items-start justify-between gap-4">
                                         <div className="flex flex-1 items-center gap-3">
                                             <div
-                                                className={`h-9 w-9 rounded-xl ${style.bg} flex shrink-0 items-center justify-center border border-white shadow-sm`}
+                                                className={`h-9 w-9 rounded-xl ${style.bg} flex shrink-0 items-center justify-center border border-[var(--acc-border)] shadow-sm`}
                                             >
                                                 <span
                                                     className={`h-3 w-3 rounded-full ${style.dot}`}
@@ -1651,10 +1659,10 @@ export default function DetallePublico({
                                                 />
                                             </div>
                                             <div>
-                                                <h3 className="text-sm leading-tight font-black text-slate-900">
+                                                <h3 className="text-sm leading-tight font-black text-[var(--acc-text)]">
                                                     {info?.nombre}
                                                 </h3>
-                                                <p className="mt-0.5 text-[10px] text-slate-400">
+                                                <p className="mt-0.5 text-[10px] text-[var(--acc-text-muted)]">
                                                     {total} créditos requeridos
                                                     · {porcentaje}% del plan
                                                 </p>
@@ -1665,7 +1673,7 @@ export default function DetallePublico({
                                                 setActiveComponentPanel(null)
                                             }
                                             aria-label="Cerrar panel de componente"
-                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all hover:bg-slate-200 hover:text-slate-700 focus-visible:ring-2 focus-visible:ring-slate-400"
+                                            className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-[var(--acc-surface-muted)] text-[var(--acc-text-muted)] transition-all hover:bg-[var(--acc-border)] hover:text-[var(--acc-text)] focus-visible:ring-2 focus-visible:ring-slate-400"
                                         >
                                             <span
                                                 className="material-symbols-outlined !text-[16px]"
@@ -1746,8 +1754,8 @@ export default function DetallePublico({
                                     </div>
 
                                     {/* Barra de peso global (sobre Creditos_Requeridos normativos) */}
-                                    <div className="mb-6 border-b border-slate-100 pb-5">
-                                        <div className="mb-2 flex justify-between text-[10px] font-bold tracking-wider text-slate-400 uppercase">
+                                    <div className="mb-6 border-b border-[var(--acc-border)] pb-5">
+                                        <div className="mb-2 flex justify-between text-[10px] font-bold tracking-wider text-[var(--acc-text-muted)] uppercase">
                                             <span>
                                                 Peso en el plan de estudios
                                             </span>
@@ -1756,7 +1764,7 @@ export default function DetallePublico({
                                                 cr.
                                             </span>
                                         </div>
-                                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-slate-100">
+                                        <div className="h-2.5 w-full overflow-hidden rounded-full bg-[var(--acc-border)]">
                                             <div
                                                 className={`h-2.5 rounded-full ${style.dot} transition-all duration-700`}
                                                 style={{
@@ -1774,14 +1782,14 @@ export default function DetallePublico({
                                     <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                                         {/* Descripción */}
                                         <div>
-                                            <p className="mb-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                                            <p className="mb-2 text-[11px] font-bold tracking-wider text-[var(--acc-text-muted)] uppercase">
                                                 Descripción del componente
                                             </p>
-                                            <p className="text-xs leading-relaxed text-slate-600">
+                                            <p className="text-xs leading-relaxed text-[var(--acc-text)]">
                                                 {info?.descripcion}
                                             </p>
                                             {info?.nota && (
-                                                <p className="mt-2 border-l-2 border-slate-200 pl-2 text-[10px] leading-relaxed text-slate-400 italic">
+                                                <p className="mt-2 border-l-2 border-[var(--acc-border)] pl-2 text-[10px] leading-relaxed text-[var(--acc-text-muted)] italic">
                                                     {info.nota}
                                                 </p>
                                             )}
@@ -1790,7 +1798,7 @@ export default function DetallePublico({
                                         {/* Distribución por agrupación — separada en obligatorias y optativas */}
                                         {rows.length > 0 && (
                                             <div>
-                                                <p className="mb-2 text-[11px] font-bold tracking-wider text-slate-500 uppercase">
+                                                <p className="mb-2 text-[11px] font-bold tracking-wider text-[var(--acc-text-muted)] uppercase">
                                                     Distribución por agrupación
                                                 </p>
                                                 {(() => {
@@ -1883,10 +1891,10 @@ export default function DetallePublico({
                                                             return (
                                                                 <div
                                                                     key={i}
-                                                                    className="rounded-xl border border-blue-200 bg-white shadow-xs"
+                                                                    className="rounded-xl border border-blue-200 bg-[var(--acc-surface)] shadow-xs"
                                                                 >
-                                                                    <div className="flex items-center justify-between border-b border-blue-100 px-3 py-2.5">
-                                                                        <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-slate-700">
+                                                                    <div className="flex items-center justify-between border-b border-[var(--acc-border)] px-3 py-2.5">
+                                                                        <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-[var(--acc-text)]">
                                                                             {
                                                                                 r.Nombre_Agrupacion
                                                                             }
@@ -1903,7 +1911,7 @@ export default function DetallePublico({
                                                                     </div>
                                                                     <div className="px-3 py-2.5">
                                                                         <div
-                                                                            className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                            className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--acc-border)]"
                                                                             title={`${Math.round(optReq)} créditos optativos`}
                                                                         >
                                                                             <div
@@ -1921,10 +1929,10 @@ export default function DetallePublico({
                                                         return (
                                                             <div
                                                                 key={i}
-                                                                className="rounded-xl border border-slate-200 bg-white shadow-xs transition-shadow hover:shadow-sm"
+                                                                className="rounded-xl border border-[var(--acc-border)] bg-[var(--acc-surface)] shadow-xs transition-shadow hover:shadow-sm"
                                                             >
-                                                                <div className="flex items-center justify-between border-b border-slate-100 px-3 py-2.5">
-                                                                    <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-slate-700">
+                                                                <div className="flex items-center justify-between border-b border-[var(--acc-border)] px-3 py-2.5">
+                                                                    <span className="min-w-0 truncate pr-2 text-[11px] font-bold text-[var(--acc-text)]">
                                                                         {
                                                                             r.Nombre_Agrupacion
                                                                         }
@@ -1936,7 +1944,7 @@ export default function DetallePublico({
                                                                             {
                                                                                 refCreditos
                                                                             }
-                                                                            <span className="ml-0.5 text-[10px] font-medium text-slate-400">
+                                                                            <span className="ml-0.5 text-[10px] font-medium text-[var(--acc-text-muted)]">
                                                                                 cr.
                                                                             </span>
                                                                         </span>
@@ -1945,7 +1953,7 @@ export default function DetallePublico({
                                                                 <div className="px-3 py-2">
                                                                     {tieneOptRow && (
                                                                         <div className="mb-2">
-                                                                            <div className="flex h-1.5 overflow-hidden rounded-full bg-slate-100">
+                                                                            <div className="flex h-1.5 overflow-hidden rounded-full bg-[var(--acc-border)]">
                                                                                 {obligReq >
                                                                                     0 && (
                                                                                     <div
@@ -1969,7 +1977,7 @@ export default function DetallePublico({
                                                                                     />
                                                                                 )}
                                                                             </div>
-                                                                            <span className="mt-1 block text-[9px] font-bold tracking-tight text-slate-400 tabular-nums">
+                                                                            <span className="mt-1 block text-[9px] font-bold tracking-tight text-[var(--acc-text-muted)] tabular-nums">
                                                                                 {Math.round(
                                                                                     obligReq,
                                                                                 )}{' '}
@@ -1989,7 +1997,7 @@ export default function DetallePublico({
                                                                         </div>
                                                                     )}
                                                                     <div
-                                                                        className="h-1.5 w-full overflow-hidden rounded-full bg-slate-100"
+                                                                        className="h-1.5 w-full overflow-hidden rounded-full bg-[var(--acc-border)]"
                                                                         title={`${rowPct}% del componente`}
                                                                     >
                                                                         <div
@@ -2001,7 +2009,7 @@ export default function DetallePublico({
                                                                     </div>
                                                                     {rowPct >
                                                                         0 && (
-                                                                        <span className="mt-1 block text-right text-[8px] font-bold text-slate-300 tabular-nums">
+                                                                        <span className="mt-1 block text-right text-[8px] font-bold text-[var(--acc-text-muted)] tabular-nums">
                                                                             {
                                                                                 rowPct
                                                                             }
@@ -2115,7 +2123,7 @@ export default function DetallePublico({
                                                                     0) &&
                                                                 rowsOpt.length >
                                                                     0 && (
-                                                                    <div className="border-t border-dashed border-slate-200" />
+                                                                    <div className="border-t border-dashed border-[var(--acc-border)]" />
                                                                 )}
 
                                                             {/* Separador entre obligatorias puras y obligatorias con optativos internos (si ambos existen) */}
@@ -2123,7 +2131,7 @@ export default function DetallePublico({
                                                                 0 &&
                                                                 rowsObligConOpt.length >
                                                                     0 && (
-                                                                    <div className="border-t border-dashed border-slate-200" />
+                                                                    <div className="border-t border-dashed border-[var(--acc-border)]" />
                                                                 )}
 
                                                             {/* Sección: Agrupaciones Optativas */}
@@ -2184,26 +2192,26 @@ export default function DetallePublico({
                                                 <div
                                                     className={`rounded-xl border ${style.bg} mt-2 flex items-center justify-between border-current/20 p-3 shadow-xs`}
                                                 >
-                                                    <span className="text-[10px] font-black tracking-wider text-slate-600 uppercase">
+                                                    <span className="text-[10px] font-black tracking-wider text-[var(--acc-tint-ink)] uppercase">
                                                         Total del componente
                                                     </span>
                                                     <div className="flex items-center gap-3 text-xs font-black tabular-nums">
                                                         {totalOblig > 0 && (
-                                                            <span className="text-slate-500">
+                                                            <span className="text-[var(--acc-tint-ink)]">
                                                                 {Math.round(
                                                                     totalOblig,
                                                                 )}{' '}
-                                                                <span className="font-medium text-slate-400">
+                                                                <span className="font-medium opacity-80">
                                                                     oblig.
                                                                 </span>
                                                             </span>
                                                         )}
                                                         {totalOpt > 0 && (
-                                                            <span className="text-slate-500">
+                                                            <span className="text-[var(--acc-tint-ink)]">
                                                                 {Math.round(
                                                                     totalOpt,
                                                                 )}{' '}
-                                                                <span className="font-medium text-slate-400">
+                                                                <span className="font-medium opacity-80">
                                                                     optat.
                                                                 </span>
                                                             </span>
@@ -2224,7 +2232,7 @@ export default function DetallePublico({
                     })()}
 
                 {/* FOOTER BAR — Leyenda de componentes + créditos rápidos */}
-                <footer className="border-t border-slate-100 bg-white/80 shadow-[0_-2px_12px_rgba(0,0,0,0.06)] backdrop-blur-md">
+                <footer className="border-t border-[var(--acc-border)] bg-[var(--acc-surface)] shadow-[0_-2px_12px_rgba(0,0,0,0.06)]">
                     <div className="mx-auto flex min-h-[44px] max-w-[1800px] items-stretch justify-between gap-2 px-4 py-0 sm:px-6">
                         {/* Botones de componentes — con crédito integrado */}
                         <div className="flex items-stretch gap-0 overflow-x-auto sm:overflow-visible [&::-webkit-scrollbar]:hidden">
@@ -2262,7 +2270,7 @@ export default function DetallePublico({
                                         }
                                         aria-pressed={isActive}
                                         aria-label={`Ver distribución de ${label}`}
-                                        className={`group relative flex shrink-0 items-center gap-2 border-r border-slate-100 px-3 py-2 transition-all duration-200 outline-none hover:bg-slate-50 focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-inset ${isActive ? 'bg-slate-50' : ''} `}
+                                        className={`group relative flex shrink-0 items-center gap-2 border-r border-[var(--acc-border)] px-3 py-2 transition-all duration-200 outline-none hover:bg-[var(--acc-surface-muted)] focus-visible:ring-2 focus-visible:ring-slate-300 focus-visible:ring-inset ${isActive ? 'bg-[var(--acc-surface-muted)]' : ''} `}
                                     >
                                         {/* Indicador activo — borde superior */}
                                         <span
@@ -2274,19 +2282,19 @@ export default function DetallePublico({
                                             aria-hidden="true"
                                         />
                                         <span
-                                            className={`text-[10px] font-bold tracking-tight whitespace-nowrap uppercase transition-colors sm:text-[11px] ${isActive ? 'text-slate-800' : 'text-slate-500 group-hover:text-slate-700'}`}
+                                            className={`text-[10px] font-bold tracking-tight whitespace-nowrap uppercase transition-colors sm:text-[11px] ${isActive ? 'text-[var(--acc-text)]' : 'text-[var(--acc-text-muted)]'}`}
                                         >
                                             {label}
                                         </span>
                                         {total > 0 && (
                                             <span
-                                                className={`text-[10px] font-black tabular-nums transition-colors ${isActive ? style.text : 'text-slate-400'}`}
+                                                className={`text-[10px] font-black tabular-nums transition-colors ${isActive ? style.text : 'text-[var(--acc-text-muted)]'}`}
                                             >
                                                 {total}
                                             </span>
                                         )}
                                         <span
-                                            className={`material-symbols-outlined !text-[13px] transition-all duration-200 ${isActive ? 'rotate-180 text-slate-500' : 'text-slate-300'}`}
+                                            className={`material-symbols-outlined !text-[13px] transition-all duration-200 ${isActive ? 'rotate-180 text-[var(--acc-text-muted)]' : 'text-[var(--acc-text-muted)] opacity-60'}`}
                                             aria-hidden="true"
                                         >
                                             expand_less
@@ -2298,7 +2306,7 @@ export default function DetallePublico({
 
                         {/* Marca / copyright */}
                         <div className="flex items-center gap-2 pl-3">
-                            <span className="text-[10px] font-bold tracking-wider whitespace-nowrap text-slate-300">
+                            <span className="text-[10px] font-bold tracking-wider whitespace-nowrap text-[var(--acc-text-muted)]">
                                 SIA · UNAL — 2026
                             </span>
                         </div>
@@ -2317,21 +2325,21 @@ export default function DetallePublico({
                     onClick={() => setShowGuideModal(false)}
                 >
                     <div
-                        className="w-full max-w-3xl overflow-hidden rounded-2xl bg-white shadow-2xl"
+                        className="w-full max-w-3xl overflow-hidden rounded-2xl bg-[var(--acc-surface)] shadow-2xl"
                         onClick={(e) => e.stopPropagation()}
                     >
-                        <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
+                        <div className="flex items-center justify-between border-b border-[var(--acc-border)] px-6 py-4">
                             <div>
-                                <h2 className="text-base font-black tracking-tight text-slate-900 uppercase">
+                                <h2 className="text-base font-black tracking-tight text-[var(--acc-text)] uppercase">
                                     ¿Cómo leer la malla curricular?
                                 </h2>
-                                <p className="mt-0.5 text-xs text-slate-500">
+                                <p className="mt-0.5 text-xs text-[var(--acc-text-muted)]">
                                     {programa.Nombre_Programa}
                                 </p>
                             </div>
                             <button
                                 onClick={() => setShowGuideModal(false)}
-                                className="flex h-8 w-8 items-center justify-center rounded-full bg-slate-100 text-slate-400 transition-all hover:bg-slate-200"
+                                className="flex h-8 w-8 items-center justify-center rounded-full bg-[var(--acc-surface-muted)] text-[var(--acc-text-muted)] transition-all hover:bg-[var(--acc-border)]"
                             >
                                 <span className="material-symbols-outlined !text-sm">
                                     close
@@ -2340,65 +2348,65 @@ export default function DetallePublico({
                         </div>
                         <div className="max-h-[75vh] overflow-y-auto">
                             {/* 1. Jerarquía del plan de estudios — Diagrama visual */}
-                            <div className="border-b border-slate-100 bg-gradient-to-br from-slate-50 to-white px-8 pt-6 pb-5">
-                                <p className="mb-4 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                            <div className="border-b border-[var(--acc-border)] bg-[var(--acc-surface-muted)] px-8 pt-6 pb-5">
+                                <p className="mb-4 text-[10px] font-black tracking-widest text-[var(--acc-text-muted)] uppercase">
                                     Niveles del plan de estudios
                                 </p>
                                 <div className="space-y-2.5 text-xs">
-                                    <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
-                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#00236f] text-[9px] font-black text-white">
+                                    <div className="flex items-center gap-3 rounded-xl border border-[var(--acc-border)] bg-[var(--acc-surface)] px-4 py-3 shadow-sm">
+                                        <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[var(--acc-hero-bg)] text-[9px] font-black text-[var(--acc-hero-text)]">
                                             1
                                         </span>
                                         <div>
-                                            <span className="font-bold text-slate-800">
+                                            <span className="font-bold text-[var(--acc-text)]">
                                                 Programa Académico
                                             </span>
-                                            <span className="ml-2 text-slate-400">
+                                            <span className="ml-2 text-[var(--acc-text-muted)]">
                                                 {programa.Nombre_Programa}
                                             </span>
                                         </div>
                                     </div>
-                                    <div className="ml-3 border-l-2 border-dashed border-slate-200 pl-10">
-                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                    <div className="ml-3 border-l-2 border-dashed border-[var(--acc-border)] pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-[var(--acc-border)] bg-[var(--acc-surface)] px-4 py-3 shadow-sm">
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#f9a825] text-[9px] font-black text-white">
                                                 2
                                             </span>
                                             <div>
-                                                <span className="font-bold text-slate-800">
+                                                <span className="font-bold text-[var(--acc-text)]">
                                                     Componente de Formación
                                                 </span>
-                                                <span className="ml-2 text-slate-400">
+                                                <span className="ml-2 text-[var(--acc-text-muted)]">
                                                     ej: Disciplinar — 84
                                                     créditos
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="ml-6 border-l-2 border-dashed border-slate-200 pl-10">
-                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                    <div className="ml-6 border-l-2 border-dashed border-[var(--acc-border)] pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-[var(--acc-border)] bg-[var(--acc-surface)] px-4 py-3 shadow-sm">
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#8bc34a] text-[9px] font-black text-white">
                                                 3
                                             </span>
                                             <div>
-                                                <span className="font-bold text-slate-800">
+                                                <span className="font-bold text-[var(--acc-text)]">
                                                     Agrupación
                                                 </span>
-                                                <span className="ml-2 text-slate-400">
+                                                <span className="ml-2 text-[var(--acc-text-muted)]">
                                                     ej: Finanzas — 14 créditos
                                                 </span>
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="ml-9 border-l-2 border-dashed border-slate-200 pl-10">
-                                        <div className="flex items-center gap-3 rounded-xl border border-slate-200 bg-white px-4 py-3 shadow-sm">
+                                    <div className="ml-9 border-l-2 border-dashed border-[var(--acc-border)] pl-10">
+                                        <div className="flex items-center gap-3 rounded-xl border border-[var(--acc-border)] bg-[var(--acc-surface)] px-4 py-3 shadow-sm">
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-[#4fc3f7] text-[9px] font-black text-white">
                                                 4
                                             </span>
                                             <div>
-                                                <span className="font-bold text-slate-800">
+                                                <span className="font-bold text-[var(--acc-text)]">
                                                     Asignatura
                                                 </span>
-                                                <span className="ml-2 text-slate-400">
+                                                <span className="ml-2 text-[var(--acc-text-muted)]">
                                                     cada curso individual en la
                                                     malla
                                                 </span>
@@ -2406,7 +2414,7 @@ export default function DetallePublico({
                                         </div>
                                     </div>
                                 </div>
-                                <p className="mt-3 text-[10px] leading-relaxed text-slate-400 italic">
+                                <p className="mt-3 text-[10px] leading-relaxed text-[var(--acc-text-muted)] italic">
                                     Cada nivel agrupa al siguiente. Una
                                     agrupación es un conjunto de asignaturas
                                     afines dentro de un mismo componente de
@@ -2415,8 +2423,8 @@ export default function DetallePublico({
                             </div>
 
                             {/* 2. Tipos de agrupación — Nuevo */}
-                            <div className="border-b border-slate-100 px-8 pt-5 pb-4">
-                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                            <div className="border-b border-[var(--acc-border)] px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-[var(--acc-text-muted)] uppercase">
                                     Tipos de agrupación
                                 </p>
                                 <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-3">
@@ -2427,7 +2435,7 @@ export default function DetallePublico({
                                                 Obligatorias
                                             </span>
                                         </div>
-                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                        <p className="text-[11px] leading-relaxed text-[var(--acc-text)]">
                                             Todas las asignaturas son
                                             obligatorias. Debes cursarlas para
                                             completar el componente.
@@ -2440,7 +2448,7 @@ export default function DetallePublico({
                                                 Mixtas
                                             </span>
                                         </div>
-                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                        <p className="text-[11px] leading-relaxed text-[var(--acc-text)]">
                                             Combinan asignaturas obligatorias y
                                             optativas. Las optativas aparecen
                                             como botón "Ver optativas de..." en
@@ -2454,7 +2462,7 @@ export default function DetallePublico({
                                                 Optativas
                                             </span>
                                         </div>
-                                        <p className="text-[11px] leading-relaxed text-slate-600">
+                                        <p className="text-[11px] leading-relaxed text-[var(--acc-text)]">
                                             Agrupaciones donde tú eliges qué
                                             cursos tomar entre una oferta
                                             disponible.
@@ -2464,11 +2472,11 @@ export default function DetallePublico({
                             </div>
 
                             {/* 3. El panel de distribución de créditos — Nuevo */}
-                            <div className="border-b border-slate-100 bg-slate-50/60 px-8 pt-5 pb-4">
-                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                            <div className="border-b border-[var(--acc-border)] bg-[var(--acc-surface-muted)] px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-[var(--acc-text-muted)] uppercase">
                                     Cómo leer la distribución de créditos
                                 </p>
-                                <div className="space-y-2.5 text-xs text-slate-600">
+                                <div className="space-y-2.5 text-xs text-[var(--acc-text)]">
                                     <div className="flex items-start gap-3">
                                         <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-rose-200 bg-rose-50">
                                             <span className="material-symbols-outlined !text-[12px] text-rose-500">
@@ -2516,8 +2524,8 @@ export default function DetallePublico({
                                         </p>
                                     </div>
                                     <div className="flex items-start gap-3">
-                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-slate-200 bg-white">
-                                            <span className="material-symbols-outlined !text-[12px] text-slate-500">
+                                        <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-md border border-[var(--acc-border)] bg-[var(--acc-surface)]">
+                                            <span className="material-symbols-outlined !text-[12px] text-[var(--acc-text-muted)]">
                                                 bar_chart
                                             </span>
                                         </div>
@@ -2563,25 +2571,25 @@ export default function DetallePublico({
                             </div>
 
                             {/* 4. Ejemplo visual de tarjeta de asignatura */}
-                            <div className="border-b border-slate-100 bg-white px-8 pt-5 pb-4">
-                                <p className="mb-3 text-[10px] font-black tracking-widest text-slate-400 uppercase">
+                            <div className="border-b border-[var(--acc-border)] bg-[var(--acc-surface)] px-8 pt-5 pb-4">
+                                <p className="mb-3 text-[10px] font-black tracking-widest text-[var(--acc-text-muted)] uppercase">
                                     Ejemplo de tarjeta de asignatura
                                 </p>
                                 <div className="flex flex-col items-start gap-5 sm:flex-row sm:items-start sm:gap-8">
                                     <div className="w-full shrink-0 sm:w-44">
-                                        <div className="overflow-hidden rounded-xl border-l-[5px] border-l-[#8bc34a] bg-white shadow-md">
-                                            <div className="flex justify-around border-b border-white/50 bg-[#f1f8e9] py-1 text-[8px] font-black text-slate-500">
+                                        <div className="overflow-hidden rounded-xl border-l-[5px] border-l-[#8bc34a] bg-[var(--acc-surface)] shadow-md">
+                                            <div className="flex justify-around border-b border-white/50 bg-[#f1f8e9] py-1 text-[8px] font-black text-[var(--acc-tint-ink)]">
                                                 <span>3 CR</span>
                                                 <span>4 HP</span>
                                                 <span>5 HE</span>
                                             </div>
                                             <div className="flex h-14 items-center justify-center px-3 py-3 text-center">
-                                                <h4 className="text-[10px] leading-tight font-bold text-slate-800">
+                                                <h4 className="text-[10px] leading-tight font-bold text-[var(--acc-text)]">
                                                     Bases de Datos I
                                                 </h4>
                                             </div>
-                                            <div className="flex items-center justify-between bg-slate-50/50 px-2 py-1">
-                                                <span className="font-mono text-[8px] font-bold text-slate-400">
+                                            <div className="flex items-center justify-between bg-[var(--acc-surface-muted)] px-2 py-1">
+                                                <span className="font-mono text-[8px] font-bold text-[var(--acc-text-muted)]">
                                                     4100552
                                                 </span>
                                                 <div className="flex items-center gap-1">
@@ -2597,7 +2605,7 @@ export default function DetallePublico({
                                             </div>
                                         </div>
                                     </div>
-                                    <div className="flex-1 space-y-2.5 text-xs text-slate-700">
+                                    <div className="flex-1 space-y-2.5 text-xs text-[var(--acc-text)]">
                                         <div className="flex items-start gap-2.5">
                                             <div className="mt-0.5 h-5 w-5 shrink-0 rounded border-l-4 border-[#8bc34a] bg-[#f1f8e9]" />
                                             <p>
@@ -2613,7 +2621,7 @@ export default function DetallePublico({
                                             </p>
                                         </div>
                                         <div className="flex items-start gap-2.5">
-                                            <span className="mt-0.5 shrink-0 rounded bg-slate-100 px-1.5 py-0.5 text-[9px] font-black whitespace-nowrap">
+                                            <span className="mt-0.5 shrink-0 rounded bg-[var(--acc-surface-muted)] px-1.5 py-0.5 text-[9px] font-black whitespace-nowrap">
                                                 3 CR / 4 HP / 5 HE
                                             </span>
                                             <p>
@@ -2678,7 +2686,7 @@ export default function DetallePublico({
                             </div>
 
                             {/* 5. Acordeones — contenido estático */}
-                            <div className="divide-y divide-slate-100">
+                            <div className="divide-y divide-[var(--acc-border)]">
                                 {[
                                     {
                                         key: 'plan',
@@ -2706,7 +2714,7 @@ export default function DetallePublico({
                                 ].map(({ key, title, content }) => (
                                     <div key={key}>
                                         <button
-                                            className="flex w-full items-center justify-between px-8 py-4 text-left transition-colors hover:bg-slate-50"
+                                            className="flex w-full items-center justify-between px-8 py-4 text-left transition-colors hover:bg-[var(--acc-surface-muted)]"
                                             onClick={() =>
                                                 setOpenAccordion(
                                                     openAccordion === key
@@ -2715,18 +2723,18 @@ export default function DetallePublico({
                                                 )
                                             }
                                         >
-                                            <span className="text-sm font-black text-slate-800">
+                                            <span className="text-sm font-black text-[var(--acc-text)]">
                                                 {title}
                                             </span>
                                             <span
-                                                className={`material-symbols-outlined !text-base text-slate-400 transition-transform duration-200 ${openAccordion === key ? 'rotate-180' : ''}`}
+                                                className={`material-symbols-outlined !text-base text-[var(--acc-text-muted)] transition-transform duration-200 ${openAccordion === key ? 'rotate-180' : ''}`}
                                             >
                                                 expand_more
                                             </span>
                                         </button>
                                         {openAccordion === key && (
                                             <div className="px-8 pb-5">
-                                                <p className="text-sm leading-relaxed text-slate-600">
+                                                <p className="text-sm leading-relaxed text-[var(--acc-text)]">
                                                     {content}
                                                 </p>
                                             </div>
