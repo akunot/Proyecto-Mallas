@@ -1,3 +1,7 @@
+import { type FormEvent } from 'react';
+
+/** URL de la página de resultados de búsqueda de la Universidad. */
+const RESULTADOS_URL = 'https://unal.edu.co/resultados-de-la-busqueda/';
 /**
  * Buscador institucional del header (punto 2 de la revisión).
  * Réplica propia de la caja de la plantilla UNAL: fondo blanco, lupa oscura a
@@ -12,13 +16,37 @@ export default function InstitutionalSearch({
     className?: string;
     fullWidth?: boolean;
 }) {
+    /**
+     * Abre la búsqueda en una pestaña nueva. Lo hacemos por JS porque la página
+     * de resultados de la UNAL (Google CSE) solo ejecuta la búsqueda si carga
+     * "fresca": si el navegador sirve una copia en caché, la pestaña se abre
+     * vacía y hay que pulsar F5. Ojo: esa página devuelve 404 (o se queda
+     * colgada) si la URL lleva parámetros extra (`s`, `cx`, `cof`, ...), por eso
+     * usamos solo `q` y añadimos un fragmento `#unj=<ts>` que NO viaja al
+     * servidor pero cambia la clave de caché del navegador y obliga a recargar.
+     */
+    const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+        event.preventDefault();
+
+        const raw = new FormData(event.currentTarget).get('q') as string | null;
+        const term = (raw ?? '').trim();
+        if (!term) {
+            return;
+        }
+
+        const params = new URLSearchParams({ q: term });
+        const url = `${RESULTADOS_URL}?${params}#unj=${Date.now()}`;
+        window.open(url, '_blank', 'noopener');
+    };
+
     return (
         <form
             role="search"
-            action="https://unal.edu.co/resultados-de-la-busqueda/"
+            action={RESULTADOS_URL}
             method="get"
             target="_blank"
             rel="noreferrer noopener"
+            onSubmit={handleSubmit}
             aria-label="Buscar en la Universidad"
             className={`buscador ${fullWidth ? 'buscador--full' : ''} ${className}`}
         >
