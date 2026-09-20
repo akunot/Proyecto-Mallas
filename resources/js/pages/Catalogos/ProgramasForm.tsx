@@ -1,5 +1,7 @@
-import { Head, useForm, Link } from '@inertiajs/react';
+import { Head, useForm, Link, usePage, router } from '@inertiajs/react';
+import { useRef, useState } from 'react';
 import MainLayout from '@/Layout/MainLayout';
+import { IMAGEN_PLACEHOLDER, resolverImagenPrograma } from '@/lib/programas';
 
 interface Programa {
   ID_Programa: number;
@@ -17,6 +19,7 @@ interface Programa {
   Extension: string | null;
   Correo: string | null;
   Area_Curricular: string | null;
+  Url_Imagen?: string | null;
   Esta_Activo: number;
 }
 
@@ -51,6 +54,52 @@ export default function ProgramasForm({ programa, facultades }: Props) {
     Correo: programa?.Correo ?? '',
     Area_Curricular: programa?.Area_Curricular ?? '',
   });
+
+  // --- Gestión de la imagen del programa (solo edición: la carga requiere ID) ---
+  const page = usePage();
+  const errorImagen = (page.props.errors as Record<string, string> | undefined)?.imagen;
+  const inputArchivo = useRef<HTMLInputElement>(null);
+  const urlImagenServidor = programa?.Url_Imagen ?? null;
+  const [imagenActual, setImagenActual] = useState<string | null>(urlImagenServidor);
+  const [urlImagenSincronizada, setUrlImagenSincronizada] = useState<string | null>(urlImagenServidor);
+  const [subiendoImagen, setSubiendoImagen] = useState(false);
+
+  // Sincroniza la vista previa cuando Inertia recarga el programa (tras cargar,
+  // reemplazar o eliminar la imagen). Se ajusta el estado durante el render,
+  // que es el patrón recomendado por React para estado derivado de props
+  // (evita el setState dentro de useEffect y renders en cascada).
+  if (urlImagenSincronizada !== urlImagenServidor) {
+    setUrlImagenSincronizada(urlImagenServidor);
+    setImagenActual(urlImagenServidor);
+  }
+
+  const subirImagen = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const archivo = e.target.files?.[0];
+    e.target.value = '';
+
+    if (!archivo || !programa) {
+      return;
+    }
+
+    setSubiendoImagen(true);
+    router.post(`/programas/${programa.ID_Programa}/imagen`, { imagen: archivo }, {
+      forceFormData: true,
+      onSuccess: () => setSubiendoImagen(false),
+      onError: () => setSubiendoImagen(false),
+    });
+  };
+
+  const eliminarImagen = () => {
+    if (!programa) {
+      return;
+    }
+
+    setSubiendoImagen(true);
+    router.delete(`/programas/${programa.ID_Programa}/imagen`, {
+      onSuccess: () => setSubiendoImagen(false),
+      onError: () => setSubiendoImagen(false),
+    });
+  };
 
   const onSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -148,6 +197,72 @@ post('/programas');
                 <label className="text-[10px] font-black uppercase text-slate-400 ml-1">Código SNIES</label>
                 <input type="text" value={data.Codigo_SNIES} onChange={e => setData('Codigo_SNIES', e.target.value)} className="w-full mt-1 px-4 py-3 bg-slate-50 border-2 border-transparent rounded-xl focus:border-blue-500" />
               </div>
+            </div>
+          </div>
+
+          {/* SECCIÓN 3: IMAGEN DEL PROGRAMA (solo edición: el upload requiere el ID) */}
+          <div className="bg-white rounded-3xl border border-slate-200 shadow-xl overflow-hidden">
+            <div className="px-8 py-4 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+              <span className="material-symbols-outlined text-emerald-600">image</span>
+              <h3 className="text-xs font-black uppercase tracking-widest text-slate-600">Imagen del Programa</h3>
+            </div>
+            <div className="p-8 flex flex-col sm:flex-row items-start gap-8">
+              {isEditing ? (
+                <>
+                  <img
+                    src={imagenActual ?? resolverImagenPrograma(programa)}
+                    alt="Imagen del programa"
+                    onError={(e) => {
+                      if (!e.currentTarget.src.endsWith(IMAGEN_PLACEHOLDER)) {
+                        e.currentTarget.src = IMAGEN_PLACEHOLDER;
+                      }
+                    }}
+                    className="w-64 h-40 rounded-2xl border border-slate-200 object-cover bg-slate-50"
+                  />
+                  <div className="flex-1 space-y-4">
+                    <p className="text-slate-500 text-sm">
+                      Formatos JPG o PNG, máximo 4 MB y mínimo 200×200 px. La vista previa se
+                      actualiza al guardar. Mientras el programa no tenga imagen cargada aquí, el
+                      sitio público muestra la imagen por defecto del programa o, si no existe, el
+                      placeholder institucional.
+                    </p>
+                    <input
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      className="hidden"
+                      ref={inputArchivo}
+                      onChange={subirImagen}
+                    />
+                    <div className="flex flex-wrap items-center gap-3">
+                      <button
+                        type="button"
+                        onClick={() => inputArchivo.current?.click()}
+                        disabled={subiendoImagen}
+                        className="px-6 py-3 bg-[#00236f] text-white rounded-2xl font-black shadow-lg shadow-blue-900/20 hover:scale-[1.02] disabled:opacity-50 transition-all uppercase tracking-widest text-xs"
+                      >
+                        <span className="material-symbols-outlined !text-base align-middle mr-1">{imagenActual ? 'sync' : 'upload'}</span>
+                        {subiendoImagen ? 'Subiendo...' : imagenActual ? 'Reemplazar imagen' : 'Cargar imagen'}
+                      </button>
+                      {imagenActual && (
+                        <button
+                          type="button"
+                          onClick={eliminarImagen}
+                          disabled={subiendoImagen}
+                          className="px-6 py-3 bg-rose-50 text-rose-600 border border-rose-200 rounded-2xl font-black hover:bg-rose-100 disabled:opacity-50 transition-all uppercase tracking-widest text-xs"
+                        >
+                          <span className="material-symbols-outlined !text-base align-middle mr-1">delete</span>
+                          Eliminar imagen
+                        </button>
+                      )}
+                    </div>
+                    {errorImagen && <p className="text-rose-600 text-xs font-bold">{errorImagen}</p>}
+                  </div>
+                </>
+              ) : (
+                <p className="text-slate-500 text-sm">
+                  Guarda el programa para poder asignarle una imagen (la carga requiere el ID del programa).
+                </p>
+              )}
             </div>
           </div>
 

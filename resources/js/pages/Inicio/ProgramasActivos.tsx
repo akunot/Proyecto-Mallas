@@ -2,6 +2,8 @@ import { Head, Link } from '@inertiajs/react';
 import { useState, useEffect } from 'react';
 import InstitutionalFooter from '../../components/InstitutionalFooter';
 import InstitutionalHeader from '../../components/InstitutionalHeader';
+import { anioActual } from '../../lib/anio';
+import { IMAGEN_PLACEHOLDER, resolverImagenPrograma } from '../../lib/programas';
 
 // --- Interfaces ---
 interface Programa {
@@ -12,6 +14,7 @@ interface Programa {
     Creditos_Totales: number | null;
     Duracion_Semestres: number | null;
     Titulo_Otorgado: string | null;
+    Url_Imagen: string | null;
     ID_Malla: number | null;
     Estado_Malla: string | null;
 }
@@ -28,97 +31,9 @@ interface Props {
     facultades: Facultad[];
 }
 
-// Ruta base única para los assets de imagen de programas.
-// Las imágenes viven en public/images/programas/ para evitar colisión
-// con la ruta SPA /programas manejada por Inertia/React.
-export const PROGRAMA_IMAGE_BASE = '/images/programas';
-
-// Mapeo de programas a archivos de imagen local.
-// Cada entrada apunta al archivo completo (con extensión) en public/images/programas/.
-// Las imágenes se movieron de public/programas/ a public/images/programas/ para
-// evitar colisión con la ruta SPA /programas manejada por Inertia/React.
-const imagesPorPrograma: Record<string, string> = {
-    'INGENIERÍA CIVIL': `${PROGRAMA_IMAGE_BASE}/Ingenieria civil.jpg`,
-    'INGENIERÍA ELÉCTRICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrica.jpg`,
-    'INGENIERÍA MECÁNICA': 'unsplash', // Fallback Unsplash
-    'INGENIERÍA INDUSTRIAL': `${PROGRAMA_IMAGE_BASE}/Ing. Industrial.jpg`,
-    'INGENIERÍA QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica.jpg`,
-    'ADMINISTRACIÓN DE SISTEMAS INFORMÁTICOS': `${PROGRAMA_IMAGE_BASE}/Administración de Sistemas Informáticos.jpg`,
-    'INGENIERÍA AGRÍCOLA': 'unsplash', // Fallback Unsplash
-    'ADMINISTRACIÓN DE EMPRESAS DIURNO': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas- diurna.jpg`,
-    'ADMINISTRACIÓN DE EMPRESAS NOCTURNO': `${PROGRAMA_IMAGE_BASE}/Administracion de empresas - Noctura.png`,
-    'ADMINISTRACIÓN DE EMPRESAS': `${PROGRAMA_IMAGE_BASE}/Administración de Empresas.jpg`,
-    'CONTADURÍA PÚBLICA': 'unsplash', // Fallback Unsplash
-    'DERECHO': 'unsplash', // Fallback Unsplash
-    'ARQUITECTURA': `${PROGRAMA_IMAGE_BASE}/ARQUITECTURA.jpg`,
-    'MEDICINA': 'unsplash', // Fallback Unsplash
-    'ENFERMERÍA': 'unsplash', // Fallback Unsplash
-    'BIOLOGÍA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica.png`,
-    'MATEMÁTICAS': `${PROGRAMA_IMAGE_BASE}/Matemáticas.jpg`,
-    'FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica.jpg`,
-    'QUÍMICA': `${PROGRAMA_IMAGE_BASE}/Ing. Quimica.jpg`,
-    'CIENCIAS HUMANAS': 'unsplash', // Fallback Unsplash
-    'CIENCIAS DE LA COMPUTACIÓN': `${PROGRAMA_IMAGE_BASE}/Ciencias de la Computación.jpg`,
-    'ESTADÍSTICA': `${PROGRAMA_IMAGE_BASE}/Estadistica.jpg`,
-    'GESTIÓN CULTURAL': `${PROGRAMA_IMAGE_BASE}/Gestión Cultural.jpg`,
-    'INGENIERÍA ELECTRÓNICA': `${PROGRAMA_IMAGE_BASE}/Ing. Electrónica.jpg`,
-    'INGENIERÍA FÍSICA': `${PROGRAMA_IMAGE_BASE}/Ing. Fisica.jpg`,
-    'INGENIERÍA BIOLÓGICA': `${PROGRAMA_IMAGE_BASE}/Ingeniería Biológica.png`,
-};
-
-// URLs de fallback Unsplash para programas sin imagen local
-const unsplashFallbacks: Record<string, string> = {
-    'INGENIERÍA MECÁNICA': 'https://images.unsplash.com/photo-1581092335397-9583eb92d232?w=600&q=80',
-    'INGENIERÍA AGRÍCOLA': 'https://images.unsplash.com/photo-1586771107445-b3b7cb66f5c6?w=600&q=80',
-    'CONTADURÍA PÚBLICA': 'https://images.unsplash.com/photo-1554224155-6726b3ff858f?w=600&q=80',
-    'DERECHO': 'https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=600&q=80',
-    'MEDICINA': 'https://images.unsplash.com/photo-1617317366354-2d9a4080185c?w=600&q=80',
-    'ENFERMERÍA': 'https://images.unsplash.com/photo-1576091160399-112ba8d25d1d?w=600&q=80',
-    'CIENCIAS HUMANAS': 'https://images.unsplash.com/photo-1531746790095-e5cb157ad1d5?w=600&q=80',
-};
-
-const getImageForPrograma = (nombre: string): string => {
-    const upper = nombre.toUpperCase().trim();
-
-    // 1) Match específico: la clave aparece como sub-cadena del nombre
-    //    (resuelve "Administración de Empresas Nocturno" → clave nocturna,
-    //     antes que la genérica de Empresas).
-    for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
-        if (upper.includes(key)) {
-            if (imagePath === 'unsplash') {
-                return (
-                    unsplashFallbacks[key] ||
-                    'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
-                );
-            }
-
-            return imagePath;
-        }
-    }
-
-    // 2) Match por primera palabra, solo si es inequívoco (no "ADMINISTRACIÓN"
-    //    porque colisiona entre Empresas / Sistemas / etc).
-    const firstWord = upper.split(' ')[0];
-    const EQUIVOCAL_FIRST_WORDS = new Set(['ADMINISTRACIÓN', 'INGENIERÍA']);
-
-    if (!EQUIVOCAL_FIRST_WORDS.has(firstWord)) {
-        for (const [key, imagePath] of Object.entries(imagesPorPrograma)) {
-            if (key.startsWith(firstWord)) {
-                if (imagePath === 'unsplash') {
-                    return (
-                        unsplashFallbacks[key] ||
-                        'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80'
-                    );
-                }
-
-                return imagePath;
-            }
-        }
-    }
-
-    // Imagen genérica de fallback para carreras no listadas
-    return 'https://images.unsplash.com/photo-1523240795612-9a054b0db644?w=600&q=80';
-};
+// La resolución de la imagen del programa (base de datos → legacy → placeholder
+// institucional) vive en resources/js/lib/programas.ts para que el listado
+// público y el panel administrativo muestren siempre la misma imagen.
 
 /**
  * Vista de Inicio — Listado de Programas Activos
@@ -168,7 +83,7 @@ export default function ProgramasActivos({ facultades }: Props) {
                     <div className="space-y-6">
                         <div className="inline-flex items-center gap-3 bg-white/10 backdrop-blur-md px-4 py-2 rounded-2xl border border-white/10 animate-in fade-in">
                             <span className="w-2 h-2 rounded-full bg-[#77c53f] animate-pulse" />
-                            <span className="text-[var(--acc-hero-text)] text-xs font-black uppercase tracking-[3px]">Admisiones 2026</span>
+                            <span className="text-[var(--acc-hero-text)] text-xs font-black uppercase tracking-[3px]">Admisiones {anioActual()}</span>
                         </div>
                         <h1 className="text-4xl sm:text-5xl lg:text-7xl font-black text-[var(--acc-hero-text)] leading-[1.1] tracking-tight">
                             Mallas Curriculares
@@ -249,7 +164,12 @@ export default function ProgramasActivos({ facultades }: Props) {
                                 >
                                     {/* Imagen de fondo con Zoom al hover */}
                                     <img 
-                                        src={getImageForPrograma(programa.Nombre_Programa)} 
+                                        src={resolverImagenPrograma(programa)}
+                                        onError={(e) => {
+                                            if (!e.currentTarget.src.endsWith(IMAGEN_PLACEHOLDER)) {
+                                                e.currentTarget.src = IMAGEN_PLACEHOLDER;
+                                            }
+                                        }}
                                         alt={programa.Nombre_Programa}
                                         className="absolute inset-0 w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
                                     />

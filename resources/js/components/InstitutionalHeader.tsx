@@ -589,10 +589,16 @@ export default function InstitutionalHeader() {
       {servicesOpen && (
         <aside
           id="institutional-services"
-          className="fixed top-0 right-0 z-[35000] hidden h-screen w-[240px] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
+          className="fixed top-0 right-0 z-[35000] hidden h-screen w-[240px] font-['Ancizar_Sans'] bg-[#333] shadow-[-4px_0_12px_rgba(0,0,0,0.2)] md:block"
           aria-label="Servicios institucionales"
         >
-          <ul className="m-0 h-full w-[240px] overflow-y-auto overflow-x-hidden px-[10px] py-[150px] text-[13px] leading-8">
+          {/* Observación de identidad visual del Menú de Servicios:
+              el panel no debe conservar el espacio gris superior (el padding
+              de 150px dejaba una franja vacía sobre los iconos) y debe usar la
+              tipografía institucional Ancízar. El aside es HERMANO del
+              <header> (que es quien define la fuente), por eso la tipografía
+              se declara aquí. Los iconos quedan en la parte superior. */}
+          <ul className="m-0 h-full w-[240px] overflow-y-auto overflow-x-hidden px-[10px] pt-[10px] pb-[24px] text-[13px] leading-8">
           {SERVICES.map(({ label, href, icon }) => (
             <li
               key={label}

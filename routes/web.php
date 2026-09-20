@@ -45,7 +45,7 @@ use Inertia\Inertia;
  * Lógica compartida para renderizar el listado de programas activos.
  */
 $renderProgramasActivos = function () {
-    $data = Cache::remember('programas_activos', 300, function () {
+    $data = Cache::remember(Programa::CACHE_KEY_ACTIVOS, 300, function () {
         $facultades = Facultad::where('Esta_Activo', 1)
             ->orderBy('Nombre_Facultad')
             ->get()
@@ -78,6 +78,7 @@ $renderProgramasActivos = function () {
                     'Duracion_Semestres' => $programa->Duracion_Semestres,
                     'Codigo_SNIES' => $programa->Codigo_SNIES,
                     'Titulo_Otorgado' => $programa->Titulo_Otorgado,
+                    'Url_Imagen' => $programa->Url_Imagen,
                     'ID_Malla' => $mallaActiva ? $mallaActiva->ID_Malla : null,
                     'Estado_Malla' => $mallaActiva ? $mallaActiva->Estado : null,
                 ];
@@ -326,6 +327,10 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/programas/{id}', [ProgramaController::class, 'update']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
     Route::delete('/programas/{id}', [ProgramaController::class, 'destroy']);
+
+    // Imagen del programa (cargar/reemplazar/eliminar)
+    Route::post('/programas/{id}/imagen', [ProgramaController::class, 'storeImagen'])->name('programas.imagen.store');
+    Route::delete('/programas/{id}/imagen', [ProgramaController::class, 'destroyImagen'])->name('programas.imagen.destroy');
 
     // Catálogos - Normativas
     Route::get('/normativas', function (Request $request) {

@@ -27,6 +27,7 @@ class ProgramaFactory extends Factory
             'Extension' => fake()->randomNumber(3),
             'Correo' => fake()->email(),
             'Area_Curricular' => fake()->word(),
+            'Ruta_Imagen' => null,
             'Esta_Activo' => 1,
         ];
     }

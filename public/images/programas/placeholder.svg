@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="800" height="600" viewBox="0 0 800 600" role="img" aria-label="Programa sin imagen">
+  <defs>
+    <linearGradient id="fondo" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#00236F"/>
+      <stop offset="1" stop-color="#0A3D91"/>
+    </linearGradient>
+  </defs>
+  <rect width="800" height="600" fill="url(#fondo)"/>
+  <path d="M400 96 C468 122 534 130 584 130 L584 316 C584 386 512 438 400 470 C288 438 216 386 216 316 L216 130 C266 130 332 122 400 96 Z" fill="#FFFFFF" opacity="0.94"/>
+  <text x="400" y="330" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="150" font-weight="bold" fill="#00236F">UN</text>
+</svg>

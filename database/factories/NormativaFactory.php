@@ -16,7 +16,7 @@ class NormativaFactory extends Factory
             'Codigo_Programa' => fn () => Programa::factory()->create()->Codigo_Programa,
             'Tipo_Normativa' => fake()->randomElement(['Acuerdo', 'Resolución', 'Decreto']),
             'Numero_Normativa' => fake()->numerify('###'),
-            'Anio_Normativa' => fake()->numberBetween(2010, 2026),
+            'Anio_Normativa' => fake()->numberBetween(2010, (int) date('Y')),
             'Instancia' => fake()->word(),
             'Descripcion_Normativa' => fake()->sentence(),
             'Url_Normativa' => fake()->url(),

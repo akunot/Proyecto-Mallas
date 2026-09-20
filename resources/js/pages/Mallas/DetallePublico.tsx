@@ -12,6 +12,7 @@ import {
     getUniqueRequisitos
 } from '../../lib/requisitos';
 import type {Requisito} from '../../lib/requisitos';
+import { anioActual } from '../../lib/anio';
 
 interface Asignatura {
     ID_Asignatura: number;
@@ -2307,7 +2308,7 @@ return;
                         {/* Marca / copyright */}
                         <div className="flex items-center gap-2 pl-3">
                             <span className="text-[10px] font-bold tracking-wider whitespace-nowrap text-[var(--acc-text-muted)]">
-                                SIA · UNAL — 2026
+                                SIA · UNAL — {anioActual()}
                             </span>
                         </div>
                     </div>

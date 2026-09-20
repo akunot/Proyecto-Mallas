@@ -2,6 +2,7 @@ import { Head, router } from '@inertiajs/react';
 import type { FormEvent } from 'react';
 import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
+import { anioActual } from '../../lib/anio';
 
 export default function Login() {
     const { login, requestOtp } = useAuth();
@@ -68,7 +69,7 @@ export default function Login() {
                     <div className="relative z-10 flex items-center gap-4 text-xs font-bold text-slate-500 uppercase tracking-widest">
                         <span>Universidad Nacional de Colombia</span>
                         <span className="w-1 h-1 bg-slate-700 rounded-full"></span>
-                        <span>2026</span>
+                        <span>{anioActual()}</span>
                     </div>
 
                     {/* Decoración abstracta de fondo */}

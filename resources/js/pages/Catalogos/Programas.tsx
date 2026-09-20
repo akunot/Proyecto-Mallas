@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { IMAGEN_PLACEHOLDER, resolverImagenPrograma } from '@/lib/programas';
 interface Programa {
     ID_Programa: number;
     ID_Facultad: number;
@@ -16,6 +17,7 @@ interface Programa {
     Extension: string | null;
     Correo: string | null;
     Area_Curricular: string | null;
+    Url_Imagen?: string | null;
     Esta_Activo: number;
     Nombre_Facultad?: string;
 }
@@ -47,11 +49,23 @@ export default function Programas({ programas }: Props) {
             label: 'Programa Académico', 
             sortable: true,
             render: (value: string, row: Programa) => (
-                <div className="flex flex-col">
-                    <span className="font-bold text-slate-800 leading-tight">{value}</span>
-                    <span className="text-[10px] font-mono text-blue-600 font-bold uppercase tracking-tighter">
-                        CÓD: {row.Codigo_Programa} • SNIES: {row.Codigo_SNIES || 'N/A'}
-                    </span>
+                <div className="flex items-center gap-3">
+                    <img
+                        src={resolverImagenPrograma(row)}
+                        alt={value}
+                        onError={(e) => {
+                            if (!e.currentTarget.src.endsWith(IMAGEN_PLACEHOLDER)) {
+                                e.currentTarget.src = IMAGEN_PLACEHOLDER;
+                            }
+                        }}
+                        className="h-10 w-10 shrink-0 rounded-lg border border-slate-200 object-cover bg-slate-50"
+                    />
+                    <div className="flex flex-col">
+                        <span className="font-bold text-slate-800 leading-tight">{value}</span>
+                        <span className="text-[10px] font-mono text-blue-600 font-bold uppercase tracking-tighter">
+                            CÓD: {row.Codigo_Programa} • SNIES: {row.Codigo_SNIES || 'N/A'}
+                        </span>
+                    </div>
                 </div>
             )
         },

@@ -7,8 +7,13 @@
 
         <title inertia>{{ config('app.name', 'Laravel') }}</title>
 
-        <link rel="icon" type="image/x-icon" href="/unal/images/favicon.ico?v=20261209" sizes="16x16">
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png">
+        {{-- Iconos institucionales: se sirve siempre /favicon.ico (móvil y escritorio)
+             para evitar que los navegadores recurran al icono por defecto de Laravel.
+             El sufijo ?v= usa la fecha de modificación del archivo como cache-buster,
+             de modo que al reemplazar el ícono no queden versiones antiguas en caché. --}}
+        @php($faviconVersion = file_exists(public_path('favicon.ico')) ? filemtime(public_path('favicon.ico')) : null)
+        <link rel="icon" type="image/x-icon" href="/favicon.ico{{ $faviconVersion ? '?v='.$faviconVersion : '' }}" sizes="16x16 32x32 48x48">
+        <link rel="apple-touch-icon" href="/favicon.ico">
 
         @viteReactRefresh
         @vite(['resources/js/app.tsx', "resources/js/pages/{$page['component']}.tsx"])

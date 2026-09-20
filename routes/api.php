@@ -138,6 +138,8 @@ Route::middleware('auth.token')->prefix('v1')->group(function () {
     Route::put('/programas/{id}', [ProgramaController::class, 'update']);
     Route::patch('/programas/{id}/toggle', [ProgramaController::class, 'toggle']);
     Route::get('/programas/{id}/electivas', [ProgramaController::class, 'electivas']);
+    Route::post('/programas/{id}/imagen', [ProgramaController::class, 'storeImagen']);
+    Route::delete('/programas/{id}/imagen', [ProgramaController::class, 'destroyImagen']);
 
     // Normativas
     Route::get('/normativas', [NormativaController::class, 'index']);

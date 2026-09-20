@@ -236,3 +236,32 @@ describe('Revisión de diseño y accesibilidad del header (2026-12)', () => {
         expect(document.documentElement.style.fontSize).toBe('100%');
     });
 });
+
+describe('Observación de identidad visual — Menú de Servicios (Manizales-0148-2026)', () => {
+    it('el panel lateral de servicios usa la tipografía institucional Ancízar', async () => {
+        const user = userEvent.setup();
+        render(<InstitutionalHeader />);
+
+        // Se abre el panel lateral con la pestaña fija de escritorio.
+        await user.click(screen.getAllByRole('button', { name: /^servicios/i })[0]!);
+
+        // El <aside> está FUERA del <header> (que define la fuente), por lo que
+        // debe declarar explícitamente la tipografía institucional Ancízar.
+        const aside = screen.getByLabelText('Servicios institucionales');
+        expect(aside.className).toContain("font-['Ancizar_Sans']");
+    });
+
+    it('el panel lateral no conserva el espacio gris superior (py de 150px eliminado)', async () => {
+        const user = userEvent.setup();
+        render(<InstitutionalHeader />);
+
+        await user.click(screen.getAllByRole('button', { name: /^servicios/i })[0]!);
+
+        const aside = screen.getByLabelText('Servicios institucionales');
+        const lista = aside.querySelector('ul');
+
+        // Los iconos deben quedar en la parte superior del panel.
+        expect(lista?.className).toContain('pt-[10px]');
+        expect(lista?.className).not.toContain('py-[150px]');
+    });
+});

@@ -61,10 +61,13 @@
 
 /* Ancizar Sans */
 
+/* El archivo "regular" corresponde al peso real 400 (antes se declaraba como
+   600, lo que obligaba al navegador a un fallback silencioso cuando el texto
+   pedía 400). El Menú de Servicios, el header y el footer usan esta familia. */
 @font-face {
     font-family: "Ancizar Sans";
     src: url("/unal/fonts/ancizar_sans-regular-webfont.woff2") format("woff2");
-    font-weight: 600;
+    font-weight: 400;
     font-style: normal;
     font-display: swap;
 }
