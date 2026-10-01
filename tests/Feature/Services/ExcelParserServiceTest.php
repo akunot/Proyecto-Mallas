@@ -3,13 +3,16 @@
 use App\Models\Agrupacion;
 use App\Models\AgrupacionAsignatura;
 use App\Models\Asignatura;
+use App\Models\CargaMalla;
 use App\Models\Componente;
+use App\Models\ErrorCarga;
 use App\Models\MallaCurricular;
 use App\Models\Normativa;
 use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
+use App\Services\CodeNormalizationService;
 use App\Services\ExcelParserService;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
@@ -485,4 +488,171 @@ test('placeholders OPTATIVA9 y OPTATIVA10 crean slots en lugar de relaciones de 
     expect(
         AgrupacionAsignatura::where('ID_Agrupacion', $agrupacion->ID_Agrupacion)->exists()
     )->toBeFalse();
+
+    // Caso 5 (integridad): la plantilla referenciada por el Excel permanece
+    // intacta después de la importación, con exactamente el mismo ID.
+    expect(PlantillaAgrupacion::find($plantilla->ID_Plantilla_Agrupacion))->not->toBeNull();
+    expect($plantilla->fresh()->ID_Plantilla_Agrupacion)->toBe($plantilla->ID_Plantilla_Agrupacion);
+});
+
+test('la hoja MALLA procesa filas con IDs de plantillas existentes sin eliminarlas (Caso 5)', function () {
+    $programa = Programa::factory()->create();
+    $normativa = Normativa::factory()->create([
+        'Codigo_Programa' => $programa->Codigo_Programa,
+    ]);
+    $malla = MallaCurricular::factory()->create([
+        'ID_Normativa' => $normativa->ID_Normativa,
+        'ID_Programa' => $programa->ID_Programa,
+        'Estado' => 'borrador',
+    ]);
+    $componente = Componente::factory()->create();
+    $carga = CargaMalla::factory()->create([
+        'ID_Malla' => $malla->ID_Malla,
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Normativa' => $normativa->ID_Normativa,
+        'tipo_carga' => 'malla',
+    ]);
+
+    $plantilla = PlantillaAgrupacion::create([
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Componente' => $componente->ID_Componente,
+        'Nombre_Agrupacion' => 'Profesionales Optativas',
+        'Tipo_Agrupacion' => 'OPTATIVA',
+        'Creditos_Requeridos' => 9,
+        'Es_Obligatoria' => false,
+    ]);
+
+    // La fila del Excel referencia la plantilla por su ID y la asignatura se
+    // busca por código normalizado.
+    $codigoAsignatura = 'MAT'.fake()->unique()->numberBetween(10000, 99999);
+    $codigoNormalizado = CodeNormalizationService::normalize($codigoAsignatura);
+    $asignatura = Asignatura::factory()->create(['Codigo_Base' => $codigoNormalizado]);
+
+    $plantillasAntes = PlantillaAgrupacion::count();
+
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+
+    $cargaProp = $reflection->getProperty('carga');
+    $cargaProp->setAccessible(true);
+    $cargaProp->setValue($service, $carga);
+
+    $mallaProp = $reflection->getProperty('malla');
+    $mallaProp->setAccessible(true);
+    $mallaProp->setValue($service, $malla);
+
+    // Columnas: Normativa, Componente, Plantilla, Código, Obligatoria,
+    // Tipo requisito, Código requisito, Semestre, ...
+    $fila = [
+        $normativa->ID_Normativa,
+        $componente->ID_Componente,
+        (string) $plantilla->ID_Plantilla_Agrupacion,
+        $codigoAsignatura,
+        'NO',
+        '', '',
+        3,
+        '', '', '', '',
+    ];
+
+    $batchComponentes = [];
+    $batchAgrupaciones = [];
+    $batchRelaciones = [];
+    $batchRequisitos = [];
+    $compTempMap = [];
+    $agrupTempMap = [];
+
+    $accumulate = $reflection->getMethod('accumulateMallaRow');
+    $accumulate->setAccessible(true);
+    $args = [
+        $fila,
+        2,
+        &$batchComponentes,
+        &$batchAgrupaciones,
+        &$batchRelaciones,
+        &$batchRequisitos,
+        &$compTempMap,
+        &$agrupTempMap,
+    ];
+    $accumulate->invokeArgs($service, $args);
+
+    // La fila se acumuló correctamente usando la plantilla existente.
+    expect($batchAgrupaciones)->toHaveCount(1);
+    expect($batchAgrupaciones[0]['Nombre_Agrupacion'])->toBe($plantilla->Nombre_Agrupacion);
+    expect($batchRelaciones)->toHaveCount(1);
+    expect($batchRelaciones[0]['ID_Asignatura'])->toBe($asignatura->ID_Asignatura);
+
+    // No se produjeron errores de validación para la plantilla existente.
+    expect(ErrorCarga::where('ID_Carga', $carga->ID_Carga)->count())->toBe(0);
+
+    // La importación no crea, elimina ni reasigna plantillas.
+    expect(PlantillaAgrupacion::count())->toBe($plantillasAntes);
+    $plantillaDespues = PlantillaAgrupacion::find($plantilla->ID_Plantilla_Agrupacion);
+    expect($plantillaDespues)->not->toBeNull();
+    expect($plantillaDespues->ID_Plantilla_Agrupacion)->toBe($plantilla->ID_Plantilla_Agrupacion);
+    expect($plantillaDespues->Nombre_Agrupacion)->toBe($plantilla->Nombre_Agrupacion);
+});
+
+test('una carga que referencia un ID de plantilla inexistente produce el error de validación (Caso 6)', function () {
+    $programa = Programa::factory()->create();
+    $normativa = Normativa::factory()->create([
+        'Codigo_Programa' => $programa->Codigo_Programa,
+    ]);
+    $malla = MallaCurricular::factory()->create([
+        'ID_Normativa' => $normativa->ID_Normativa,
+        'ID_Programa' => $programa->ID_Programa,
+        'Estado' => 'borrador',
+    ]);
+    $componente = Componente::factory()->create();
+    $carga = CargaMalla::factory()->create([
+        'ID_Malla' => $malla->ID_Malla,
+        'ID_Programa' => $programa->ID_Programa,
+        'ID_Normativa' => $normativa->ID_Normativa,
+        'tipo_carga' => 'malla',
+    ]);
+
+    $idInexistente = 987654;
+    expect(PlantillaAgrupacion::find($idInexistente))->toBeNull();
+    $plantillasAntes = PlantillaAgrupacion::count();
+
+    $service = new ExcelParserService();
+    $reflection = new ReflectionClass($service);
+
+    $cargaProp = $reflection->getProperty('carga');
+    $cargaProp->setAccessible(true);
+    $cargaProp->setValue($service, $carga);
+
+    $mallaProp = $reflection->getProperty('malla');
+    $mallaProp->setAccessible(true);
+    $mallaProp->setValue($service, $malla);
+
+    // Fila placeholder que referencia la plantilla inexistente.
+    $fila = [
+        $normativa->ID_Normativa,
+        $componente->ID_Componente,
+        (string) $idInexistente,
+        'OPTATIVA7',
+        'NO',
+        '', '',
+        5,
+    ];
+
+    $method = $reflection->getMethod('procesarPlaceholder');
+    $method->setAccessible(true);
+    $method->invoke($service, $fila, 8);
+
+    // La validación de importación conserva el error esperado.
+    $error = ErrorCarga::where('ID_Carga', $carga->ID_Carga)
+        ->where('Columna_Error', 'Agrupacion')
+        ->first();
+
+    expect($error)->not->toBeNull();
+    expect($error->Mensaje_Error)->toContain("Plantilla de Agrupacion ({$idInexistente})");
+    expect($error->Mensaje_Error)->toContain('no válida');
+    expect($error->Severidad_Error)->toBe('error');
+
+    // El proceso no crea, elimina ni reasigna plantillas.
+    expect(PlantillaAgrupacion::count())->toBe($plantillasAntes);
+
+    // Tampoco se crean agrupaciones para la plantilla inexistente.
+    expect(Agrupacion::where('ID_Malla', $malla->ID_Malla)->count())->toBe(0);
 });

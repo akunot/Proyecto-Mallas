@@ -46,6 +46,15 @@
 | `error` | La fila **no se procesa**. El resto del archivo sigue. La carga queda en estado `con_errores`. |
 | `advertencia` | La fila **sí se procesa** usando la lógica de fallback definida. La carga puede quedar en `borrador`. |
 
+## Plantillas y agrupaciones
+
+| Término | Definición |
+|---------|------------|
+| **`plantillas_agrupacion`** | Definiciones persistentes por programa que contienen `ID_Plantilla_Agrupacion`, componente, nombre, tipo y reglas de créditos/obligatoriedad. El Excel puede referenciarlas por ID. |
+| **`agrupaciones`** | Instancias concretas generadas para una `malla_curricular`. Sus asignaturas se vinculan mediante `agrupacion_asignatura` y `ID_Malla`. |
+
+Las plantillas se editan sobre el mismo registro y no se eliminan desde la aplicación. Sus IDs `AUTO_INCREMENT` son persistentes: los gaps son válidos y no deben rellenarse artificialmente.
+
 ---
 
 ## Tipos de requisito
@@ -76,7 +85,7 @@
 
 - **INV-02**: Si `carga_malla.Estado = 'aprobado'` entonces su `malla_curricular.Estado = 'activa'` y `Es_Vigente = 1`.
 
-- **INV-03**: Ningún registro de `sede`, `facultad`, `programa`, `normativa`, `componente` o `asignatura` se elimina físicamente. Solo se desactiva.
+- **INV-03**: Los catálogos con campo de activación se desactivan en lugar de eliminarse. Las plantillas de agrupación no tienen soft delete y no exponen eliminación desde la aplicación.
 
 - **INV-04**: Ningún registro de `log_actividad` puede ser modificado o eliminado por ningún usuario.
 

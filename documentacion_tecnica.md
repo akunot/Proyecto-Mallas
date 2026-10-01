@@ -8,7 +8,7 @@ Sistema de Gestión de Mallas Académicas — UNAL Manizales
 
 _Documento técnico para desarrollo y mantenimiento_
 
-Versión 5.5 | Julio 2026
+Auditoría documental | Septiembre 2026
 
 ---
 
@@ -20,7 +20,7 @@ Versión 5.5 | Julio 2026
 | Arquitectura      | Monolito modular (Laravel + Inertia + React) + MySQL 8 + Redis 7   |
 | Autenticación     | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña)    |
 | Tipo de sistema   | Panel administrativo cerrado, usuarios contados                     |
-| Documento versión | 5.5 — Julio 2026                                                    |
+| Documento versión | Auditoría basada en código y migraciones vigentes — septiembre 2026 |
 
 ### Historial de cambios
 
@@ -55,13 +55,13 @@ El nuevo sistema permite a los administradores cargar archivos Excel con la estr
 Las entidades principales del dominio, de mayor a menor jerarquía, son:
 
 - `Sede` → `Facultad` → `Programa` → `Normativa` → `MallaCurricular`
-- `Programa` → `Agrupacion` (las agrupaciones son estructuras estables del programa, no de una versión de malla)
+- `Programa` → `PlantillaAgrupacion` → `Agrupacion` concreta de una `MallaCurricular`
 - `Agrupacion` + `MallaCurricular` → `AgrupacionAsignatura` → `Requisito`
 - `Componente` (catálogo transversal usado por Agrupacion)
 - `Asignatura` (catálogo global compartido entre todos los programas)
 - `Usuario`, `ArchivoExcel`, `CargaMalla`, `ErrorCarga`, `DiffMalla`, `LogActividad` (gestión y auditoría)
 
-> **CAMBIO v4:** Las agrupaciones pertenecen al **Programa** (`ID_Programa`), no a la versión de malla. Lo que cambia entre versiones es qué asignaturas están en cada agrupación (`AgrupacionAsignatura`), registrado mediante `ID_Malla`. Ver sección 3.8 para detalle completo.
+> **Estado actual:** `plantillas_agrupacion` pertenece al programa y conserva las definiciones referenciadas por Excel. `agrupaciones` es la instancia concreta asociada a una `malla_curricular` mediante `ID_Malla`; `agrupacion_asignatura` también queda versionada por `ID_Malla`. Las migraciones históricas contienen una transición intermedia con `ID_Programa`, pero el modelo operativo actual crea y busca agrupaciones por malla.
 
 > **CAMBIO v5:** La carga masiva se divide en tres archivos independientes: `asignaturas`, `electivas` y `malla`. La subida es progresiva (se pueden subir en cualquier orden) y el procesamiento se lanza manualmente cuando los tres están listos. Ver sección 4.3 para el flujo completo.
 
@@ -301,9 +301,27 @@ DB::statement("
 
 ---
 
-### 3.8. Tabla: `agrupacion`
+### 3.8. Tabla: `plantillas_agrupacion`
 
-> **CAMBIO CRÍTICO v4:** `ID_Malla` → `ID_Programa`. Las agrupaciones son estructuras estables del programa, no de una versión de malla.
+Es el catálogo de definiciones de agrupación por programa. No contiene las asignaturas de una malla concreta.
+
+| Columna | Tipo / comportamiento | Notas |
+| --- | --- | --- |
+| `ID_Plantilla_Agrupacion` | `INT UNSIGNED AUTO_INCREMENT` PK | Identificador persistente; puede tener gaps y no debe reasignarse |
+| `ID_Programa` | FK a `programas.ID_Programa` | Programa al que pertenece la definición |
+| `ID_Componente` | FK a `componentes.ID_Componente` | Componente de la plantilla |
+| `Indice_Agrupacion_Excel` | Entero nullable | Índice auxiliar de origen Excel |
+| `Nombre_Agrupacion` | `VARCHAR(255)` | Nombre de la definición |
+| `Tipo_Agrupacion` | `VARCHAR(100)` nullable | Tipo definido para la agrupación |
+| `Creditos_Requeridos` | Entero nullable | Créditos mínimos |
+| `Creditos_Maximos` | Entero nullable | Límite superior, si aplica |
+| `Es_Obligatoria` | Boolean | Regla de obligatoriedad |
+
+La aplicación permite editar estos campos sobre el registro existente. No existe DELETE en las rutas web/API de este catálogo, el controlador responde 405 incluso si se invoca directamente y la tabla no tiene un campo de soft delete.
+
+### 3.9. Tabla: `agrupacion`
+
+> La agrupación concreta se genera desde una plantilla para una malla. No debe confundirse con la plantilla persistente.
 >
 > **Mapeo de `Tipo_Agrupacion` desde Excel:** El archivo Excel de agrupaciones tiene dos columnas relevantes: `COMPONENTE` y `TIPO AGRUPACIÓN`. La columna `COMPONENTE` del Excel alimenta el campo `Tipo_Agrupacion` de la BD (no la columna `TIPO AGRUPACIÓN`). La columna `TIPO AGRUPACIÓN` del Excel alimenta `Es_Obligatoria`.
 >
@@ -330,7 +348,8 @@ DB::statement("
 | **Columna**         | **Tipo MySQL**              | **NN** | **Default** | **Notas**                                                                                                        |
 | ------------------- | --------------------------- | ------ | ----------- | ---------------------------------------------------------------------------------------------------------------- |
 | ID_Agrupacion       | INT UNSIGNED AUTO_INCREMENT | Sí     | -           | PK                                                                                                               |
-| ID_Programa         | INT UNSIGNED                | Sí     | -           | **CAMBIA v4.** FK → programa (antes era FK → malla_curricular)                                                   |
+| ID_Malla            | INT UNSIGNED                | Sí     | -           | FK → `mallas_curriculares`; identifica la instancia concreta de esta malla                                         |
+| ID_Programa         | INT UNSIGNED                | Sí     | -           | FK adicional al programa; se conserva en el esquema operativo                                                     |
 | ID_Componente       | INT UNSIGNED                | Sí     | -           | FK → componente                                                                                                  |
 | Tipo_Agrupacion     | VARCHAR(30)                 | Sí     | -           | fundamentacion\|disciplinar_profesional\|libre_eleccion\|nivelatorio. Mapeado desde columna COMPONENTE del Excel |
 | Nombre_Agrupacion   | VARCHAR(150)                | Sí     | -           |                                                                                                                  |
@@ -338,15 +357,15 @@ DB::statement("
 | Creditos_Maximos    | INT UNSIGNED                | No     | NULL        |                                                                                                                  |
 | Es_Obligatoria      | TINYINT(1)                  | Sí     | 0           | Mapeado desde columna TIPO AGRUPACIÓN del Excel                                                                  |
 
-**Restricción UNIQUE:**
+**Restricción UNIQUE vigente:**
 
 ```sql
-UNIQUE KEY uq_agrupacion_programa (ID_Programa, ID_Componente, Nombre_Agrupacion)
+UNIQUE KEY uq_agrupacion_malla (ID_Malla, ID_Componente, Nombre_Agrupacion)
 ```
 
 ---
 
-### 3.9. Tabla: `agrupacion_asignatura`
+### 3.10. Tabla: `agrupacion_asignatura`
 
 > **CAMBIO CRÍTICO v4:** Se agrega `ID_Malla`. Esta tabla es el punto de unión entre una versión de malla y las agrupaciones del programa.
 
@@ -367,7 +386,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.10. Tabla: `requisito`
+### 3.11. Tabla: `requisito`
 
 | **Columna**             | **Tipo MySQL**              | **NN** | **Default** | **Notas**                                                                      |
 | ----------------------- | --------------------------- | ------ | ----------- | ------------------------------------------------------------------------------ |
@@ -381,7 +400,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.11. Tabla: `usuario`
+### 3.12. Tabla: `usuario`
 
 | **Columna**      | **Tipo MySQL**              | **NN** | **Default**       | **Notas**                                        |
 | ---------------- | --------------------------- | ------ | ----------------- | ------------------------------------------------ |
@@ -395,7 +414,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.12. Tabla: `archivo_excel`
+### 3.13. Tabla: `archivo_excel`
 
 | **Columna**          | **Tipo MySQL**              | **NN** | **Default**       | **Notas**                                               |
 | -------------------- | --------------------------- | ------ | ----------------- | ------------------------------------------------------- |
@@ -411,7 +430,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.13. Tabla: `carga_malla`
+### 3.14. Tabla: `carga_malla`
 
 | **Columna**            | **Tipo MySQL**              | **NN** | **Default**       | **Notas**                                                                                                                      |
 | ---------------------- | --------------------------- | ------ | ----------------- | ------------------------------------------------------------------------------------------------------------------------------ |
@@ -435,7 +454,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.14. Tabla: `error_carga`
+### 3.15. Tabla: `error_carga`
 
 | **Columna**     | **Tipo MySQL**              | **NN** | **Default** | **Notas**            |
 | --------------- | --------------------------- | ------ | ----------- | -------------------- |
@@ -449,7 +468,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.15. Tabla: `diff_malla`
+### 3.16. Tabla: `diff_malla`
 
 | **Columna**      | **Tipo MySQL**              | **NN** | **Default**       | **Notas**                                         |
 | ---------------- | --------------------------- | ------ | ----------------- | ------------------------------------------------- |
@@ -464,7 +483,7 @@ UNIQUE KEY uq_agrup_asig_malla (ID_Agrupacion, ID_Asignatura, ID_Malla)
 
 ---
 
-### 3.16. Tabla: `log_actividad`
+### 3.17. Tabla: `log_actividad`
 
 | **Columna**    | **Tipo MySQL**              | **NN** | **Default**       | **Notas**                                |
 | -------------- | --------------------------- | ------ | ----------------- | ---------------------------------------- |
@@ -710,7 +729,7 @@ ORDER BY ag.Tipo_Agrupacion, ag.Nombre_Agrupacion, aa.Semestre_Sugerido;
 | RN-04  | Cambios CRUD en malla se registran en diff y log  | Eloquent Observer                          |
 | RN-05  | Malla activa no se edita directamente             | Validación en endpoints                    |
 | RN-06  | Hash duplicado por programa = rechazo             | ExcelUploadService                         |
-| RN-07  | Nunca eliminar físicamente, solo desactivar       | Controllers                                |
+| RN-07  | Catálogos con `toggle` se desactivan; plantillas sin DELETE | Controllers / rutas                       |
 | RN-08  | Agrupación única por programa+componente+nombre   | UNIQUE KEY                                 |
 | RN-09  | Asignatura única por agrupación+malla             | UNIQUE KEY                                 |
 | RN-10  | Procesar solo si listo_para_procesar (409)        | CargaController                            |
@@ -757,7 +776,7 @@ Entidades: sedes, facultades, programas, normativas, componentes, asignaturas, u
 | GET        | /api/programas/{id}/agrupaciones | Lista del programa                 |
 | POST       | /api/programas/{id}/agrupaciones | Crear en el programa               |
 | PUT        | /api/agrupaciones/{id}           | Editar (registra diff + log)       |
-| DELETE     | /api/agrupaciones/{id}           | Eliminar (solo sin mallas activas) |
+| DELETE     | No disponible para agrupaciones/plantillas | La eliminación responde 405; la plantilla debe editarse conservando su ID |
 
 ### 8.4. Mallas y Cargas
 
@@ -951,7 +970,7 @@ El archivo se procesa **después** del archivo de malla (Paso 4), extrayendo **s
 
 - Laravel 12, React 19, MySQL 8, Inertia.js
 - Token en memoria (Context API)
-- Nunca eliminar físicamente, solo desactivar
+- Los catálogos con `toggle` se desactivan; las plantillas no tienen soft delete y no se eliminan desde la aplicación
 - Lógica de negocio en Services, no Controllers
 - Agrupaciones pertenecen al Programa, no a la malla
 - Tres archivos obligatorios + uno opcional (optativas) para carga masiva
@@ -1115,3 +1134,49 @@ docker run --rm -v mallas_db_backups:/backups alpine cat /backups/$LATEST | \
 ```
 
 > **Advertencia:** La restauración sobreescribe los datos existentes en la base de datos. Asegurarse de que el contenedor `mysql` esté saludable antes de ejecutar (`docker compose ps`).
+
+---
+
+## 14. Estado real auditado: caché, seguridad y operación
+
+Esta sección prevalece sobre descripciones históricas anteriores del documento.
+
+### 14.1. Caché
+
+En el despliegue Docker, `CACHE_STORE=redis`; en pruebas PHPUnit se fuerza `CACHE_STORE=array`. Las claves observadas en el código son:
+
+| Clave | TTL | Contenido | Invalidación |
+| --- | ---: | --- | --- |
+| `malla_visualizer:programa:{ID_Programa}` | 86400 s | Payload de la malla activa de un programa | `forgetProgramaCache()` y `forgetAll()` en mutaciones que afectan el programa |
+| `malla_visualizer:v:{ID_Malla}` | 86400 s | Payload de una versión pública visible | `forgetVersionCache()` al cambiar visibilidad y `forgetAll()` |
+| `programas_activos` | 300 s | Listado público agrupado por facultad, con programas y malla vigente | El código observado usa TTL; no debe asumirse invalidación global adicional si no se comprueba en la mutación correspondiente |
+
+El payload del visualizador depende de programa, malla, agrupaciones, asignaturas, requisitos y visibilidad histórica. No se debe reutilizar una clave global sin esos límites de contexto.
+
+### 14.2. Seguridad implementada y límites conocidos
+
+- OTP de seis dígitos por correo, con throttling en solicitud y verificación; Sanctum protege el API mediante `auth.token` y las vistas administrativas mediante sesión `auth`.
+- Validación de entrada en controladores/Form Requests, validación de archivos Excel y errores por fila durante el parseo.
+- CSRF se mantiene para las rutas web; el middleware excluye `sanctum/*` y la API usa autenticación por token según la ruta.
+- Nginx aplica CSP, `X-Frame-Options`, `X-Content-Type-Options` y `X-XSS-Protection`. La CSP permite recursos propios, estilos inline, imágenes `images.unsplash.com` y bloquea objetos/frames.
+- Nginx limita el cuerpo de subida a 20 MB y PHP-FPM recibe los mismos límites de archivo/post definidos en la configuración del contenedor.
+- La configuración incluida escucha HTTP en el puerto interno 80 y no contiene terminación TLS ni certificado HTTPS. HTTPS debe resolverse en un reverse proxy o infraestructura externa; no debe documentarse como proporcionado por este contenedor.
+- `security/zap/diagnostico-inicial.md` contiene hallazgos y pendientes de una auditoría anterior; sus recomendaciones no deben presentarse como funcionalidades ya implementadas.
+
+### 14.3. Servicios Docker y diferencia de entornos
+
+`docker-compose.yml` define `mysql:8.0`, `redis:7-alpine`, `app` (Nginx + PHP-FPM + Supervisor), `mailpit` y `backup`. MySQL y Redis usan volúmenes persistentes; `app` persiste `storage`; el backup conserva dumps en `db_backups` y elimina los de más de siete días. El puerto publicado de la aplicación es `8080:80`, Mailpit publica `1025`/`8025`.
+
+En desarrollo local se puede usar `npm run dev`, MySQL local, `php artisan queue:work` y `QUEUE_CONNECTION=sync` o Redis según el objetivo. En el contenedor, el frontend se construye con Vite, Nginx sirve `public/` y Supervisor inicia los workers. Los valores por defecto de Compose son de desarrollo y no son credenciales de producción.
+
+### 14.4. Pruebas verificables
+
+- PHP: Pest/PHPUnit, suites `tests/Unit` y `tests/Feature`; hay pruebas específicas de catálogo de plantillas, importación, cargas, ciclo de vida, aprobación, visualización y optativas.
+- Frontend: Vitest en `resources/js/**/__tests__`, incluyendo que una plantilla se puede editar y no muestra acciones de eliminación.
+- E2E: especificaciones Playwright en `e2e/` para salud, login y catálogos.
+- Carga: scripts k6 en `k6/`, ejecutables mediante los scripts `test:load:*` de `package.json`.
+- `php artisan test --list-tests` enumeró 183 tests PHP en esta auditoría. Las assertions y los conteos de Vitest, Playwright y k6 requieren ejecuciones separadas.
+
+### 14.5. Incidencia histórica de plantillas
+
+Se detectó un Excel con IDs de plantilla que ya no existían. El parser rechazó las filas afectadas con error de validación. La solución implementada es conservar las plantillas, permitir edición sobre el mismo registro, bloquear la eliminación y mantener la validación de existencia. Los gaps de `AUTO_INCREMENT` son válidos y no se rellenan artificialmente.

@@ -152,6 +152,8 @@ public int $timeout = 120; // segundos máximos de ejecución
 
 > ⚠️ **Diferencia crítica respecto a la spec original**: la columna `Normativa` contiene el **ID entero** del registro en `normativa`, NO el nombre del acuerdo. El parser debe hacer `WHERE ID_Normativa = valor` en lugar de buscar por texto.
 
+La columna `Agrupación` contiene el `ID_Plantilla_Agrupacion` numérico. Antes de persistir la fila, el parser resuelve ese ID contra `plantillas_agrupacion`. Si no existe, la fila se rechaza con severidad `error`; el mensaje actual tiene la forma `Plantilla de Agrupacion (X) no valida.`. No se crean plantillas artificiales ni se sustituye el ID referenciado.
+
 ### 4.3 Columnas reales de la hoja Agrupacion {Programa}
 
 | Columna | Nombre | Campo destino |
@@ -309,7 +311,7 @@ Para cada fila de la hoja MALLA (saltando filas completamente vacías):
   PASO 3 — Componente: findOrCreate por Nombre_Componente
     (el componente ya debe existir si se procesó la hoja de Agrupaciones antes)
 
-  PASO 4 — Agrupación: findOrCreate por (ID_Malla + ID_Componente + Nombre_Agrupacion)
+  PASO 4 — Plantilla/agrupación: resolver `ID_Plantilla_Agrupacion` existente y crear la agrupación concreta por (ID_Malla + ID_Componente + Nombre_Agrupacion)
 
   PASO 5 — AgrupacionAsignatura:
     INSERT con (ID_Agrupacion, ID_Asignatura, Tipo_Asignatura, Semestre_Sugerido=NULL)
@@ -322,6 +324,10 @@ Para cada fila de la hoja MALLA (saltando filas completamente vacías):
 > El parser puede encontrar la misma asignatura (mismo código) en filas diferentes con distintas agrupaciones. Esto es válido: se crean múltiples registros en `agrupacion_asignatura`. El paso 2 simplemente retorna el `ID_Asignatura` ya existente.
 >
 > Este es el origen de los 227 créditos aparentes vs 179 reales: múltiples filas, misma asignatura.
+
+## 4.11. Incidencia histórica de IDs de plantillas
+
+Se detectó un Excel que referenciaba IDs de `plantillas_agrupacion` cuyos registros habían sido eliminados. La importación detectó correctamente que las referencias no eran válidas y registró errores por fila. La solución adoptada es conservar las plantillas, permitir su edición sin cambiar el ID, impedir su eliminación desde la aplicación y mantener la validación de existencia durante la importación. Rellenar gaps con registros artificiales no es una solución válida.
 
 ### 4.10 Cálculo de créditos únicos (sin cambios)
 

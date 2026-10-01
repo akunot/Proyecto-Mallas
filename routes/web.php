@@ -487,7 +487,6 @@ Route::middleware(['auth'])->group(function () {
     Route::put('/agrupaciones/{id}', [AgrupacionController::class, 'update']);
     Route::post('/agrupaciones', [AgrupacionController::class, 'store']);
     Route::patch('/agrupaciones/{id}/toggle', [AgrupacionController::class, 'toggle']);
-    Route::delete('/agrupaciones/{id}', [AgrupacionController::class, 'destroy']);
 
     // Catálogos - Asignaturas
     Route::get('/asignaturas', function (Request $request) {

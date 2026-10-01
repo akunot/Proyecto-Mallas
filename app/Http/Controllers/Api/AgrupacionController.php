@@ -140,16 +140,20 @@ class AgrupacionController extends CatalogoController
         return $result;
     }
 
+    /**
+     * Las plantillas de agrupación no se pueden eliminar.
+     *
+     * Los archivos Excel de carga referencian las plantillas mediante su
+     * ID_Plantilla_Agrupacion; eliminar una plantilla rompería la importación
+     * de mallas históricas o futuras. Las rutas DELETE fueron retiradas y este
+     * guardia impide la eliminación aunque el método se invoque directamente.
+     */
     public function destroy(int $id)
     {
-        $plantilla = PlantillaAgrupacion::findOrFail($id);
-        $programaId = $plantilla->ID_Programa;
-
-        $result = parent::destroy($id);
-
-        app(MallaVisualizerService::class)->forgetProgramaCache($programaId);
-
-        return $result;
+        return response()->json([
+            'data' => null,
+            'message' => 'Las plantillas de agrupación no se pueden eliminar.',
+        ], 405);
     }
 
     /**

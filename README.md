@@ -12,11 +12,11 @@
 | --------------- | ---------------------------------------------------------------- |
 | Proyecto        | Sistema de Gestión de Mallas Académicas                          |
 | Cliente         | Universidad Nacional de Colombia - Sede Manizales                |
-| Stack           | Laravel 12 + React 19 + MySQL 8 + Inertia.js 2.0                 |
-| Arquitectura    | Monolito modular (Laravel + Inertia + React)                     |
+| Stack           | Laravel 12 + React 19 + Inertia.js 2.0 + MySQL 8 + Redis 7       |
+| Arquitectura    | Monolito modular detrás de Nginx, PHP-FPM y workers Redis        |
 | Autenticación   | Laravel Sanctum con OTP de 6 dígitos por correo (sin contraseña) |
 | Tipo de sistema | Panel administrativo cerrado, usuarios contados                  |
-| Versión actual  | 5.4 — Julio 2026                                                 |
+| Versión actual  | Auditoría documental — septiembre 2026                           |
 
 ---
 
@@ -46,8 +46,11 @@
 | Build tool       | Vite                        | 6.x              |
 | Routing frontend | React Router                | 7.x              |
 | HTTP client      | Axios                       | 1.x              |
-| Servidor web     | Apache                      | 2.4.62 (FreeBSD) |
-| PHP              | PHP                         | 8.3.8 (FreeBSD)  |
+| Cache / sesión / cola | Redis                  | 7.x              |
+| Servidor web     | Nginx                       | Alpine            |
+| PHP              | PHP-FPM                     | 8.4              |
+| Correo local     | Mailpit                     | SMTP 1025 / UI 8025 |
+| Orquestación     | Docker Compose              | MySQL + Redis + app + Mailpit + backup |
 
 ---
 
@@ -78,7 +81,7 @@ mallas/
     Feature/Api/              # Tests E2E de API
     Unit/                     # Tests unitarios
   docker/                     # Config Docker (nginx, php-fpm, supervisor)
-  docker-compose.yml          # Orquestación (mysql + app)
+  docker-compose.yml          # Orquestación (mysql + redis + app + mailpit + backup)
   Dockerfile                  # Imagen multi-etapa
 ```
 
@@ -101,11 +104,12 @@ Antes de implementar, revisar estos cambios en el documento de requerimientos (s
 ## Despliegue con Docker
 
 ```bash
-docker-compose up -d     # Inicia MySQL + app con nginx + php-fpm + queue worker
-docker-compose down      # Detiene todo
+docker compose up -d --build  # MySQL, Redis, app, Mailpit y backup
+docker compose ps
+docker compose down
 ```
 
-El queue worker corre automáticamente via supervisor dentro del contenedor `app`.
+El contenedor `app` expone la aplicación por el puerto `8080` del host y ejecuta Nginx, PHP-FPM y los workers mediante Supervisor. Mailpit expone SMTP en `1025` y su interfaz en `8025` cuando se configura como servidor de correo local. En producción se deben proporcionar `APP_KEY`, credenciales de base de datos y las variables SMTP mediante el entorno; no deben documentarse valores reales.
 
 ### Entorno local
 
@@ -138,7 +142,7 @@ El Job procesa en orden estricto: **asignaturas → electivas → malla**. Ver s
 
 ## Tests
 
-145 tests (285 assertions) — Pest PHP v4 con MySQL real.
+La suite PHP se organiza en `tests/Unit` y `tests/Feature` y usa Pest/PHPUnit. `php artisan test --list-tests` enumeró 183 tests PHP en esta auditoría. También existen pruebas frontend con Vitest, pruebas E2E en `e2e/` y escenarios de carga k6; sus conteos no se suman a esa cifra.
 
 ```bash
 php artisan test
@@ -162,14 +166,25 @@ Archivos Excel en `files_tests/`:
 
 ---
 
+## Plantillas y agrupaciones
+
+`plantillas_agrupacion` y `agrupaciones` no son la misma entidad:
+
+- Una plantilla es la definición administrativa persistente de una agrupación para un programa. Su `ID_Plantilla_Agrupacion` es estable y es el identificador que pueden referenciar los Excel.
+- Una agrupación es la instancia concreta creada para una `malla_curricular`; sus asignaturas se relacionan por `agrupacion_asignatura` y `ID_Malla`.
+- Las plantillas se pueden editar. La edición actualiza el registro existente y no cambia su ID.
+- No se pueden eliminar desde la interfaz ni mediante las rutas actuales: DELETE responde 405. No existe una estrategia de soft delete para plantillas.
+
+Los IDs `AUTO_INCREMENT` pueden tener gaps. Los gaps no son un error por sí mismos y no deben rellenarse con registros artificiales. Las referencias del Excel deben apuntar a plantillas existentes.
+
 ## Referencia rápida de restricciones
 
-- No eliminar registros físicamente (solo desactivar).
+- Los catálogos que tienen `toggle` se desactivan; las plantillas de agrupación no tienen campo de activo y no se pueden eliminar desde la aplicación.
 - No poner lógica de negocio en Controllers (usar Services).
-- Las agrupaciones pertenecen al **Programa**, no a la malla.
+- Las plantillas pertenecen al **Programa**; las agrupaciones concretas se generan para cada malla.
 - `POST /api/cargas` **no recibe archivos**. Solo `POST /api/cargas/{id}/archivo`.
 - El Job solo se lanza si `Estado_Carga = listo_para_procesar`.
 
 ---
 
-_Para el detalle completo del modelo de BD, requerimientos funcionales, endpoints, plan de fases y convenciones de código, ver `requerimientos_mallas_unal_v5.md`._
+_Para el detalle completo del modelo de BD, importación, endpoints, caché, seguridad y despliegue, ver `documentacion_tecnica.md` y `spec/excel_parser.md`._

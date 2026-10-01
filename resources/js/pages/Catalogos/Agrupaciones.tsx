@@ -1,4 +1,3 @@
-import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
@@ -42,8 +41,6 @@ export default function Agrupaciones({ agrupaciones }: Props) {
         new URLSearchParams(url.split('?')[1] || '').get('search') || '';
     const sortBy = agrupaciones.meta.sort_by || 'ID_Plantilla_Agrupacion';
     const sortOrder = agrupaciones.meta.sort_order || 'asc';
-
-    const [deleteId, setDeleteId] = useState<number | null>(null);
 
     const columns = [
         {
@@ -130,13 +127,6 @@ export default function Agrupaciones({ agrupaciones }: Props) {
         },
     ];
 
-    const handleDelete = (id: number) => {
-        router.delete(`/agrupaciones/${id}`, {
-            preserveScroll: true,
-            onSuccess: () => setDeleteId(null),
-        });
-    };
-
     return (
         <MainLayout>
             <Head title="Agrupaciones Curriculares - UNAL" />
@@ -200,50 +190,11 @@ export default function Agrupaciones({ agrupaciones }: Props) {
                                     edit_note
                                 </span>
                             </Link>
-                            <button
-                                onClick={() =>
-                                    setDeleteId(record.ID_Plantilla_Agrupacion)
-                                }
-                                className="rounded-lg p-2 text-slate-400 transition-all hover:bg-rose-50 hover:text-rose-600"
-                            >
-                                <span className="material-symbols-outlined !text-xl">
-                                    delete
-                                </span>
-                            </button>
                         </div>
                     )}
                 />
             </div>
 
-            {deleteId && (
-                <div className="fixed inset-0 z-[100] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm">
-                    <div className="w-full max-w-sm rounded-2xl bg-white p-6 text-center shadow-2xl">
-                        <span className="material-symbols-outlined mb-3 !text-5xl text-red-500">
-                            warning
-                        </span>
-                        <h3 className="text-lg font-bold text-slate-900">
-                            ¿Eliminar plantilla de agrupación?
-                        </h3>
-                        <p className="mt-1 text-sm text-slate-500">
-                            Esta acción no se puede deshacer.
-                        </p>
-                        <div className="mt-6 flex justify-center gap-3">
-                            <button
-                                onClick={() => setDeleteId(null)}
-                                className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium text-slate-600 hover:bg-slate-50"
-                            >
-                                Cancelar
-                            </button>
-                            <button
-                                onClick={() => handleDelete(deleteId)}
-                                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-bold text-white hover:bg-red-700"
-                            >
-                                Eliminar
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            )}
         </MainLayout>
     );
 }
