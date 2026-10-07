@@ -2,6 +2,8 @@
 
 namespace App\Http\Requests;
 
+use App\Rules\CodigoAsignatura;
+use App\Rules\CodigoBaseUnico;
 use Illuminate\Foundation\Http\FormRequest;
 
 class UpdateAsignaturaRequest extends FormRequest
@@ -13,8 +15,10 @@ class UpdateAsignaturaRequest extends FormRequest
 
     public function rules(): array
     {
+        $id = $this->route('id');
+
         return [
-            'Codigo_Asignatura' => 'sometimes|string|max:20|unique:asignatura,Codigo_Asignatura,' . $this->route('id') . ',ID_Asignatura',
+            'Codigo_Asignatura' => ['sometimes', new CodigoAsignatura, new CodigoBaseUnico($id !== null ? (int) $id : null)],
             'Nombre_Asignatura' => 'sometimes|string|max:200',
             'Creditos_Asignatura' => 'sometimes|integer|min:1',
             'Horas_Presencial' => 'nullable|integer|min:0',

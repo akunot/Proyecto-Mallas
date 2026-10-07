@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Api;
 
 use App\Models\Asignatura;
+use App\Rules\CodigoAsignatura;
+use App\Rules\CodigoBaseUnico;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 
@@ -21,6 +23,29 @@ class AsignaturaController extends CatalogoController
             'Horas_Estudiante',
             'Descripcion_Asignatura',
         ];
+    }
+
+    /**
+     * `Codigo_Asignatura` no es un código institucional numérico: el catálogo
+     * admite códigos de sección (1000057-Z) y legados alfanuméricos, así que
+     * se sustituye la regla genérica `integer` por las reglas del dominio.
+     */
+    protected function getValidationRules(string $type): array
+    {
+        $rules = parent::getValidationRules($type);
+
+        $ruta = request()->route();
+        $ignorarId = $type === 'update' && $ruta !== null
+            ? (int) $ruta->parameter('id')
+            : null;
+
+        $rules['Codigo_Asignatura'] = [
+            $type === 'update' ? 'nullable' : 'required',
+            new CodigoAsignatura,
+            new CodigoBaseUnico($ignorarId),
+        ];
+
+        return $rules;
     }
 
     /**

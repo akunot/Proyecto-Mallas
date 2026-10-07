@@ -258,8 +258,8 @@ Catálogo global compartido entre todos los programas. Una asignatura puede pert
 | **Columna**            | **Tipo MySQL**              | **NN** | **Default** | **Notas**                                                                                         |
 | ---------------------- | --------------------------- | ------ | ----------- | ------------------------------------------------------------------------------------------------- |
 | ID_Asignatura          | INT UNSIGNED AUTO_INCREMENT | Sí     | -           | PK                                                                                                |
-| Codigo_Asignatura      | VARCHAR(20)                 | Sí     | -           | UNIQUE. NULL es bloqueante en carga Excel                                                         |
-| Codigo_Base            | VARCHAR(20)                 | No     | NULL        | UNIQUE. Código normalizado (solo dígitos). Generado automáticamente a partir de Codigo_Asignatura |
+| Codigo_Asignatura      | VARCHAR(20)                 | Sí     | -           | UNIQUE. Formato: letras y dígitos con un sufijo opcional `-{letras\|dígitos}` (ej. `1000001`, `1000057-Z`, `OPTATIVA1`); sin espacios ni puntos. NULL es bloqueante en carga Excel |
+| Codigo_Base            | VARCHAR(50)                 | No     | NULL        | UNIQUE. Clave de búsqueda = `CodeNormalizationService::normalize(Codigo_Asignatura)` (prefijo antes del primer guion, no «solo dígitos»). Se genera automáticamente; no se edita |
 | Nombre_Asignatura      | VARCHAR(200)                | Sí     | -           |                                                                                                   |
 | Creditos_Asignatura    | INT UNSIGNED                | Sí     | -           |                                                                                                   |
 | Horas_Presencial       | INT UNSIGNED                | No     | NULL        |                                                                                                   |

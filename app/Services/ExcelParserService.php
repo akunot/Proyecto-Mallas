@@ -15,6 +15,7 @@ use App\Models\PlantillaAgrupacion;
 use App\Models\Programa;
 use App\Models\Requisito;
 use App\Models\SlotAgrupacion;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use PhpOffice\PhpSpreadsheet\IOFactory;
 use PhpOffice\PhpSpreadsheet\Spreadsheet;
@@ -41,6 +42,8 @@ class ExcelParserService
     private array $componentesCache = [];      // Nombre_Componente => ID_Componente
 
     private array $agrupacionesCache = [];     // "ID_Malla|ID_Componente|Nombre" => ID_Agrupacion
+
+    private ?Collection $plantillasCache = null; // ID_Plantilla_Agrupacion => PlantillaAgrupacion
 
     private array $processedRels = [];
 
@@ -724,7 +727,7 @@ class ExcelParserService
             return;
         }
 
-        $plantillasCache = PlantillaAgrupacion::where('ID_Programa', $programaId)
+        $plantillasDelPrograma = PlantillaAgrupacion::where('ID_Programa', $programaId)
             ->get()
             ->keyBy('ID_Plantilla_Agrupacion');
 
@@ -741,8 +744,8 @@ class ExcelParserService
             $meta = $metaByCodigo[$codigoBase] ?? [];
             $plantillaId = $meta['ID_Plantilla_Agrupacion'] ?? null;
 
-            if (! empty($plantillaId) && isset($plantillasCache[$plantillaId])) {
-                $plantilla = $plantillasCache[$plantillaId];
+            if (! empty($plantillaId) && isset($plantillasDelPrograma[$plantillaId])) {
+                $plantilla = $plantillasDelPrograma[$plantillaId];
                 $componenteId = $meta['ID_Componente'] ?? null;
 
                 if ($componenteId) {
@@ -1271,10 +1274,7 @@ class ExcelParserService
             return;
         }
 
-        static $plantillasCache = null;
-        if ($plantillasCache === null) {
-            $plantillasCache = PlantillaAgrupacion::all()->keyBy('ID_Plantilla_Agrupacion');
-        }
+        $plantillasCache = $this->plantillasCatalogo();
 
         if (! isset($plantillasCache[$plantillaAgrupacionId])) {
             $this->recordError($rowNumber, 'Agrupacion', "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no valida.", $codigoAsignatura, 'error');
@@ -1579,6 +1579,23 @@ class ExcelParserService
     {
         $this->asignaturasCache = Asignatura::pluck('ID_Asignatura', 'Codigo_Base')
             ->toArray();
+    }
+
+    /**
+     * Catálogo de plantillas de agrupación cacheado POR INSTANCIA.
+     *
+     * No debe ser `static`: una variable estática de método sobrevive a todo el
+     * proceso, de modo que en un worker de colas la siguiente importación seguía
+     * viendo la colección de plantillas leída en la importación anterior.
+     */
+    private function plantillasCatalogo(): Collection
+    {
+        if ($this->plantillasCache === null) {
+            $this->plantillasCache = PlantillaAgrupacion::all()
+                ->keyBy('ID_Plantilla_Agrupacion');
+        }
+
+        return $this->plantillasCache;
     }
 
     /**
@@ -2658,10 +2675,7 @@ class ExcelParserService
         $plantillaAgrupacionId = (int) $plantillaRaw;
 
         // Same PlantillaAgrupacion lookup used in accumulateMallaRow
-        static $plantillasCache = null;
-        if ($plantillasCache === null) {
-            $plantillasCache = PlantillaAgrupacion::all()->keyBy('ID_Plantilla_Agrupacion');
-        }
+        $plantillasCache = $this->plantillasCatalogo();
 
         if (! isset($plantillasCache[$plantillaAgrupacionId])) {
             $this->recordError($rowNumber, 'Agrupacion', "Plantilla de Agrupacion ({$plantillaAgrupacionId}) no válida.", $codigoPlaceholder, 'error');

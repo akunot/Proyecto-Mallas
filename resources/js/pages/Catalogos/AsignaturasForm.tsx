@@ -68,6 +68,7 @@ post('/asignaturas');
                     type="text"
                     value={data.Codigo_Asignatura}
                     onChange={e => setData('Codigo_Asignatura', e.target.value)}
+                    maxLength={20}
                     className={`w-full px-4 py-3 bg-slate-50 border-2 rounded-xl transition-all focus:ring-4 focus:ring-blue-100 ${errors.Codigo_Asignatura ? 'border-rose-300' : 'border-transparent focus:border-blue-500'}`}
                     placeholder="Ej: 1000001"
                 />
