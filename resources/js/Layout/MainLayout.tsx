@@ -95,12 +95,15 @@ export default function Layout({ children }: { children: ReactNode }) {
     // Construir crumbs: cada uno con label y href acumulado
     const crumbs = pathnames.map((segment, index) => {
         const href = '/' + pathnames.slice(0, index + 1).join('/');
-        // Si es un número (ID), mostrarlo como "#123"
-        const label = /^\d+$/.test(segment)
+        // Si es un número (ID), mostrarlo como "#123". No se renderiza como
+        // enlace porque no existen rutas GET de detalle para estos recursos
+        // (solo PUT/DELETE), y navegar allí produciría un error 405.
+        const isId = /^\d+$/.test(segment);
+        const label = isId
             ? `#${segment}`
             : (routeNames[segment.toLowerCase()] ?? segment.replace(/-/g, ' '));
 
-        return { label, href };
+        return { label, href, isId };
     });
 
     return (
@@ -280,6 +283,10 @@ export default function Layout({ children }: { children: ReactNode }) {
                                     <span className="text-slate-300">/</span>
                                     {index === crumbs.length - 1 ? (
                                         <span className="font-semibold text-slate-800 capitalize">
+                                            {crumb.label}
+                                        </span>
+                                    ) : crumb.isId ? (
+                                        <span className="text-slate-400 capitalize">
                                             {crumb.label}
                                         </span>
                                     ) : (
