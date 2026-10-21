@@ -34,3 +34,4 @@ phpunit.xml
 /migrate_status.txt
 /nul
 docker-compose.override.yml
+/backups

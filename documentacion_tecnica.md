@@ -1086,51 +1086,39 @@ docker exec mallas_app tail -f /var/log/nginx/error.log
 
 ### 13.2. Backup de base de datos
 
-El contenedor `mallas_backup` (definido en `docker-compose.yml`) ejecuta un `mysqldump` completo cada 24 horas automáticamente.
+El contenedor `mallas_backup` (definido en `docker-compose.yml`) ejecuta `docker/backup.sh` cada 24 horas automáticamente.
 
 **Cómo funciona:**
 
-- Corre sobre `alpine:3.19` e instala `mysql-client` al arrancar.
-- Cada ciclo: genera un dump con `--all-databases --single-transaction --routines --triggers`.
-- Guarda el archivo en `/backups/dump_YYYYMMDD_HHMMSS.sql` dentro del contenedor.
-- El volumen Docker `mallas_db_backups` (`db_backups` en `docker-compose.yml`) persiste estos archivos.
-- Limpieza automática: elimina dumps con más de 7 días (`-mtime +7`).
+- Corre sobre `mysql:8.0` para usar el `mysqldump` oficial (el cliente MariaDB de Alpine no soporta `caching_sha2_password` y generaba dumps vacíos).
+- Cada ciclo: genera un dump de la base de la aplicación con `--databases <DB_DATABASE> --single-transaction --routines --triggers` (incluye `CREATE DATABASE` y `USE`).
+- Guarda el archivo comprimido en la carpeta `backups/` del proyecto (`backups/dump_YYYYMMDD_HHMMSS.sql.gz`), montada en `/backups` dentro del contenedor. La carpeta está excluida de git y de la imagen Docker.
+- Si el dump falla, lo registra en el log del contenedor y no borra los backups anteriores.
+- Limpieza automática: elimina dumps con más de 7 días (`BACKUP_RETENTION_DAYS`).
 
 **Variables de entorno relevantes:**
 
-| Variable       | Default | Descripción                     |
-| -------------- | ------- | ------------------------------- |
-| `DB_PASSWORD`  | `root`  | Contraseña de root de MySQL     |
+| Variable       | Default     | Descripción                     |
+| -------------- | ----------- | ------------------------------- |
+| `DB_PASSWORD`  | `root`      | Contraseña de root de MySQL     |
+| `DB_DATABASE`  | `mallas_db` | Base de datos a respaldar       |
 
-**Listar backups disponibles:**
+**Listar backups disponibles y ver el último resultado:**
 
 ```bash
-docker run --rm -v mallas_db_backups:/backups alpine ls -lh /backups
+ls -lh backups/
+docker logs --tail 5 mallas_backup
 ```
+
+> Los backups quedan en el mismo servidor que la base de datos; conviene copiarlos periódicamente a otra máquina (`rsync`/`scp` de la carpeta `backups/`).
 
 ### 13.3. Restauración de base de datos
 
-En caso de fallo, restaurar desde el backup más reciente:
-
-**Opción 1 — copiar al host y restaurar:**
+En caso de fallo, restaurar desde el backup más reciente (desde la raíz del proyecto):
 
 ```bash
-# 1. Identificar el backup más reciente
-docker run --rm -v mallas_db_backups:/backups alpine ls -t /backups | head -1
-
-# 2. Copiarlo al host
-docker run --rm -v mallas_db_backups:/backups alpine cat /backups/dump_20260708_030001.sql > ~/restore.sql
-
-# 3. Restaurar en MySQL
-docker exec -i mallas_mysql mysql -u root -p"${DB_PASSWORD:-root}" mallas_db < ~/restore.sql
-```
-
-**Opción 2 — tubería directa (sin archivo intermedio):**
-
-```bash
-LATEST=$(docker run --rm -v mallas_db_backups:/backups alpine ls -t /backups | head -1)
-docker run --rm -v mallas_db_backups:/backups alpine cat /backups/$LATEST | \
-  docker exec -i mallas_mysql mysql -u root -p"${DB_PASSWORD:-root}" mallas_db
+LATEST=$(ls -t backups/dump_*.sql.gz | head -1)
+gunzip -c "$LATEST" | docker exec -i mallas_mysql sh -c 'mysql -uroot -p"$MYSQL_ROOT_PASSWORD"'
 ```
 
 > **Advertencia:** La restauración sobreescribe los datos existentes en la base de datos. Asegurarse de que el contenedor `mysql` esté saludable antes de ejecutar (`docker compose ps`).
@@ -1165,7 +1153,7 @@ El payload del visualizador depende de programa, malla, agrupaciones, asignatura
 
 ### 14.3. Servicios Docker y diferencia de entornos
 
-`docker-compose.yml` define `mysql:8.0`, `redis:7-alpine`, `app` (Nginx + PHP-FPM + Supervisor) y `backup`. MySQL y Redis usan volúmenes persistentes; `app` persiste `storage`; el backup (script `docker/backup.sh`, imagen `mysql:8.0`) guarda a diario un dump comprimido de la base de la aplicación en `db_backups` y elimina los de más de siete días. El puerto publicado de la aplicación es `8080:80`. Mailpit (`1025`/`8025`) solo se define en `docker-compose.override.yml`, que es local y no se versiona.
+`docker-compose.yml` define `mysql:8.0`, `redis:7-alpine`, `app` (Nginx + PHP-FPM + Supervisor) y `backup`. MySQL y Redis usan volúmenes persistentes; `app` persiste `storage`; el backup (script `docker/backup.sh`, imagen `mysql:8.0`) guarda a diario un dump comprimido de la base de la aplicación en la carpeta `backups/` del proyecto y elimina los de más de siete días. El puerto publicado de la aplicación es `8080:80`. Mailpit (`1025`/`8025`) solo se define en `docker-compose.override.yml`, que es local y no se versiona.
 
 En desarrollo local se puede usar `npm run dev`, MySQL local, `php artisan queue:work` y `QUEUE_CONNECTION=sync` o Redis según el objetivo. En el contenedor, el frontend se construye con Vite, Nginx sirve `public/` y Supervisor inicia los workers. Los valores por defecto de Compose son de desarrollo y no son credenciales de producción.
 

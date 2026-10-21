@@ -94,7 +94,7 @@ services:
       DB_PASSWORD: ${DB_PASSWORD:-root}
       DB_DATABASE: ${DB_DATABASE:-mallas_db}
     volumes:
-      - db_backups:/backups
+      - ./backups:/backups
       - ./docker/backup.sh:/backup.sh:ro
     depends_on:
       mysql:
@@ -106,4 +106,3 @@ volumes:
   storage_data:
   storage_framework:
   storage_logs:
-  db_backups:
