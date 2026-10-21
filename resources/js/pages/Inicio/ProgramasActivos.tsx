@@ -10,6 +10,7 @@ interface Programa {
     ID_Programa: number;
     Nombre_Programa: string;
     Codigo_Programa: number;
+    Codigo_SNIES: string | null;
     Nivel_Formacion: string | null;
     Creditos_Totales: number | null;
     Duracion_Semestres: number | null;
@@ -184,8 +185,8 @@ export default function ProgramasActivos({ facultades }: Props) {
                                                 <span className="px-3 py-1 bg-[#77c53f] text-white text-[9px] font-black uppercase tracking-widest rounded-lg shadow-lg">
                                                     {programa.Nivel_Formacion || 'Pregrado'}
                                                 </span>
-                                                {programa.Codigo_Programa && (
-                                                    <span className="text-white/60 text-[9px] font-mono">SNIES {programa.Codigo_Programa}</span>
+                                                {programa.Codigo_SNIES && (
+                                                    <span className="text-white/60 text-[9px] font-mono">SNIES {programa.Codigo_SNIES}</span>
                                                 )}
                                             </div>
                                             
