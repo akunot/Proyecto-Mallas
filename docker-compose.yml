@@ -1,12 +1,4 @@
 services:
-  mailpit:
-    image: axllent/mailpit:latest
-    container_name: mallas_mailpit
-    restart: unless-stopped
-    ports:
-      - '8025:8025'
-      - '1025:1025'
-
   mysql:
     image: mysql:8.0
     container_name: mallas_mysql
@@ -45,7 +37,7 @@ services:
       - '8080:80'
     environment:
       APP_ENV: production
-      APP_DEBUG: false
+      APP_DEBUG: 'false'
       APP_KEY: ${APP_KEY}
       APP_URL: http://localhost
       DB_CONNECTION: mysql
@@ -94,26 +86,16 @@ services:
           memory: 1G
 
   backup:
-    image: alpine:3.19
+    image: mysql:8.0
     container_name: mallas_backup
     restart: unless-stopped
-    command:
-      - /bin/sh
-      - -c
-      - |
-        apk add --no-cache mysql-client > /dev/null 2>&1
-        while true; do
-          TS=$(date +%Y%m%d_%H%M%S)
-          echo "[$$TS] Running MySQL backup..."
-          mysqldump -h mysql -u root -p"${DB_PASSWORD:-root}" --all-databases --single-transaction --routines --triggers > /backups/dump_$${TS}.sql 2>/dev/null
-          find /backups -name 'dump_*.sql' -mtime +7 -delete
-          echo "[$$(date +%Y%m%d_%H%M%S)] Backup complete. Sleeping 24h..."
-          sleep 86400
-        done
+    entrypoint: ['sh', '/backup.sh']
     environment:
       DB_PASSWORD: ${DB_PASSWORD:-root}
+      DB_DATABASE: ${DB_DATABASE:-mallas_db}
     volumes:
       - db_backups:/backups
+      - ./docker/backup.sh:/backup.sh:ro
     depends_on:
       mysql:
         condition: service_healthy

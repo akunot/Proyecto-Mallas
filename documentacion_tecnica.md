@@ -1165,7 +1165,7 @@ El payload del visualizador depende de programa, malla, agrupaciones, asignatura
 
 ### 14.3. Servicios Docker y diferencia de entornos
 
-`docker-compose.yml` define `mysql:8.0`, `redis:7-alpine`, `app` (Nginx + PHP-FPM + Supervisor), `mailpit` y `backup`. MySQL y Redis usan volúmenes persistentes; `app` persiste `storage`; el backup conserva dumps en `db_backups` y elimina los de más de siete días. El puerto publicado de la aplicación es `8080:80`, Mailpit publica `1025`/`8025`.
+`docker-compose.yml` define `mysql:8.0`, `redis:7-alpine`, `app` (Nginx + PHP-FPM + Supervisor) y `backup`. MySQL y Redis usan volúmenes persistentes; `app` persiste `storage`; el backup (script `docker/backup.sh`, imagen `mysql:8.0`) guarda a diario un dump comprimido de la base de la aplicación en `db_backups` y elimina los de más de siete días. El puerto publicado de la aplicación es `8080:80`. Mailpit (`1025`/`8025`) solo se define en `docker-compose.override.yml`, que es local y no se versiona.
 
 En desarrollo local se puede usar `npm run dev`, MySQL local, `php artisan queue:work` y `QUEUE_CONNECTION=sync` o Redis según el objetivo. En el contenedor, el frontend se construye con Vite, Nginx sirve `public/` y Supervisor inicia los workers. Los valores por defecto de Compose son de desarrollo y no son credenciales de producción.
 

@@ -81,7 +81,7 @@ mallas/
     Feature/Api/              # Tests E2E de API
     Unit/                     # Tests unitarios
   docker/                     # Config Docker (nginx, php-fpm, supervisor)
-  docker-compose.yml          # Orquestación (mysql + redis + app + mailpit + backup)
+  docker-compose.yml          # Orquestación (mysql + redis + app + backup); mailpit solo en el override local
   Dockerfile                  # Imagen multi-etapa
 ```
 
