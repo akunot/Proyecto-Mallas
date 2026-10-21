@@ -2,6 +2,17 @@
 
 namespace App\Providers;
 
+use App\Models\Agrupacion;
+use App\Models\AgrupacionAsignatura;
+use App\Models\Asignatura;
+use App\Models\Componente;
+use App\Models\MallaCurricular;
+use App\Models\Normativa;
+use App\Models\PlantillaAgrupacion;
+use App\Models\Programa;
+use App\Models\Requisito;
+use App\Models\SlotAgrupacion;
+use App\Services\MallaVisualizerService;
 use Carbon\CarbonImmutable;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Http\Request;
@@ -29,6 +40,7 @@ class AppServiceProvider extends ServiceProvider
     {
         $this->configureDefaults();
         $this->configureRateLimiting();
+        $this->invalidateMallaVisualizerCache();
 
         if (app()->environment('production')) {
             URL::forceScheme('https');
@@ -55,6 +67,32 @@ class AppServiceProvider extends ServiceProvider
                 ->uncompromised()
             : null,
         );
+    }
+
+    /**
+     * La vista pública de mallas se cachea 24 h. Cualquier cambio en los
+     * modelos que la alimentan (p. ej. créditos de una asignatura o de una
+     * agrupación) debe verse de inmediato, así que se invalida en cada escritura.
+     */
+    protected function invalidateMallaVisualizerCache(): void
+    {
+        $models = [
+            Agrupacion::class,
+            AgrupacionAsignatura::class,
+            Asignatura::class,
+            Componente::class,
+            MallaCurricular::class,
+            Normativa::class,
+            PlantillaAgrupacion::class,
+            Programa::class,
+            Requisito::class,
+            SlotAgrupacion::class,
+        ];
+
+        foreach ($models as $model) {
+            $model::saved(fn () => MallaVisualizerService::flush());
+            $model::deleted(fn () => MallaVisualizerService::flush());
+        }
     }
 
     protected function configureRateLimiting(): void

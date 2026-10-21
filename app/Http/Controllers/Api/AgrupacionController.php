@@ -109,6 +109,8 @@ class AgrupacionController extends CatalogoController
         $oldName = $plantilla->Nombre_Agrupacion;
         $oldComponente = $plantilla->ID_Componente;
         $oldPrograma = $plantilla->ID_Programa;
+        $camposPropagables = ['Creditos_Requeridos', 'Creditos_Maximos', 'Es_Obligatoria'];
+        $oldValores = $plantilla->only($camposPropagables);
 
         $result = parent::update($request, $id);
 
@@ -120,10 +122,34 @@ class AgrupacionController extends CatalogoController
                 ->where('ID_Componente', $oldComponente)
                 ->where('Nombre_Agrupacion', $oldName)
                 ->update(['Nombre_Agrupacion' => $plantilla->Nombre_Agrupacion]);
-
-            // Limpiar cache del visualizador
-            app(MallaVisualizerService::class)->forgetProgramaCache($oldPrograma);
         }
+
+        // Los créditos y la obligatoriedad se copian a cada malla al cargarla.
+        // Solo se propagan los campos editados ahora (algunas mallas toman los
+        // créditos del Excel) y solo a las mallas en uso (activa, borrador, en
+        // revisión); las archivadas y rechazadas conservan sus valores históricos.
+        $cambios = [];
+        foreach ($camposPropagables as $campo) {
+            if ($plantilla->{$campo} !== $oldValores[$campo]) {
+                $cambios[$campo] = $plantilla->{$campo};
+            }
+        }
+
+        if ($cambios !== []) {
+            DB::table('agrupaciones')
+                ->where('ID_Componente', $oldComponente)
+                ->where('Nombre_Agrupacion', $plantilla->Nombre_Agrupacion)
+                ->whereIn('ID_Malla', function ($q) use ($oldPrograma) {
+                    $q->select('ID_Malla')
+                        ->from('mallas_curriculares')
+                        ->where('ID_Programa', $oldPrograma)
+                        ->whereNotIn('Estado', ['archivada', 'rechazada', 'ARCHIVADA', 'RECHAZADA']);
+                })
+                ->update($cambios + ['updated_at' => now()]);
+        }
+
+        // Las escrituras con DB::table no disparan eventos de modelo
+        MallaVisualizerService::flush();
 
         return $result;
     }

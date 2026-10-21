@@ -11,9 +11,29 @@ final class MallaVisualizerService
 {
     private const CACHE_TTL = 86400;
 
+    /**
+     * Contador global que forma parte de cada clave de caché. Incrementarlo
+     * invalida de una vez todas las mallas cacheadas: una asignatura o un
+     * componente se comparte entre muchos programas, así que no hay una clave
+     * concreta que olvidar cuando cambian.
+     */
+    private const VERSION_KEY = 'malla_visualizer:version';
+
+    public static function flush(): void
+    {
+        Cache::increment(self::VERSION_KEY);
+    }
+
+    private function cacheKey(string $suffix): string
+    {
+        $version = (int) Cache::get(self::VERSION_KEY, 0);
+
+        return "malla_visualizer:{$version}:{$suffix}";
+    }
+
     public function forPrograma(int $idPrograma): ?array
     {
-        $cacheKey = "malla_visualizer:programa:{$idPrograma}";
+        $cacheKey = $this->cacheKey("programa:{$idPrograma}");
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($idPrograma): ?array {
             $malla = MallaCurricular::with($this->eagerLoads($idPrograma))
@@ -32,7 +52,7 @@ final class MallaVisualizerService
 
     public function byVersion(int $versionId): ?array
     {
-        $cacheKey = "malla_visualizer:v:{$versionId}";
+        $cacheKey = $this->cacheKey("v:{$versionId}");
 
         return Cache::remember($cacheKey, self::CACHE_TTL, function () use ($versionId): ?array {
             // Misma regla de visibilidad que publicHistory(): una malla
@@ -69,12 +89,12 @@ final class MallaVisualizerService
 
     public function forgetProgramaCache(int $idPrograma): void
     {
-        Cache::forget("malla_visualizer:programa:{$idPrograma}");
+        Cache::forget($this->cacheKey("programa:{$idPrograma}"));
     }
 
     public function forgetVersionCache(int $versionId): void
     {
-        Cache::forget("malla_visualizer:v:{$versionId}");
+        Cache::forget($this->cacheKey("v:{$versionId}"));
     }
 
     public function forgetAll(int $idPrograma, ?int $versionId = null): void
