@@ -146,21 +146,32 @@ Route::middleware(['auth'])->group(function () {
         // Cargas pendientes de aprobación
         $cargasPendientes = CargaMalla::where('Estado_Carga', 'pendiente_aprobacion')->count();
 
-        // Cargas recientes
-        $cargasRecientes = CargaMalla::with(['malla', 'usuario', 'programa'])
+        // Cargas recientes de todos los usuarios (actividad del sistema)
+        $cargasRecientes = CargaMalla::with([
+            'malla:ID_Malla,Version_Numero,Version_Etiqueta,Estado',
+            'usuario:ID_Usuario,Nombre_Usuario',
+            'programa:ID_Programa,Nombre_Programa',
+        ])
+            ->whereHas('programa')
             ->orderBy('Creacion_Carga', 'desc')
-            ->limit(5)
+            ->limit(6)
             ->get()
-            ->map(function ($carga) {
-                return [
-                    'id' => $carga->ID_Carga,
-                    'estado' => $carga->Estado_Carga,
-                    'malla' => $carga->malla ? $carga->malla->Nombre_Malla : 'N/A',
-                    'programa' => $carga->programa ? $carga->programa->Nombre_Programa : 'N/A',
-                    'usuario' => $carga->usuario ? $carga->usuario->Nombre_Usuario : 'N/A',
-                    'fecha' => $carga->Creacion_Carga->format('d/m/Y H:i'),
-                ];
-            });
+            ->map(fn (CargaMalla $carga) => [
+                'ID_Carga' => $carga->ID_Carga,
+                'Estado_Carga' => $carga->Estado_Carga,
+                'Comentario_Carga' => $carga->Comentario_Carga,
+                'Creacion_Carga' => $carga->Creacion_Carga?->toIso8601String(),
+                'usuario' => $carga->usuario ? [
+                    'Nombre_Usuario' => $carga->usuario->Nombre_Usuario,
+                ] : null,
+                'programa' => [
+                    'ID_Programa' => $carga->programa->ID_Programa,
+                    'Nombre_Programa' => $carga->programa->Nombre_Programa,
+                ],
+                'malla' => $carga->malla ? [
+                    'Version_Etiqueta' => $carga->malla->Version_Etiqueta,
+                ] : null,
+            ]);
 
         return Inertia::render('Dashboard', [
             'sedesCount' => $sedesCount,

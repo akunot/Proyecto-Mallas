@@ -1,33 +1,14 @@
 import { Head, Link } from '@inertiajs/react';
-import { useState, useEffect } from 'react';
-import apiClient from '../api/client';
 import MainLayout from '../Layout/MainLayout';
 
-interface CargaMalla {
+interface CargaReciente {
     ID_Carga: number;
-    ID_Programa: number;
-    ID_Normativa: number;
-    ID_Malla: number;
-    ID_Malla_Base?: number;
-    ID_Usuario: number;
     Estado_Carga: string;
-    Comentario_Carga: string;
+    Comentario_Carga: string | null;
     Creacion_Carga: string;
-    usuario?: {
-        ID_Usuario: number;
-        Nombre_Usuario: string;
-        Email_Usuario: string;
-    };
-    programa?: {
-        ID_Programa: number;
-        Nombre_Programa: string;
-    };
-    malla?: {
-        ID_Malla: number;
-        Version_Numero: number;
-        Version_Etiqueta: string;
-        Estado: string;
-    };
+    usuario: { Nombre_Usuario: string } | null;
+    programa: { ID_Programa: number; Nombre_Programa: string };
+    malla: { Version_Etiqueta: string | null } | null;
 }
 
 interface Props {
@@ -41,14 +22,7 @@ interface Props {
     componentesCount: number;
     agrupacionesCount: number;
     cargasPendientes: number;
-    cargasRecientes: Array<{
-        id: number;
-        estado: string;
-        malla: string;
-        programa: string;
-        usuario: string;
-        fecha: string;
-    }>;
+    cargasRecientes: CargaReciente[];
 }
 
 const statCards = [
@@ -111,30 +85,8 @@ const getEstadoDot = (estado: string) => {
 export default function Dashboard({
     sedesCount, facultadesCount, programasCount, asignaturasCount,
     mallasCount, usuariosCount, normativasCount, agrupacionesCount, cargasPendientes,
+    cargasRecientes,
 }: Props) {
-    const [cargasRecientes, setCargasRecientes] = useState<CargaMalla[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    useEffect(() => {
- fetchCargasRecientes(); 
-}, []);
-
-    const fetchCargasRecientes = async () => {
-        try {
-            setLoading(true);
-            const response = await apiClient.get<{ data: CargaMalla[] }>('/aprobacion/mis-cargas');
-            const filtradas = (response.data || []).filter(c => c.programa?.ID_Programa);
-            const recientes = filtradas.sort((a, b) => 
-                new Date(b.Creacion_Carga).getTime() - new Date(a.Creacion_Carga).getTime()
-            ).slice(0, 6); // Aumentado a 6 para mejor equilibrio visual
-            setCargasRecientes(recientes);
-        } catch (error) {
-            console.error('Error fetching cargas recientes:', error);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const counts: Record<string, number> = {
         mallasCount, programasCount, asignaturasCount, facultadesCount,
         usuariosCount, sedesCount, normativasCount, agrupacionesCount,
@@ -220,12 +172,7 @@ export default function Dashboard({
                         </div>
 
                         <div className="max-h-[500px] overflow-y-auto custom-scrollbar">
-                            {loading ? (
-                                <div className="p-20 flex flex-col items-center justify-center gap-4">
-                                    <div className="spinner border-4 border-blue-100 border-t-blue-600 w-10 h-10 rounded-full animate-spin"></div>
-                                    <p className="text-slate-400 font-medium text-sm">Actualizando datos...</p>
-                                </div>
-                            ) : cargasRecientes.length > 0 ? (
+                            {cargasRecientes.length > 0 ? (
                                 <div className="divide-y divide-slate-100">
                                     {cargasRecientes.map((carga) => (
                                         <div key={carga.ID_Carga} className="p-5 hover:bg-slate-50 transition-colors flex items-start gap-4">
