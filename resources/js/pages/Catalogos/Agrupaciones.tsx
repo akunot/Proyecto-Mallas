@@ -169,14 +169,23 @@ export default function Agrupaciones({ agrupaciones }: Props) {
                     onSearch={(search, page) =>
                         router.get(
                             '/agrupaciones',
-                            { search, page },
+                            {
+                                search,
+                                page,
+                                sort_by: sortBy,
+                                sort_order: sortOrder,
+                            },
                             { preserveState: true },
                         )
                     }
                     onSort={(col, dir) =>
                         router.get(
                             '/agrupaciones',
-                            { sort_by: col, sort_order: dir },
+                            {
+                                search: currentSearch,
+                                sort_by: col,
+                                sort_order: dir,
+                            },
                             { preserveState: true },
                         )
                     }

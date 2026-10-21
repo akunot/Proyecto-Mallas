@@ -1,4 +1,4 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import React from 'react';
 import Layout from '@/Layout/MainLayout';
 
@@ -37,6 +37,19 @@ const StatusBadge = ({ estado }: { estado: string }) => {
 };
 
 export default function MallasIndex({ mallas }: Props) {
+    const goToPage = (page: number) => {
+        router.get('/mallas', { page }, { preserveState: true, preserveScroll: true });
+    };
+
+    // Ventana de hasta 5 páginas centrada en la actual
+    const currentPage = mallas.meta?.current_page ?? 1;
+    const lastPage = mallas.meta?.last_page ?? 1;
+    const firstVisible = Math.max(1, Math.min(currentPage - 2, lastPage - 4));
+    const visiblePages = Array.from(
+        { length: Math.min(lastPage, 5) },
+        (_, i) => firstVisible + i,
+    );
+
     // Lógica de Negocio para el Dashboard
     const total = mallas.meta?.total || mallas.data.length;
     const activas = mallas.data.filter(m => m.Estado === 'ACTIVO').length;
@@ -134,13 +147,14 @@ export default function MallasIndex({ mallas }: Props) {
                             </span>
                             
                             <div className="flex items-center gap-1">
-                                <button disabled={mallas.meta.current_page <= 1} className="p-2 text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
+                                <button onClick={() => goToPage(currentPage - 1)} disabled={currentPage <= 1} className="p-2 text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
                                     <span className="material-symbols-outlined">chevron_left</span>
                                 </button>
                                 
-                                {Array.from({ length: Math.min(mallas.meta.last_page, 5) }, (_, i) => i + 1).map((page) => (
+                                {visiblePages.map((page) => (
                                     <button
                                         key={page}
+                                        onClick={() => goToPage(page)}
                                         className={`w-9 h-9 rounded-xl text-xs font-black transition-all ${
                                             page === mallas.meta.current_page 
                                             ? 'bg-[#00236f] text-white shadow-lg shadow-blue-900/20' 
@@ -151,7 +165,7 @@ export default function MallasIndex({ mallas }: Props) {
                                     </button>
                                 ))}
                                 
-                                <button disabled={mallas.meta.current_page >= mallas.meta.last_page} className="p-2 text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
+                                <button onClick={() => goToPage(currentPage + 1)} disabled={currentPage >= lastPage} className="p-2 text-slate-400 hover:text-blue-600 disabled:opacity-20 transition-colors">
                                     <span className="material-symbols-outlined">chevron_right</span>
                                 </button>
                             </div>

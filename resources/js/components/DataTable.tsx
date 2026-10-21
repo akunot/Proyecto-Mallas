@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useRef } from 'react';
 
 interface Column {
   key: string;
@@ -39,29 +39,38 @@ export default function DataTable({
   emptyMessage = 'No se encontraron registros coincidentes',
 }: DataTableProps) {
   const [search, setSearch] = useState(searchValue);
-  const isInitialMount = useRef(true);
+  // Solo se busca cuando el usuario escribe; los re-renders (p. ej. al
+  // cambiar de página) no deben relanzar la búsqueda ni volver a la página 1.
+  const userTyped = useRef(false);
+  const onSearchRef = useRef(onSearch);
+
+  useEffect(() => {
+    onSearchRef.current = onSearch;
+  }, [onSearch]);
 
   // Sincronizar búsqueda externa
   useEffect(() => {
     setSearch(searchValue);
   }, [searchValue]);
 
-  // Debounce mejorado
+  // Debounce de la búsqueda escrita por el usuario
   useEffect(() => {
-    if (isInitialMount.current) {
-        isInitialMount.current = false;
-
+    if (!userTyped.current) {
         return;
     }
 
     const timer = setTimeout(() => {
-      if (onSearch) {
-onSearch(search);
-}
+      userTyped.current = false;
+      onSearchRef.current?.(search, 1);
     }, 400);
 
     return () => clearTimeout(timer);
-  }, [search, onSearch]);
+  }, [search]);
+
+  const changeSearch = (value: string) => {
+    userTyped.current = true;
+    setSearch(value);
+  };
 
   const toggleSort = (key: string) => {
     if (!onSort) {
@@ -82,11 +91,11 @@ return;
             type="text"
             placeholder={searchPlaceholder}
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => changeSearch(e.target.value)}
             className="w-full pl-10 pr-10 py-2.5 bg-slate-50 border-none rounded-xl text-sm focus:ring-2 focus:ring-blue-500 transition-all"
           />
           {search && (
-            <button onClick={() => setSearch('')} className="clear-search-btn">
+            <button onClick={() => changeSearch('')} className="clear-search-btn">
               <span className="material-symbols-outlined !text-sm">close</span>
             </button>
           )}
