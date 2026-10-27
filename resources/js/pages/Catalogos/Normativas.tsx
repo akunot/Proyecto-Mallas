@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Normativa {
     ID_Normativa: number;
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function Normativas({ normativas }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
     const sortBy = normativas.meta.sort_by || 'ID_Normativa';
@@ -108,7 +110,7 @@ export default function Normativas({ normativas }: Props) {
     const actions = (row: Normativa) => (
         <div className="flex justify-end gap-1">
             <Link
-                href={`/normativas/${row.ID_Normativa}/edit`}
+                href={`/normativas/${row.ID_Normativa}/edit${listado}`}
                 className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
                 <span className="material-symbols-outlined !text-xl">edit_document</span>

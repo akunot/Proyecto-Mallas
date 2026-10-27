@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Facultad {
     ID_Facultad: number;
@@ -31,6 +32,7 @@ interface Props {
 }
 
 export default function Facultades({ facultades }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentParams = new URLSearchParams(url.split('?')[1] || '');
     const currentSearch = currentParams.get('search') || '';
@@ -111,7 +113,7 @@ export default function Facultades({ facultades }: Props) {
     const actions = (row: Facultad) => (
         <div className="flex justify-end gap-1">
             <Link
-                href={`/facultades/${row.ID_Facultad}/edit`}
+                href={`/facultades/${row.ID_Facultad}/edit${listado}`}
                 className="rounded-lg p-2 text-slate-400 transition-all hover:bg-blue-50 hover:text-[#00236f]"
             >
                 <span className="material-symbols-outlined !text-xl">

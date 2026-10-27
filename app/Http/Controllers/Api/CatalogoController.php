@@ -167,7 +167,11 @@ class CatalogoController extends Controller
             ]);
         }
 
-        return redirect('/'.($this->routeBase ?: $this->routeName.'s'));
+        // El formulario envía la query del listado (página, búsqueda, orden)
+        // para volver a la misma página tras guardar y no a la página 1.
+        $query = $request->getQueryString();
+
+        return redirect('/'.($this->routeBase ?: $this->routeName.'s').($query ? '?'.$query : ''));
     }
 
     /**

@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Asignatura {
     ID_Asignatura: number;
@@ -27,6 +28,7 @@ interface Props {
 }
 
 export default function Asignaturas({ asignaturas }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
     const sortBy = asignaturas.meta.sort_by || 'ID_Asignatura';
@@ -84,7 +86,7 @@ export default function Asignaturas({ asignaturas }: Props) {
     const actions = (row: Asignatura) => (
         <div className="flex justify-end gap-1">
             <Link
-                href={`/asignaturas/${row.ID_Asignatura}/edit`}
+                href={`/asignaturas/${row.ID_Asignatura}/edit${listado}`}
                 className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
                 <span className="material-symbols-outlined !text-xl">edit_square</span>

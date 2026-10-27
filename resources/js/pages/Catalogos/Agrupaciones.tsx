@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface PlantillaAgrupacion {
     ID_Plantilla_Agrupacion: number;
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function Agrupaciones({ agrupaciones }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch =
         new URLSearchParams(url.split('?')[1] || '').get('search') || '';
@@ -192,7 +194,7 @@ export default function Agrupaciones({ agrupaciones }: Props) {
                     actions={(record) => (
                         <div className="flex justify-end gap-1">
                             <Link
-                                href={`/agrupaciones/${record.ID_Plantilla_Agrupacion}/edit`}
+                                href={`/agrupaciones/${record.ID_Plantilla_Agrupacion}/edit${listado}`}
                                 className="rounded-lg p-2 text-slate-400 transition-all hover:bg-blue-50 hover:text-[#00236f]"
                             >
                                 <span className="material-symbols-outlined !text-xl">

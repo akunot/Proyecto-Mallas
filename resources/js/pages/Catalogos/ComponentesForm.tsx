@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Componente {
   ID_Componente: number;
@@ -13,6 +14,7 @@ interface Props {
 }
 
 export default function ComponentesForm({ componente }: Props) {
+  const listado = useQueryListado();
   const isEditing = !!componente;
   
   const { data, setData, post, put, processing, errors } = useForm({
@@ -24,7 +26,7 @@ export default function ComponentesForm({ componente }: Props) {
     e.preventDefault();
 
     if (isEditing) {
-      put(`/componentes/${componente.ID_Componente}`);
+      put(`/componentes/${componente.ID_Componente}${listado}`);
     } else {
       post('/componentes');
     }
@@ -36,7 +38,7 @@ export default function ComponentesForm({ componente }: Props) {
       
       <div className="max-w-4xl mx-auto py-10 px-4">
         <header className="mb-10">
-          <Link href="/componentes" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+          <Link href={`/componentes${listado}`} className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
             <span className="material-symbols-outlined !text-sm">arrow_back</span> Volver a componentes
           </Link>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
@@ -78,7 +80,7 @@ export default function ComponentesForm({ componente }: Props) {
           </div>
 
           <div className="flex justify-end items-center gap-4 pt-4">
-            <Link href="/componentes" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+            <Link href={`/componentes${listado}`} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
               Cancelar
             </Link>
             <button

@@ -2,6 +2,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
 import { IMAGEN_PLACEHOLDER, resolverImagenPrograma } from '@/lib/programas';
+import { useQueryListado } from '@/lib/listado';
 interface Programa {
     ID_Programa: number;
     ID_Facultad: number;
@@ -38,6 +39,7 @@ interface Props {
 }
 
 export default function Programas({ programas }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
     const sortBy = programas.meta.sort_by || 'ID_Programa';
@@ -102,7 +104,7 @@ export default function Programas({ programas }: Props) {
     const actions = (row: Programa) => (
         <div className="flex justify-end gap-1">
             <Link
-                href={`/programas/${row.ID_Programa}/edit`}
+                href={`/programas/${row.ID_Programa}/edit${listado}`}
                 className="p-2 text-slate-400 hover:text-[#00236f] hover:bg-blue-50 rounded-lg transition-all"
             >
                 <span className="material-symbols-outlined !text-xl">edit_note</span>

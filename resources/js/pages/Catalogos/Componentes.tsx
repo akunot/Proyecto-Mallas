@@ -1,6 +1,7 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Componente {
     ID_Componente: number;
@@ -23,6 +24,7 @@ interface Props {
 }
 
 export default function Componentes({ componentes }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
 
@@ -90,7 +92,7 @@ const actions = (row: Componente) => (
             <button
                 className="btn-edit"
                 onClick={() =>
-                    router.visit(`/componentes/${row.ID_Componente}/edit`)
+                    router.visit(`/componentes/${row.ID_Componente}/edit${listado}`)
                 }
                 title="Editar"
             >

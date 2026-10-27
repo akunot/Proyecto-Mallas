@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Sede {
     ID_Sede: number;
@@ -29,6 +30,7 @@ interface Props {
 }
 
 export default function Sedes({ sedes }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentParams = new URLSearchParams(url.split('?')[1] || '');
     const currentSearch = currentParams.get('search') || '';
@@ -98,7 +100,7 @@ export default function Sedes({ sedes }: Props) {
     const actions = (row: Sede) => (
         <div className="flex justify-end gap-1">
             <Link
-                href={`/sedes/${row.ID_Sede}/edit`}
+                href={`/sedes/${row.ID_Sede}/edit${listado}`}
                 className="rounded-lg p-2 text-slate-400 transition-all hover:bg-blue-50 hover:text-[#00236f]"
             >
                 <span className="material-symbols-outlined !text-xl">

@@ -1,6 +1,7 @@
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import DataTable from '@/components/DataTable';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Usuario {
     ID_Usuario: number;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function Usuarios({ usuarios }: Props) {
+    const listado = useQueryListado();
     const { url } = usePage();
     const currentSearch = new URLSearchParams(url.split('?')[1] || '').get('search') || '';
     const sortBy = usuarios.meta.sort_by || 'ID_Usuario';
@@ -68,7 +70,7 @@ export default function Usuarios({ usuarios }: Props) {
     const actions = (row: Usuario) => (
         <div className="flex justify-end gap-2">
             <Link
-                href={`/usuarios/${row.ID_Usuario}/edit`}
+                href={`/usuarios/${row.ID_Usuario}/edit${listado}`}
                 className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
                 title="Editar Perfil"
             >

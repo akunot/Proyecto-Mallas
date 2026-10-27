@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Facultad {
     ID_Facultad: number;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function FacultadesForm({ facultad, sedes }: Props) {
+    const listado = useQueryListado();
     const isEditing = !!facultad;
     
     const { data, setData, post, put, processing, errors } = useForm({
@@ -41,7 +43,7 @@ export default function FacultadesForm({ facultad, sedes }: Props) {
         e.preventDefault();
 
         if (isEditing) {
-put(`/facultades/${facultad.ID_Facultad}`);
+put(`/facultades/${facultad.ID_Facultad}${listado}`);
 } else {
 post('/facultades');
 }
@@ -59,7 +61,7 @@ post('/facultades');
                         </h1>
                         <p className="text-slate-500 mt-2 text-sm font-medium">Define los parámetros de la unidad académica.</p>
                     </div>
-                    <Link href="/facultades" className="text-slate-400 hover:text-slate-600 transition-colors">
+                    <Link href={`/facultades${listado}`} className="text-slate-400 hover:text-slate-600 transition-colors">
                         <span className="material-symbols-outlined !text-3xl">close</span>
                     </Link>
                 </header>
@@ -161,7 +163,7 @@ post('/facultades');
                     </div>
 
                     <div className="flex justify-end items-center gap-4 pt-4">
-                        <Link href="/facultades" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
+                        <Link href={`/facultades${listado}`} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">
                             Cancelar
                         </Link>
                         <button

@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Agrupacion {
     ID_Plantilla_Agrupacion?: number;
@@ -25,6 +26,7 @@ interface Props {
 }
 
 export default function AgrupacionesForm({ agrupacion, programas = [], componentes = [] }: Props) {
+    const listado = useQueryListado();
     const isEditing = !!agrupacion?.ID_Plantilla_Agrupacion;
     
     // Migración a useForm para gestión nativa de Inertia
@@ -42,7 +44,7 @@ export default function AgrupacionesForm({ agrupacion, programas = [], component
         e.preventDefault();
 
         if (isEditing) {
-put(`/agrupaciones/${agrupacion.ID_Plantilla_Agrupacion}`);
+put(`/agrupaciones/${agrupacion.ID_Plantilla_Agrupacion}${listado}`);
 } else {
 post('/agrupaciones');
 }
@@ -55,7 +57,7 @@ post('/agrupaciones');
             <div className="max-w-4xl mx-auto py-10 px-4">
                 <header className="mb-10 flex justify-between items-center">
                     <div>
-                        <Link href="/agrupaciones" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4 uppercase tracking-widest">
+                        <Link href={`/agrupaciones${listado}`} className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4 uppercase tracking-widest">
                             <span className="material-symbols-outlined !text-sm">arrow_back</span> Regresar
                         </Link>
                         <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
@@ -184,7 +186,7 @@ post('/agrupaciones');
                     </div>
 
                     <div className="flex justify-end items-center gap-4 pt-4">
-                        <Link href="/agrupaciones" className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</Link>
+                        <Link href={`/agrupaciones${listado}`} className="text-xs font-black uppercase tracking-widest text-slate-400 hover:text-slate-600 transition-colors">Cancelar</Link>
                         <button 
                             type="submit" 
                             disabled={processing}

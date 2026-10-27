@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Normativa {
   ID_Normativa: number;
@@ -26,6 +27,7 @@ interface Props {
 }
 
 export default function NormativasForm({ normativa, programas }: Props) {
+  const listado = useQueryListado();
   const isEditing = !!normativa;
   
   const { data, setData, post, put, processing, errors } = useForm({
@@ -42,7 +44,7 @@ export default function NormativasForm({ normativa, programas }: Props) {
     e.preventDefault();
 
     if (isEditing) {
-put(`/normativas/${normativa.ID_Normativa}`);
+put(`/normativas/${normativa.ID_Normativa}${listado}`);
 } else {
 post('/normativas');
 }
@@ -54,7 +56,7 @@ post('/normativas');
       
       <div className="max-w-4xl mx-auto py-10 px-4">
         <header className="mb-10">
-          <Link href="/normativas" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+          <Link href={`/normativas${listado}`} className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
             <span className="material-symbols-outlined !text-sm">arrow_back</span> Volver
           </Link>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
@@ -163,7 +165,7 @@ post('/normativas');
           </div>
 
           <div className="flex justify-end items-center gap-4 pt-4">
-            <Link href="/normativas" className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cancelar</Link>
+            <Link href={`/normativas${listado}`} className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cancelar</Link>
             <button 
               type="submit" 
               disabled={processing}

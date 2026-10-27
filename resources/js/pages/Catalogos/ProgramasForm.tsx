@@ -2,6 +2,7 @@ import { Head, useForm, Link, usePage, router } from '@inertiajs/react';
 import { useRef, useState } from 'react';
 import MainLayout from '@/Layout/MainLayout';
 import { IMAGEN_PLACEHOLDER, resolverImagenPrograma } from '@/lib/programas';
+import { useQueryListado } from '@/lib/listado';
 
 interface Programa {
   ID_Programa: number;
@@ -36,6 +37,7 @@ interface Props {
 }
 
 export default function ProgramasForm({ programa, facultades }: Props) {
+  const listado = useQueryListado();
   const isEditing = !!programa;
   
   const { data, setData, post, put, processing, errors } = useForm({
@@ -105,7 +107,7 @@ export default function ProgramasForm({ programa, facultades }: Props) {
     e.preventDefault();
 
     if (isEditing) {
-put(`/programas/${programa.ID_Programa}`);
+put(`/programas/${programa.ID_Programa}${listado}`);
 } else {
 post('/programas');
 }
@@ -117,7 +119,7 @@ post('/programas');
       
       <div className="max-w-5xl mx-auto py-10 px-4">
         <header className="mb-10">
-          <Link href="/programas" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+          <Link href={`/programas${listado}`} className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
             <span className="material-symbols-outlined !text-sm">arrow_back</span> Volver a la lista
           </Link>
           <h1 className="text-4xl font-black text-slate-900 tracking-tight leading-none">
@@ -267,7 +269,7 @@ post('/programas');
           </div>
 
           <div className="flex justify-end items-center gap-4 pt-4">
-            <Link href="/programas" className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cancelar</Link>
+            <Link href={`/programas${listado}`} className="text-sm font-bold text-slate-400 uppercase tracking-widest">Cancelar</Link>
             <button 
               type="submit" 
               disabled={processing}

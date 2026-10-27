@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Props {
     sede?: {
@@ -16,6 +17,7 @@ interface Props {
 }
 
 export default function SedesForm({ sede }: Props) {
+    const listado = useQueryListado();
     const isEditing = !!sede;
     
     const { data, setData, post, put, processing, errors } = useForm({
@@ -32,7 +34,7 @@ export default function SedesForm({ sede }: Props) {
         e.preventDefault();
 
         if (isEditing) {
-put(`/sedes/${sede.ID_Sede}`);
+put(`/sedes/${sede.ID_Sede}${listado}`);
 } else {
 post('/sedes');
 }
@@ -50,7 +52,7 @@ post('/sedes');
                         </h1>
                         <p className="text-slate-500 mt-2">Configuración de información básica y contacto institucional.</p>
                     </div>
-                    <Link href="/sedes" className="text-slate-400 hover:text-[#00236f] transition-colors">
+                    <Link href={`/sedes${listado}`} className="text-slate-400 hover:text-[#00236f] transition-colors">
                         <span className="material-symbols-outlined !text-3xl">cancel</span>
                     </Link>
                 </div>
@@ -150,7 +152,7 @@ post('/sedes');
                     </div>
 
                     <div className="flex justify-end items-center gap-4 pt-4">
-                        <Link href="/sedes" className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
+                        <Link href={`/sedes${listado}`} className="text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors uppercase tracking-widest">
                             Cancelar
                         </Link>
                         <button

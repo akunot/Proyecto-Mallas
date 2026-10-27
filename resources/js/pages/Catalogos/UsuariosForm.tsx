@@ -1,5 +1,6 @@
 import { Head, useForm, Link } from '@inertiajs/react';
 import MainLayout from '@/Layout/MainLayout';
+import { useQueryListado } from '@/lib/listado';
 
 interface Usuario {
   ID_Usuario: number;
@@ -12,6 +13,7 @@ interface Props {
 }
 
 export default function UsuariosForm({ usuario }: Props) {
+  const listado = useQueryListado();
   const isEditing = !!usuario;
   
   // Uso de useForm para manejo nativo de Inertia
@@ -24,7 +26,7 @@ export default function UsuariosForm({ usuario }: Props) {
     e.preventDefault();
 
     if (isEditing) {
-      put(`/usuarios/${usuario.ID_Usuario}`);
+      put(`/usuarios/${usuario.ID_Usuario}${listado}`);
     } else {
       post('/usuarios');
     }
@@ -36,7 +38,7 @@ export default function UsuariosForm({ usuario }: Props) {
       
       <div className="max-w-2xl mx-auto py-10">
         <div className="mb-8">
-            <Link href="/usuarios" className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
+            <Link href={`/usuarios${listado}`} className="text-sm font-bold text-[#00236f] flex items-center gap-1 hover:underline mb-4">
                 <span className="material-symbols-outlined !text-sm">arrow_back</span>
                 Volver a la lista
             </Link>
@@ -89,7 +91,7 @@ export default function UsuariosForm({ usuario }: Props) {
                 {/* Footer del Formulario */}
                 <div className="px-8 py-6 bg-slate-50 border-t border-slate-100 flex justify-end gap-4">
                     <Link 
-                        href="/usuarios" 
+                        href={`/usuarios${listado}`} 
                         className="px-6 py-3 text-sm font-bold text-slate-400 hover:text-slate-600 transition-colors"
                     >
                         CANCELAR
