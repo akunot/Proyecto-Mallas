@@ -35,3 +35,4 @@ phpunit.xml
 /nul
 docker-compose.override.yml
 /backups
+/brag-output
